@@ -1,0 +1,223 @@
+! rtl83xx: trying to reach 16-port "dlink des1016d" switch at 80:80:80:a7:56:9c@eth1
+!
+version rtl8316b
+!
+mac-address-table aging-time 300
+!
+rrcp enable
+rrcp echo enable
+no rrcp loop-detect enable
+!
+vlan enable
+vlan dot1q enable
+no vlan leaky arp
+no vlan leaky unicast
+no vlan leaky multicast
+no vlan untagged_frames drop
+no vlan invalid_vid drop
+!
+qos tos enable
+qos dot1p enable
+no qos flow-control-jam enable
+wrr-queue ratio 16:1
+!
+flowcontrol dot3x enable
+flowcontrol backpressure enable
+no storm-control broadcast enable
+no storm-control broadcast strict
+no storm-control multicast strict
+!
+interface FastEthernet0/1
+ no shutdown
+ switchport access vlan 101
+ switchport mode access
+ rate-limit input 100M
+ rate-limit output 100M
+ mac learning enable
+ no rrcp enable
+ mls qos cos 0
+ speed auto
+ duplex auto
+!
+interface FastEthernet0/2
+ no shutdown
+ switchport access vlan 102
+ switchport mode access
+ rate-limit input 100M
+ rate-limit output 100M
+ mac learning enable
+ no rrcp enable
+ mls qos cos 0
+ speed auto
+ duplex auto
+!
+interface FastEthernet0/3
+ no shutdown
+ switchport access vlan 103
+ switchport mode access
+ rate-limit input 100M
+ rate-limit output 100M
+ mac learning enable
+ no rrcp enable
+ mls qos cos 0
+ speed auto
+ duplex auto
+!
+interface FastEthernet0/4
+ no shutdown
+ switchport access vlan 104
+ switchport mode access
+ rate-limit input 100M
+ rate-limit output 100M
+ mac learning enable
+ no rrcp enable
+ mls qos cos 0
+ speed auto
+ duplex auto
+!
+interface FastEthernet0/5
+ no shutdown
+ switchport access vlan 105
+ switchport mode access
+ rate-limit input 256K
+ rate-limit output 128K
+ mac learning enable
+ no rrcp enable
+ mls qos cos 0
+ speed auto
+ duplex auto
+!
+interface FastEthernet0/6
+ no shutdown
+ switchport access vlan 106
+ switchport mode access
+ rate-limit input 1M
+ rate-limit output 512K
+ mac learning enable
+ no rrcp enable
+ mls qos cos 0
+ speed auto
+ duplex auto
+!
+interface FastEthernet0/7
+ no shutdown
+ switchport access vlan 107
+ switchport mode access
+ rate-limit input 100M
+ rate-limit output 100M
+ port monitor FastEthernet0/5 tx
+ port monitor FastEthernet0/8
+ mac learning enable
+ no rrcp enable
+ mls qos cos 7
+ speed auto
+ duplex auto
+!
+interface FastEthernet0/8
+ shutdown
+ switchport access vlan 108
+ switchport mode access
+ rate-limit input 100M
+ rate-limit output 100M
+ mac learning enable
+ no rrcp enable
+ mls qos cos 0
+ speed auto
+ duplex auto
+!
+interface FastEthernet0/9
+ shutdown
+ switchport access vlan 109
+ switchport mode access
+ rate-limit input 100M
+ rate-limit output 100M
+ mac learning enable
+ no rrcp enable
+ mls qos cos 0
+ speed auto
+ duplex auto
+!
+interface FastEthernet0/10
+ shutdown
+ switchport access vlan 110
+ switchport mode access
+ rate-limit input 100M
+ rate-limit output 100M
+ mac learning enable
+ no rrcp enable
+ mls qos cos 0
+ speed auto
+ duplex auto
+!
+interface FastEthernet0/11
+ no shutdown
+ switchport access vlan 111
+ switchport mode access
+ rate-limit input 100M
+ rate-limit output 100M
+ mac learning enable
+ no rrcp enable
+ mls qos cos 0
+ speed auto
+ duplex auto
+!
+interface FastEthernet0/12
+ no shutdown
+ switchport access vlan 112
+ switchport mode access
+ rate-limit input 100M
+ rate-limit output 100M
+ mac learning enable
+ no rrcp enable
+ mls qos cos 0
+ speed auto
+ duplex auto
+!
+interface FastEthernet0/13
+ no shutdown
+ switchport access vlan 113
+ switchport mode access
+ rate-limit input 100M
+ rate-limit output 100M
+ mac learning enable
+ no rrcp enable
+ mls qos cos 0
+ speed auto
+ duplex auto
+!
+interface FastEthernet0/14
+ no shutdown
+ switchport access vlan 114
+ switchport mode access
+ rate-limit input 100M
+ rate-limit output 100M
+ mac learning enable
+ no rrcp enable
+ mls qos cos 0
+ speed auto
+ duplex auto
+!
+interface FastEthernet0/15
+ no shutdown
+ switchport access vlan 115
+ switchport mode access
+ rate-limit input 100M
+ rate-limit output 100M
+ mac learning enable
+ no rrcp enable
+ mls qos cos 0
+ speed auto
+ duplex auto
+!
+interface FastEthernet0/16
+ no shutdown
+ switchport trunk allowed vlan 101,102,103,104,105,106,107,108,109,110,111,112,113,114,115
+ switchport mode trunk
+ rate-limit input 100M
+ rate-limit output 100M
+ mac learning enable
+ rrcp enable
+ mls qos cos 0
+ speed auto
+ duplex auto
+!

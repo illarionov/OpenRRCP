@@ -1,0 +1,23 @@
+------------------------ rtl83xx 0.1.90 ---------------------------------------
+Tue Sep 21 15:12:10 MSD 2006
+	* added rrcp_cli applcation to configure switch in cisco CLI-like fashion
+	  (not yet functional)
+	* code cleanup
+
+------------------------ rtl83xx 0.1 ------------------------------------------
+Wed Sep 20 13:01:58 MSD 2006
+	* added "show config" command - a first step in ongoing effort to make
+	  rrcp-enabled switches configurable in cisco catalyst-like fashion
+	  (see des1016d.config.txt file)
+	* added vlan command with subcommands status, enable_hvlan,
+	  enable_8021q sub-commands
+	* added specific support for switches:
+	    - D-Link DES-1024D
+	    - D-Link DES-1016D h/w rev. D1
+	    - Compex PS2216
+        * code cleanup
+	* added copyright clauses to each file and LICENCE file
+
+---------------------- rtl8326-0.0 --------------------------------------------
+Oct 7 2005
+	* first publuc release

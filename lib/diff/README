@@ -1,0 +1,12 @@
+libcli-1.8.6-autocompletion.diff
+
+This patch is for TAB-driven autocompletion support for
+libcli-1.8.6
+
+You do not need this patch to use allready patched
+version of libcli as it is distributed with OpenRRCP.
+However, you do need this patch if you want to upgrade
+to other version of libcli or to advocate inclusion
+of autocompletion support into mainline libcli.
+
+This patch is released under terms of GPL.

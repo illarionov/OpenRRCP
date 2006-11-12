@@ -323,6 +323,29 @@ void rtl83xx_setreg16reg16(unsigned short regno, unsigned short regval){
     rtl83xx_setreg16(regno, (unsigned long) regval);
 }
 
+int wait_eeprom(){
+int i;
+unsigned short res;
+
+ for(i=0;i<10;i++){
+  res=rtl83xx_readreg16(0x217);
+  if ((res&0x1000) == 0) return(res);
+  usleep(1000);
+ }
+ return(0xffff);
+}
+
+int do_write_eeprom(unsigned int addr,unsigned short data){
+
+ rtl83xx_setreg16(0x218,data>>8);
+ rtl83xx_setreg16(0x217,addr);
+ if ((wait_eeprom()&0x800)!=0) return 1;
+ rtl83xx_setreg16(0x218,data&0x00ff);
+ rtl83xx_setreg16(0x217,addr-1);
+ if ((wait_eeprom()&0x800)!=0) return 1;
+ return 0;
+}
+
 //returns 1 if got response
 unsigned long rtl83xx_ping(void){
     int i,len = 0;

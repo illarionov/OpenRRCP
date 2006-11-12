@@ -149,3 +149,4 @@ extern const char *wrr_ratio_text[4];
 extern struct t_swconfig swconfig;
 
 void do_show_config(void);
+void rrcp_swconfig_read_from_switch(void);

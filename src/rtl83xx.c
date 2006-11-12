@@ -334,6 +334,25 @@ void do_vlan_enable_vlan(int is_8021q, int root_port, int vid_base){
     rtl83xx_setreg16(0x037e,vlan_port_insert_vid.raw[1]);
 }
 
+void do_write_memory(){
+ int i,numreg;
+
+ numreg=(switchtypes[switchtype].num_ports==16)?12:13;
+ rrcp_swconfig_read_from_switch();
+ if (do_write_eeprom(0x0d,swconfig.rrcp_config.raw)) {printf("write eeprom\n");exit(1);}
+ if (do_write_eeprom(0x0f,swconfig.rrcp_byport_disable.raw[0])) {printf("write eeprom\n");exit(1);}
+ if (do_write_eeprom(0x11,swconfig.rrcp_byport_disable.raw[1])) {printf("write eeprom\n");exit(1);}
+ if (do_write_eeprom(0x23,swconfig.alt.raw[0])) {printf("write eeprom\n");exit(1);}
+ if (do_write_eeprom(0x29,swconfig.vlan.raw[0])) {printf("write eeprom\n");exit(1);}
+ if (do_write_eeprom(0x2f,swconfig.qos_config.raw)) {printf("write eeprom\n");exit(1);}
+ if (do_write_eeprom(0x31,swconfig.qos_port_priority.raw[0])) {printf("write eeprom\n");exit(1);}
+ if (do_write_eeprom(0x33,swconfig.qos_port_priority.raw[1])) {printf("write eeprom\n");exit(1);}
+ if (do_write_eeprom(0x39,swconfig.port_config_global.raw)) {printf("write eeprom\n");exit(1);}
+ for(i=0;i<numreg;i++){
+    if (do_write_eeprom(0x3b+i*2,swconfig.port_config.raw[i])) {printf("write eeprom\n");exit(1);}
+ }
+}
+
 int main(int argc, char **argv){
     unsigned int x[6];
     int i;
@@ -355,6 +374,7 @@ int main(int argc, char **argv){
 	printf(" link-status          - print link status for all ports\n");
 	printf(" counters             - print port rx/tx counters for all ports\n");
 	printf(" ping                 - test if switch is responding\n");
+        printf(" write memory         - save current config to EEPROM\n");
 	exit(0);
     }
     p=argv[0];
@@ -453,6 +473,16 @@ int main(int argc, char **argv){
 	}else{
 	    printf("Unknown sub-command: %s",argv[3]);
 	}
+    }else if(strcmp(argv[2],"write")==0){
+        if (argc<4){
+            printf("No sub-command specified! available subcommands are:\n");
+            printf("memory\n");
+        }
+        if(strcmp(argv[3],"memory")==0){
+            do_write_memory();
+        }else{
+            printf("Unknown sub-command: %s\n",argv[3]);
+        }
     }else{
 	printf("unknown command: %s\n",argv[2]);
     }

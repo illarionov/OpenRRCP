@@ -26,6 +26,12 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/time.h>
+
+#ifndef __linux__
+#include <sys/socket.h>
+#include <net/if.h>
+#endif
+
 #include <signal.h>
 #include <unistd.h>
 #include "rrcp_packet.h"

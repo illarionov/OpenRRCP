@@ -26,9 +26,9 @@ extern char ifname[128];
 extern unsigned char my_mac[6];
 extern unsigned char dest_mac[6];
 extern unsigned char mac_bcast[6];
-
+#ifdef __linux__
 extern unsigned int if_nametoindex (__const char *__ifname) __THROW;
-
+#endif
 // takes logical port number as printed on switch' case (1,2,3...)
 // returns physical port number (0,1,2...) or -1 if this device has no such logical port
 int map_port_number_from_logical_to_physical(int port);

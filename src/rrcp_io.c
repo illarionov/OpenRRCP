@@ -22,12 +22,21 @@
     This would be appreciated, however not required.
 */
 
+#include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/ioctl.h>
+
+#ifdef __linux__
 #include <linux/if.h>
 #include <linux/if_packet.h>
 #include <linux/if_ether.h>
 #include <linux/if_arp.h>
+#else
+#include <net/if.h>
+#include <pcap.h>
+#include <err.h>
+#endif
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -35,6 +44,11 @@
 #ifndef htonl
 #include <arpa/inet.h>
 #endif
+
+#ifndef __linux__
+#include <dnet.h>
+#endif
+
 #include <errno.h>
 #include "rrcp_packet.h"
 #include "rrcp_io.h"
@@ -49,7 +63,19 @@ unsigned int switchtype;
 
 int s,s_rec,s_send;
 
+#ifdef __linux__
 struct sockaddr_ll sockaddr_rec,sockaddr_send;
+#else
+eth_t                    *p_eth;
+pcap_t                   *handle;
+const u_char		 *rcvbuf;
+struct addr               intf_mac;
+char errbuf[PCAP_ERRBUF_SIZE];
+struct bpf_program filter;
+bpf_u_int32 mask;
+bpf_u_int32 net;
+char filter_app[512];
+#endif
 
 // takes logical port number as printed on switch' case (1,2,3...)
 // returns physical port number (0,1,2...) or -1 if this device has no such logical port
@@ -67,6 +93,7 @@ int map_port_number_from_physical_to_logical(int port){
     return -1;
 }
 
+#ifdef __linux__
 void rtl83xx_prepare(){
     struct ifreq ifr;
 
@@ -120,6 +147,52 @@ int sock_rec(void *ptr, int size, int waittick){
     printf("can't recvfrom!");
     _exit(1);
 }
+#else
+void rtl83xx_prepare(){
+
+ intf_mac.addr_type=ADDR_TYPE_ETH;
+ intf_mac.addr_bits=ETH_ADDR_BITS;
+ if ((p_eth = eth_open(ifname)) == NULL) errx(2, "eth_open");
+ if (eth_get(p_eth,&intf_mac.addr_eth) < 0) errx(2, "get intf MAC");
+ memcpy(my_mac,&intf_mac.addr_eth,ETH_ADDR_LEN);
+ memset(filter_app,0,sizeof(filter_app));
+ snprintf(filter_app, sizeof(filter_app), "ether proto 0x8899 and not ether src %s", addr_ntoa(&intf_mac));
+ if (pcap_lookupnet(ifname, &net, &mask, errbuf) < 0){ net = 0;mask = 0;}
+ if ((handle = pcap_open_live(ifname, 128, 0, 0, errbuf))== NULL) errx(2, "pcap_open_live: %s", errbuf);
+#if defined(BSD) && defined(BIOCIMMEDIATE)
+ {
+  int on = 1;
+  if (ioctl(pcap_fileno(handle), BIOCIMMEDIATE, &on) < 0) errx(2, "BIOCIMMEDIATE");
+ }
+#endif
+    if (pcap_compile(handle, &filter, filter_app, 1, mask) < 0) errx(2, "bad pcap filter: %s", pcap_geterr(handle));
+    if (pcap_setfilter(handle, &filter) < 0) errx(2, "bad pcap filter: %s", pcap_geterr(handle));
+}
+
+//send to wire
+ssize_t sock_send(void *ptr, int size){
+    int i,res;
+    for (i=0;i<3;i++){
+        res=eth_send(p_eth,ptr,size);
+	if (res!=-1) return res;
+	usleep(50000);
+    }
+    errx(2,"can't sendto!");
+}
+
+//recieve from wire, returns length
+int sock_rec(void *ptr, int size, int waittick){
+    int len=0;
+    struct pcap_pkthdr pkt_h;
+ 
+    rcvbuf=pcap_next(handle,&pkt_h);
+    if (rcvbuf==NULL) return 0;
+    if (pkt_h.caplen > size) len=size;
+    else len=pkt_h.caplen;
+    memcpy(ptr,rcvbuf,len);
+    return len;
+}
+#endif
 
 void rtl83xx_scan(int verbose){
     int len = 0;

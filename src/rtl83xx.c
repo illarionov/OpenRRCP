@@ -288,6 +288,11 @@ void do_vlan_enable_vlan(int is_8021q, int root_port, int vid_base){
 	vlan_status=(rtl83xx_readreg32(0x030b)|1)&~(1<<4);
     }
 
+    if (root_port < 0){
+      rtl83xx_setreg16reg16(0x030b,vlan_status);
+      return;
+    }
+
     vlan_port_output_tag.bitmap=0;
     vlan_port_insert_vid.bitmap=0;
     for(port=1;port<=switchtypes[switchtype].num_ports;port++){
@@ -357,6 +362,7 @@ int main(int argc, char **argv){
     unsigned int x[6];
     int i;
     char *p;
+    int root_port=-1;
 
     if (argc<3){
 	printf("Usage: rtl8316b <if-name|xx:xx:xx:xx:xx:xx@if-name> <command> [<argument>]\n");
@@ -369,8 +375,8 @@ int main(int argc, char **argv){
 	printf(" reboot                   - initiate switch reboot\n");
 	printf(" show config              - show current switch config\n");
 	printf(" vlan status              - show low-level vlan confg\n");
-	printf(" vlan enable_hvlan <port> - configure switch as home-vlan tree with specified uplink port\n");
-	printf(" vlan enable_8021q <port> - configure switch as IEEE 802.1Q vlan tree with specified uplink port\n");
+	printf(" vlan enable_hvlan [<port>] - configure switch as home-vlan tree with specified uplink port\n");
+	printf(" vlan enable_8021q [<port>] - configure switch as IEEE 802.1Q vlan tree with specified uplink port\n");
 	printf(" link-status          - print link status for all ports\n");
 	printf(" counters             - print port rx/tx counters for all ports\n");
 	printf(" ping                 - test if switch is responding\n");
@@ -456,9 +462,9 @@ int main(int argc, char **argv){
     }else if(strcmp(argv[2],"vlan")==0){
 	if (argc<4){
 	    printf("No sub-command specified! available subcommands are:\n");
-	    printf("vlan enable_hvlan <root-port>\n");
+	    printf("vlan enable_hvlan [<root-port>]\n");
 //	    printf("vlan enable_8021q <root-port>[,VID_base] *(VID_base is 100 by default)\n");
-	    printf("vlan enable_8021q <root-port>\n");
+	    printf("vlan enable_8021q [<root-port>]\n");
 	    printf("vlan status\n");
 	    return(1);
 	}
@@ -466,10 +472,13 @@ int main(int argc, char **argv){
 	    print_vlan_status();
 	}else if((strcmp(argv[3],"enable_hvlan")==0)||(strcmp(argv[3],"enable_8021q")==0)){
 	    if (argc<5){
-		printf("no root-port specified!\n");
-		return(1);
-	    }
-	    do_vlan_enable_vlan(strcmp(argv[3],"enable_8021q")==0,atoi(argv[4]),100);
+//		printf("no root-port specified!\n");
+//		return(1);
+                root_port=-1;
+            }else{
+                root_port=atoi(argv[4]);
+            }
+            do_vlan_enable_vlan(strcmp(argv[3],"enable_8021q")==0,root_port,100);
 	}else{
 	    printf("Unknown sub-command: %s",argv[3]);
 	}

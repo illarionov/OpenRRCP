@@ -358,11 +358,82 @@ void do_write_memory(){
  }
 }
 
+int str_portlist_to_array(char *list,unsigned short int *arr,unsigned int arrlen){
+short int i,k;
+char *s,*c,*n;
+char *d[16];
+unsigned int st,sp; 
+
+ s=list;
+ for (i=0;i<arrlen;i++) { *(arr+i)=0; }
+ for (i=0;i<strlen(s);i++){  //check allowed symbols
+  if ( ((s[i] >= '0') && (s[i] <= '9')) || (s[i] == ',') || (s[i] == '-') ) continue; 
+  return(1);
+ }
+ while(*s){
+  bzero(d,sizeof(d));
+  // parsing
+  if ( (c=strchr(s,',')) != NULL ) { k=c-s; n=c+1; }
+  else { k=strlen(s); n=s+k; }
+  if (k >= sizeof(d)) return(1);
+  memcpy(d,s,k);s=n;
+  // range of ports or one port?
+  if (strchr((char *)d,'-')!=NULL){ 
+   // range
+   if (sscanf((char *)d,"%u-%u",&st,&sp) != 2) return(2);
+   if ( !st || !sp || (st > sp) || (st > arrlen) || (sp > arrlen) ) return(3);
+   for (i=st;i<=sp;i++) { *(arr+i-1)=1; }
+  }else{
+   // one port
+   st=(unsigned int)strtoul((char *)d, (char **)NULL, 10);
+   if ( !st || (st > arrlen) ) return(3);
+   *(arr+st-1)=1;
+  }
+ }
+ return(0);
+}
+
+void do_restrict_rrcp(unsigned short int *arr){
+    int i;
+    union {
+        struct {
+            unsigned short low;
+            unsigned short high;
+        } doubleshort;
+        unsigned long signlelong;
+    } u;
+    u.signlelong=0;
+    for(i=0;i<switchtypes[switchtype].num_ports;i++){
+      u.signlelong|=(((~*(arr+map_port_number_from_physical_to_logical(i)-1))&0x1)<<i);
+    }
+    rtl83xx_setreg16(0x0201,u.doubleshort.low);
+    rtl83xx_setreg16(0x0202,u.doubleshort.high);
+}
+
+void print_rrcp_status(void){
+    int i;
+    union {
+        struct {
+            unsigned short low;
+            unsigned short high;
+        } doubleshort;
+        unsigned long signlelong;
+    } u;
+    u.doubleshort.low=rtl83xx_readreg16(0x0201);
+    u.doubleshort.high=rtl83xx_readreg16(0x0202);
+    for(i=1;i<=switchtypes[switchtype].num_ports;i++){
+      printf("%s/%-2d: ",ifname,i);
+      if ( ((u.signlelong>>(map_port_number_from_logical_to_physical(i)))&0x1) == 0) printf("ENABLED\n");
+      else printf("disable\n");
+    }
+}
+
 int main(int argc, char **argv){
     unsigned int x[6];
     int i;
     char *p;
     int root_port=-1;
+    unsigned short int rrcp_ena_port[26];
 
     if (argc<3){
 	printf("Usage: rtl8316b <if-name|xx:xx:xx:xx:xx:xx@if-name> <command> [<argument>]\n");
@@ -377,6 +448,8 @@ int main(int argc, char **argv){
 	printf(" vlan status              - show low-level vlan confg\n");
 	printf(" vlan enable_hvlan [<port>] - configure switch as home-vlan tree with specified uplink port\n");
 	printf(" vlan enable_8021q [<port>] - configure switch as IEEE 802.1Q vlan tree with specified uplink port\n");
+	printf(" restrict-rrcp <list ports> - enable rrcp on specified ports, disable on other\n");
+	printf(" restrict-rrcp status - print rrcp status for all ports\n");
 	printf(" link-status          - print link status for all ports\n");
 	printf(" counters             - print port rx/tx counters for all ports\n");
 	printf(" ping                 - test if switch is responding\n");
@@ -492,6 +565,23 @@ int main(int argc, char **argv){
         }else{
             printf("Unknown sub-command: %s\n",argv[3]);
         }
+    }else if(strcmp(argv[2],"restrict-rrcp")==0){
+        if (argc<4){
+            printf("No list of allowed-port specified!\n");
+        } else { 
+                 if(strcmp(argv[3],"status")==0){
+                  print_rrcp_status();
+                 }
+                 else if (str_portlist_to_array(argv[3],&rrcp_ena_port[0],switchtypes[switchtype].num_ports)==0){
+                   do_restrict_rrcp(&rrcp_ena_port[0]);
+                 }else{
+                   printf("Invalid list of ports. Valid form:\n");
+                   printf("                                  1         - one port\n");
+                   printf("                                  1,5, .. x - list port\n");
+                   printf("                                  1-5       - range of ports\n");
+                   printf("                                  1,5,8-10, .. x - mix list and range of ports\n");
+                 }
+               }
     }else{
 	printf("unknown command: %s\n",argv[2]);
     }

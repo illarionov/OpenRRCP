@@ -22,6 +22,9 @@
     This would be appreciated, however not required.
 */
 
+//#include <sys/types.h>
+#include <stdint.h>
+
 extern char ifname[128];
 extern unsigned char my_mac[6];
 extern unsigned char dest_mac[6];
@@ -45,14 +48,14 @@ void rtl83xx_prepare();
 
 void rtl83xx_scan(int verbose);
 
-unsigned long rtl83xx_readreg32(unsigned short regno);
+uint32_t rtl83xx_readreg32(uint16_t regno);
 
-unsigned short rtl83xx_readreg16(unsigned short regno);
+uint16_t rtl83xx_readreg16(uint16_t regno);
 
-void rtl83xx_setreg16(unsigned short regno, unsigned long regval);
+void rtl83xx_setreg16(uint16_t regno, uint32_t regval);
 
-void rtl83xx_setreg16reg16(unsigned short regno, unsigned short regval);
+void rtl83xx_setreg16reg16(uint16_t regno, uint16_t regval);
 
-int do_write_eeprom(unsigned int addr,unsigned short data);
+int do_write_eeprom(uint16_t addr,uint16_t data);
 
 unsigned long rtl83xx_ping(void);

@@ -22,36 +22,40 @@
     This would be appreciated, however not required.
 */
 
-#include <sys/types.h>
+//#include <sys/types.h>
+#include <stdint.h>
 
+#ifndef ETH_ALEN 
 #define ETH_ALEN 6
+#endif
+
 struct rrcp_packet_t
 {
-  u_int8_t  ether_dhost[ETH_ALEN];      /* destination eth addr */
-  u_int8_t  ether_shost[ETH_ALEN];      /* source ether addr    */
-  u_int16_t ether_type;                 /* must be 0x8899 */
-  u_int8_t  rrcp_proto;			/* must be 0x01         */
-  u_int8_t  rrcp_opcode:7;              /* 0x00 = hello, 0x01 = get, 0x02 = set */
-  u_int8_t  rrcp_isreply:1;             /* 0 = request to switch, 1 = reply from switch */
-  u_int16_t rrcp_authkey;		/* 0x2379 by default */
-  u_int16_t rrcp_reg_addr;		/* register address */
-  u_int32_t rrcp_reg_data;		/* register data */
-  u_int32_t stub;
+  uint8_t  ether_dhost[ETH_ALEN];      /* destination eth addr */
+  uint8_t  ether_shost[ETH_ALEN];      /* source ether addr    */
+  uint16_t ether_type;                 /* must be 0x8899 */
+  uint8_t  rrcp_proto;			/* must be 0x01         */
+  uint8_t  rrcp_opcode:7;              /* 0x00 = hello, 0x01 = get, 0x02 = set */
+  uint8_t  rrcp_isreply:1;             /* 0 = request to switch, 1 = reply from switch */
+  uint16_t rrcp_authkey;		/* 0x2379 by default */
+  uint16_t rrcp_reg_addr;		/* register address */
+  uint32_t rrcp_reg_data;		/* register data */
+  uint32_t stub;
 };
 
 struct rrcp_helloreply_packet_t
 {
-  u_int8_t  ether_dhost[ETH_ALEN];      /* destination eth addr */
-  u_int8_t  ether_shost[ETH_ALEN];      /* source ether addr    */
-  u_int16_t ether_type;                 /* must be 0x8899 */
-  u_int8_t  rrcp_proto;			/* must be 0x01         */
-  u_int8_t  rrcp_opcode:7;              /* 0x00 = hello, 0x01 = get, 0x02 = set */
-  u_int8_t  rrcp_isreply:1;             /* 0 = request to switch, 1 = reply from switch */
-  u_int16_t rrcp_authkey;		/* 0x2379 by default */
-  u_int8_t  rrcp_downlink_port;		/*  */
-  u_int8_t  rrcp_uplink_port;		/*  */
-  u_int8_t  rrcp_uplink_mac[ETH_ALEN];  /*  */
-  u_int16_t rrcp_chip_id;		/*  */
-  u_int32_t rrcp_vendor_id;		/*  */
-  u_int32_t stub;
+  uint8_t  ether_dhost[ETH_ALEN];      /* destination eth addr */
+  uint8_t  ether_shost[ETH_ALEN];      /* source ether addr    */
+  uint16_t ether_type;                 /* must be 0x8899 */
+  uint8_t  rrcp_proto;			/* must be 0x01         */
+  uint8_t  rrcp_opcode:7;              /* 0x00 = hello, 0x01 = get, 0x02 = set */
+  uint8_t  rrcp_isreply:1;             /* 0 = request to switch, 1 = reply from switch */
+  uint16_t rrcp_authkey;		/* 0x2379 by default */
+  uint8_t  rrcp_downlink_port;		/*  */
+  uint8_t  rrcp_uplink_port;		/*  */
+  uint8_t  rrcp_uplink_mac[ETH_ALEN];  /*  */
+  uint16_t rrcp_chip_id;		/*  */
+  uint32_t rrcp_vendor_id;		/*  */
+  uint32_t stub;
 };

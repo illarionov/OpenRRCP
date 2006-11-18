@@ -258,7 +258,7 @@ void rtl83xx_scan(int verbose){
     }
 }
 
-unsigned long rtl83xx_readreg32(unsigned short regno){
+uint32_t rtl83xx_readreg32(uint16_t regno){
     int len = 0;
     struct rrcp_packet_t pkt,pktr;
 
@@ -291,11 +291,11 @@ unsigned long rtl83xx_readreg32(unsigned short regno){
     }
 }
 
-unsigned short rtl83xx_readreg16(unsigned short regno){
-    return (unsigned short)rtl83xx_readreg32(regno);
+uint16_t rtl83xx_readreg16(uint16_t regno){
+    return (uint16_t)rtl83xx_readreg32(regno);
 }
 
-void rtl83xx_setreg16(unsigned short regno, unsigned long regval){
+void rtl83xx_setreg16(uint16_t regno, uint32_t regval){
     int cnt = 0;
     struct rrcp_packet_t pkt;
 
@@ -319,13 +319,13 @@ void rtl83xx_setreg16(unsigned short regno, unsigned long regval){
 //    _exit(0);
 }
 
-void rtl83xx_setreg16reg16(unsigned short regno, unsigned short regval){
-    rtl83xx_setreg16(regno, (unsigned long) regval);
+void rtl83xx_setreg16reg16(uint16_t regno, uint16_t regval){
+    rtl83xx_setreg16(regno, (uint32_t) regval);
 }
 
 int wait_eeprom(){
 int i;
-unsigned short res;
+uint16_t res;
 
  for(i=0;i<10;i++){
   res=rtl83xx_readreg16(0x217);
@@ -335,7 +335,7 @@ unsigned short res;
  return(0xffff);
 }
 
-int do_write_eeprom(unsigned int addr,unsigned short data){
+int do_write_eeprom(uint16_t addr,uint16_t data){
 
  rtl83xx_setreg16(0x218,data>>8);
  rtl83xx_setreg16(0x217,addr);

@@ -22,6 +22,9 @@
     This would be appreciated, however not required.
 */
 
+//#include <sys/types.h>
+#include <stdint.h>
+
 //chip types
 #define unknown 0
 #define rtl8316b 1
@@ -38,7 +41,7 @@ struct switchtype_t {
 };
 
 struct t_rtl83xx_port_link_status {
-	unsigned char	speed:2,
+	uint8_t	speed:2,
   		duplex:1,
   		reserved:1,
   		link:1,
@@ -47,6 +50,35 @@ struct t_rtl83xx_port_link_status {
   		auto_negotiation:1;
 };
 
+union t_vlan_port_vlan {
+        uint8_t  index[26];
+        uint16_t raw[13];
+};
+
+union t_vlan_port_output_tag {
+        uint64_t bitmap;
+        uint16_t raw[4];
+};
+
+union t_vlan_entry {
+        uint32_t bitmap[32];
+        uint16_t raw[64];
+};
+
+union t_vlan_port_insert_vid {
+        uint32_t bitmap;
+        uint16_t raw[2];
+};
+
+union t_rrcp_status {
+        struct {
+            uint16_t  low;
+            uint16_t  high;
+        } doubleshort;
+        uint32_t signlelong;
+} ;
+
 extern struct switchtype_t switchtypes[5];
 
 extern unsigned int switchtype;
+

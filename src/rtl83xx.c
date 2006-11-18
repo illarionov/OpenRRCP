@@ -68,15 +68,7 @@ void dumpmem(void *ptr, int len){
 }
 
 void print_port_link_status(int port_no, int enabled, unsigned char encoded_status){
-    struct t_rtl83xx_port_link_status {
-	unsigned char	speed:2,
-  		duplex:1,
-  		reserved:1,
-  		link:1,
-  		flow_control:1,
-  		asy_pause:1,
-  		auto_negotiation:1;
-    };
+
     struct t_rtl83xx_port_link_status stat;
     memcpy(&stat,&encoded_status,1);
     printf("%s/%-2d: ",ifname,port_no);
@@ -109,15 +101,15 @@ void print_port_link_status(int port_no, int enabled, unsigned char encoded_stat
 void print_link_status(void){
     int i;
     union {
-	unsigned short sh[13];
-	unsigned char  ch[26];
+	uint16_t sh[13];
+	uint8_t  ch[26];
     } r;
     union {
         struct {
-            unsigned short low;
-            unsigned short high;
+            uint16_t low;
+            uint16_t high;
 	} doubleshort;
-        unsigned long signlelong;
+        uint32_t signlelong;
     } u;
     u.doubleshort.low=rtl83xx_readreg16(0x0608);
     u.doubleshort.high=rtl83xx_readreg16(0x0609);
@@ -150,9 +142,9 @@ void print_counters(void){
 	port_tr=map_port_number_from_logical_to_physical(i);
 	printf("%s/%-2d: %11lu %11lu %11lu\n",
 		ifname,i,
-		rtl83xx_readreg32(0x070d+port_tr),
-		rtl83xx_readreg32(0x0727+port_tr),
-		rtl83xx_readreg32(0x0741+port_tr));
+		(unsigned long)rtl83xx_readreg32(0x070d+port_tr),
+		(unsigned long)rtl83xx_readreg32(0x0727+port_tr),
+		(unsigned long)rtl83xx_readreg32(0x0741+port_tr));
     }
     return;
 }
@@ -174,23 +166,11 @@ void print_vlan_status(void){
     int i,port,port_phys;
 
     unsigned short vlan_status;
-    union {
-	unsigned char index[26];
-	unsigned short raw[13];
-    } vlan_port_vlan;
-    union {
-	unsigned long long bitmap;
-	unsigned short raw[4];
-    } vlan_port_output_tag;
-    union {
-	unsigned long bitmap[32];
-	unsigned short raw[64];
-    } vlan_entry;
+    union t_vlan_port_vlan vlan_port_vlan;
+    union t_vlan_port_output_tag vlan_port_output_tag;
+    union t_vlan_entry vlan_entry;
     unsigned short vlan_vid[32];
-    union {
-	unsigned long bitmap;
-	unsigned short raw[2];
-    } vlan_port_insert_vid;
+    union t_vlan_port_insert_vid vlan_port_insert_vid;
 
     char *vlan_port_output_tag_descr[4]={
 	"strip_all(00)",
@@ -263,23 +243,11 @@ void print_vlan_status(void){
 void do_vlan_enable_vlan(int is_8021q, int root_port, int vid_base){
     int i,port,vlan,port_phys,root_port_phys;
     unsigned short vlan_status;
-    union {
-	unsigned char index[26];
-	unsigned short raw[13];
-    } vlan_port_vlan;
-    union {
-	unsigned long long bitmap;
-	unsigned short raw[4];
-    } vlan_port_output_tag;
-    union {
-	unsigned long bitmap[32];
-	unsigned short raw[64];
-    } vlan_entry;
+    union t_vlan_port_vlan vlan_port_vlan;
+    union t_vlan_port_output_tag vlan_port_output_tag;
+    union t_vlan_entry vlan_entry;
     unsigned short vlan_vid[32];
-    union {
-	unsigned long bitmap;
-	unsigned short raw[2];
-    } vlan_port_insert_vid;
+    union t_vlan_port_insert_vid vlan_port_insert_vid;
 
     //fill-up local data structures
     if (is_8021q){
@@ -395,13 +363,8 @@ unsigned int st,sp;
 
 void do_restrict_rrcp(unsigned short int *arr){
     int i;
-    union {
-        struct {
-            unsigned short low;
-            unsigned short high;
-        } doubleshort;
-        unsigned long signlelong;
-    } u;
+    union t_rrcp_status u;
+
     u.signlelong=0;
     for(i=0;i<switchtypes[switchtype].num_ports;i++){
       u.signlelong|=(((~*(arr+map_port_number_from_physical_to_logical(i)-1))&0x1)<<i);
@@ -412,13 +375,8 @@ void do_restrict_rrcp(unsigned short int *arr){
 
 void print_rrcp_status(void){
     int i;
-    union {
-        struct {
-            unsigned short low;
-            unsigned short high;
-        } doubleshort;
-        unsigned long signlelong;
-    } u;
+    union t_rrcp_status u;
+
     u.doubleshort.low=rtl83xx_readreg16(0x0201);
     u.doubleshort.high=rtl83xx_readreg16(0x0202);
     for(i=1;i<=switchtypes[switchtype].num_ports;i++){

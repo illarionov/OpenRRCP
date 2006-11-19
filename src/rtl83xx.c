@@ -311,7 +311,7 @@ void do_write_memory(){
  int i,numreg;
 
  numreg=(switchtypes[switchtype].num_ports==16)?12:13;
- rrcp_swconfig_read_from_switch();
+ rrcp_config_read_from_switch();
  if (do_write_eeprom(0x0d,swconfig.rrcp_config.raw)) {printf("write eeprom\n");exit(1);}
  if (do_write_eeprom(0x0f,swconfig.rrcp_byport_disable.raw[0])) {printf("write eeprom\n");exit(1);}
  if (do_write_eeprom(0x11,swconfig.rrcp_byport_disable.raw[1])) {printf("write eeprom\n");exit(1);}

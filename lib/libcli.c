@@ -195,7 +195,6 @@ int cli_set_configmode(struct cli_def *cli, int mode, char *config_desc)
 int cli_build_shortest(struct cli_def *cli, struct cli_command *commands)
 {
 	struct cli_command *c, *p;
-
 	for (c = commands; c; c = c->next)
 	{
 		for (c->unique_len = 1; c->unique_len <= strlen(c->command); c->unique_len++)
@@ -531,11 +530,13 @@ int cli_parse_line(char *line, char *words[], int max_words)
 
 int cli_find_command(struct cli_def *cli, struct cli_command *commands, int num_words, char *words[], int start_word, int filters[])
 {
-	struct cli_command *c;
+	struct cli_command *c=NULL;
 	int c_words = num_words;
+	int m=0;
 
 	if (filters[0])
 		c_words = filters[0];
+
 
 	// Deal with ? for help
 	if (!words[start_word]) { return CLI_ERROR; }
@@ -552,17 +553,23 @@ int cli_find_command(struct cli_def *cli, struct cli_command *commands, int num_
 		return CLI_OK;
 	}
 
-	for (c = commands; c; c = c->next)
 	{
-		if (cli->privilege < c->privilege)
-			continue;
-
-		if (strncasecmp(c->command, words[start_word], c->unique_len))
-			continue;
-			
-		if (strncasecmp(c->command, words[start_word], strlen(words[start_word])))
-			continue;
-
+		struct cli_command *c2;
+		for (c2 = commands; c2; c2 = c2->next)
+		{
+			if (cli->privilege < c2->privilege)
+				continue;
+			if (c2->mode != cli->mode && c2->mode != MODE_ANY)
+				continue;
+			if (strncasecmp(c2->command, words[start_word], strlen(words[start_word]))==0){
+			    m++;
+			    c=c2;
+			}
+		}
+	}
+	//continule only if there is exactly one match
+	if (m==1)
+	{
 		// drop out of config submode
 		if (cli->mode > MODE_CONFIG && c->mode == MODE_CONFIG)
 			cli_set_configmode(cli, MODE_CONFIG, NULL);

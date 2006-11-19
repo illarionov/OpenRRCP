@@ -23,6 +23,7 @@
 */
 
 #include <stdio.h>
+#include <stdarg.h>
 #include <string.h>
 #include "rrcp_io.h"
 #include "rrcp_switches.h"
@@ -34,7 +35,7 @@ const char *wrr_ratio_text[4]={"4:1","8:1","16:1","1:0"};
 struct t_swconfig swconfig;
 
 ////////////// read all relevant config from switch into our data structures    
-void rrcp_swconfig_read_from_switch(void)
+void rrcp_config_read_from_switch(void)
 {
     int i;
     
@@ -79,16 +80,27 @@ void rrcp_swconfig_read_from_switch(void)
     }
 }
 
-void do_show_config(void)
+void sncprintf(char *str, size_t size, const char *format, ...) {
+    char line[1024];
+    va_list ap;
+
+    line[0]=0;
+    va_start(ap, format);
+    vsnprintf (line, size, format, ap);
+    va_end(ap);
+    if (size>(strlen(str)+strlen(line)+1)){
+	strncat(str,line,sizeof(line));
+    }
+}
+
+void rrcp_config_bin2text(char *s, int l)
 {
     int i,port,port_phys,port2,port2_phys;
 
-    rrcp_swconfig_read_from_switch();
-
-    printf("!\n");
+    sprintf(s,"!\n");
     {
-        printf("version %s\n",switchtypes[switchtype].chip_name);
-	printf("!\n");
+        sncprintf(s,l,"version %s\n",switchtypes[switchtype].chip_name);
+	sncprintf(s,l,"!\n");
     }
     {
 	int mac_aging_time=-1;
@@ -99,47 +111,47 @@ void do_show_config(void)
 	}else{
 	    mac_aging_time=300;
 	}
-        printf("mac-address-table aging-time %d\n",mac_aging_time);
-	printf("!\n");
+        sncprintf(s,l,"mac-address-table aging-time %d\n",mac_aging_time);
+	sncprintf(s,l,"!\n");
     }
     {
-	printf("%srrcp enable\n", swconfig.rrcp_config.config.rrcp_disable ? "no ":"");
-	printf("%srrcp echo enable\n", swconfig.rrcp_config.config.echo_disable ? "no ":"");
-	printf("%srrcp loop-detect enable\n", swconfig.rrcp_config.config.loop_enable ? "":"no ");
-	printf("!\n");
+	sncprintf(s,l,"%srrcp enable\n", swconfig.rrcp_config.config.rrcp_disable ? "no ":"");
+	sncprintf(s,l,"%srrcp echo enable\n", swconfig.rrcp_config.config.echo_disable ? "no ":"");
+	sncprintf(s,l,"%srrcp loop-detect enable\n", swconfig.rrcp_config.config.loop_enable ? "":"no ");
+	sncprintf(s,l,"!\n");
     }
     {
-	printf("%svlan enable\n", swconfig.vlan.s.config.enable ? "":"no ");
-	printf("%svlan dot1q enable\n", swconfig.vlan.s.config.dot1q ? "":"no ");
-	printf("%svlan leaky arp\n", swconfig.vlan.s.config.arp_leaky ? "":"no ");
-	printf("%svlan leaky unicast\n", swconfig.vlan.s.config.unicast_leaky ? "":"no ");
-	printf("%svlan leaky multicast\n", swconfig.vlan.s.config.multicast_leaky ? "":"no ");
-	printf("%svlan untagged_frames drop\n", swconfig.vlan.s.config.drop_untagged_frames ? "":"no ");
-	printf("%svlan invalid_vid drop\n", swconfig.vlan.s.config.ingress_filtering ? "":"no ");
-	printf("!\n");
+	sncprintf(s,l,"%svlan enable\n", swconfig.vlan.s.config.enable ? "":"no ");
+	sncprintf(s,l,"%svlan dot1q enable\n", swconfig.vlan.s.config.dot1q ? "":"no ");
+	sncprintf(s,l,"%svlan leaky arp\n", swconfig.vlan.s.config.arp_leaky ? "":"no ");
+	sncprintf(s,l,"%svlan leaky unicast\n", swconfig.vlan.s.config.unicast_leaky ? "":"no ");
+	sncprintf(s,l,"%svlan leaky multicast\n", swconfig.vlan.s.config.multicast_leaky ? "":"no ");
+	sncprintf(s,l,"%svlan untagged_frames drop\n", swconfig.vlan.s.config.drop_untagged_frames ? "":"no ");
+	sncprintf(s,l,"%svlan invalid_vid drop\n", swconfig.vlan.s.config.ingress_filtering ? "":"no ");
+	sncprintf(s,l,"!\n");
     }
     {
-	printf("%sqos tos enable\n", swconfig.qos_config.config.tos_enable ? "":"no ");
-	printf("%sqos dot1p enable\n", swconfig.qos_config.config.dot1p_enable ? "":"no ");
-	printf("%sqos flow-control-jam enable\n", swconfig.qos_config.config.flow_control_jam ? "":"no ");
-	printf("wrr-queue ratio %s\n", wrr_ratio_text[swconfig.qos_config.config.wrr_ratio]);
-	printf("!\n");
+	sncprintf(s,l,"%sqos tos enable\n", swconfig.qos_config.config.tos_enable ? "":"no ");
+	sncprintf(s,l,"%sqos dot1p enable\n", swconfig.qos_config.config.dot1p_enable ? "":"no ");
+	sncprintf(s,l,"%sqos flow-control-jam enable\n", swconfig.qos_config.config.flow_control_jam ? "":"no ");
+	sncprintf(s,l,"wrr-queue ratio %s\n", wrr_ratio_text[swconfig.qos_config.config.wrr_ratio]);
+	sncprintf(s,l,"!\n");
     }
     {
-	printf("%sflowcontrol dot3x enable\n", swconfig.port_config_global.config.flow_dot3x_disable ? "no ":"");
-	printf("%sflowcontrol backpressure enable\n", swconfig.port_config_global.config.flow_backpressure_disable ? "no ":"");
-	printf("%sstorm-control broadcast enable\n", swconfig.port_config_global.config.storm_control_broadcast_disable ? "no ":"");
-	printf("%sstorm-control broadcast strict\n", swconfig.port_config_global.config.storm_control_broadcast_strict ? "":"no ");
-	printf("%sstorm-control multicast strict\n", swconfig.port_config_global.config.storm_control_multicast_strict ? "":"no ");
-	printf("!\n");
+	sncprintf(s,l,"%sflowcontrol dot3x enable\n", swconfig.port_config_global.config.flow_dot3x_disable ? "no ":"");
+	sncprintf(s,l,"%sflowcontrol backpressure enable\n", swconfig.port_config_global.config.flow_backpressure_disable ? "no ":"");
+	sncprintf(s,l,"%sstorm-control broadcast enable\n", swconfig.port_config_global.config.storm_control_broadcast_disable ? "no ":"");
+	sncprintf(s,l,"%sstorm-control broadcast strict\n", swconfig.port_config_global.config.storm_control_broadcast_strict ? "":"no ");
+	sncprintf(s,l,"%sstorm-control multicast strict\n", swconfig.port_config_global.config.storm_control_multicast_strict ? "":"no ");
+	sncprintf(s,l,"!\n");
     }
 
     for(port=1;port<=switchtypes[switchtype].num_ports;port++){
 	int is_trunk;
 	port_phys=map_port_number_from_logical_to_physical(port);
 	is_trunk=swconfig.vlan_port_insert_vid.bitmap&(1<<port_phys);
-	printf("interface FastEthernet0/%d\n",port);
-	printf(" %sshutdown\n", (swconfig.port_disable.bitmap&(1<<port_phys)) ? "":"no ");
+	sncprintf(s,l,"interface FastEthernet0/%d\n",port);
+	sncprintf(s,l," %sshutdown\n", (swconfig.port_disable.bitmap&(1<<port_phys)) ? "":"no ");
 	if (is_trunk){
 	    char vlanlist[256],s[16];
 	    vlanlist[0]=0;
@@ -152,49 +164,57 @@ void do_show_config(void)
 		    strcat(vlanlist,s);
 		}		
 	    }
-	    printf(" switchport trunk allowed vlan %s\n",vlanlist);
+	    sncprintf(s,l," switchport trunk allowed vlan %s\n",vlanlist);
 	}else{
-	    printf(" switchport access vlan %d\n",swconfig.vlan_vid[swconfig.vlan.s.port_vlan_index[port_phys]]);
+	    sncprintf(s,l," switchport access vlan %d\n",swconfig.vlan_vid[swconfig.vlan.s.port_vlan_index[port_phys]]);
 	}
-	printf(" switchport mode %s\n",is_trunk ? "trunk":"access");
-	printf(" rate-limit input %s\n",bandwidth_text[swconfig.bandwidth.rxtx[port_phys].rx]);
-	printf(" rate-limit output %s\n",bandwidth_text[swconfig.bandwidth.rxtx[port_phys].tx]);
+	sncprintf(s,l," switchport mode %s\n",is_trunk ? "trunk":"access");
+	sncprintf(s,l," rate-limit input %s\n",bandwidth_text[swconfig.bandwidth.rxtx[port_phys].rx]);
+	sncprintf(s,l," rate-limit output %s\n",bandwidth_text[swconfig.bandwidth.rxtx[port_phys].tx]);
 	if (swconfig.port_monitor.sniff.sniffer & (1<<port_phys)){
 	    for(port2=1;port2<=switchtypes[switchtype].num_ports;port2++){
 		port2_phys=map_port_number_from_logical_to_physical(port2);
 		if ((swconfig.port_monitor.sniff.sniffed_rx & (1<<port2_phys))&&
 		    (swconfig.port_monitor.sniff.sniffed_tx & (1<<port2_phys))){
-		    printf(" port monitor FastEthernet0/%d\n", port2);
+		    sncprintf(s,l," port monitor FastEthernet0/%d\n", port2);
 		}else if (swconfig.port_monitor.sniff.sniffed_rx & (1<<port2_phys)){
-		    printf(" port monitor FastEthernet0/%d rx\n", port2);
+		    sncprintf(s,l," port monitor FastEthernet0/%d rx\n", port2);
 		}else if (swconfig.port_monitor.sniff.sniffed_tx & (1<<port2_phys)){
-		    printf(" port monitor FastEthernet0/%d tx\n", port2);
+		    sncprintf(s,l," port monitor FastEthernet0/%d tx\n", port2);
 		}
 	    }
 	}
 	if (swconfig.alt.s.alt_control&(1<<port_phys)){
-	    printf(" no mac learning enable\n");
+	    sncprintf(s,l," no mac learning enable\n");
 	}else{
-	    printf(" mac learning enable\n");
+	    sncprintf(s,l," mac learning enable\n");
 	}
 	if (swconfig.rrcp_byport_disable.bitmap&(1<<port_phys)){
-	    printf(" no rrcp enable\n");
+	    sncprintf(s,l," no rrcp enable\n");
 	}else{
-	    printf(" rrcp enable\n");
+	    sncprintf(s,l," rrcp enable\n");
 	}
-	printf(" mls qos cos %d\n", (swconfig.qos_port_priority.bitmap & (1<<port_phys)) ? 7:0);
+	sncprintf(s,l," mls qos cos %d\n", (swconfig.qos_port_priority.bitmap & (1<<port_phys)) ? 7:0);
 	if (swconfig.port_config.config[port_phys].autoneg){
-	    printf(" speed auto\n duplex auto\n");
+	    sncprintf(s,l," speed auto\n duplex auto\n");
 	}else if (swconfig.port_config.config[port_phys].media_100full){
-	    printf(" speed 100\n duplex full\n");
+	    sncprintf(s,l," speed 100\n duplex full\n");
 	}else if (swconfig.port_config.config[port_phys].media_100half){
-	    printf(" speed 100\n duplex half\n");
+	    sncprintf(s,l," speed 100\n duplex half\n");
 	}else if (swconfig.port_config.config[port_phys].media_10full){
-	    printf(" speed 10\n duplex full\n");
+	    sncprintf(s,l," speed 10\n duplex full\n");
 	}else if (swconfig.port_config.config[port_phys].media_10half){
-	    printf(" speed 10\n duplex half\n");
+	    sncprintf(s,l," speed 10\n duplex half\n");
 	}
-	printf("!\n");
+	sncprintf(s,l,"!\n");
     }
 }
 
+void do_show_config(void)
+{
+    char text[32768];
+
+    rrcp_config_read_from_switch();
+    rrcp_config_bin2text(text,sizeof(text));
+    printf("%s",text);
+}

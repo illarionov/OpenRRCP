@@ -134,19 +134,19 @@ ssize_t sock_send(void *ptr, int size){
 }
 
 //recieve from wire, returns length
-int sock_rec(void *ptr, int size, int waittick){
+int sock_rec_(void *ptr, int size, int waittick){
     int i,res=0,len=0;
     for (i=0;i<10;i++){
 	res=recvfrom(s_rec, ptr, size, MSG_DONTWAIT, (struct sockaddr*)&sockaddr_rec, (unsigned int *)&len);
 	if (res==-1){
 	    usleep(waittick);
 	}else{
-	    return len;
+	    break;
 	}
     }
-    printf("can't recvfrom!");
-    _exit(1);
+    return len;
 }
+
 #else
 void rtl83xx_prepare(){
 
@@ -181,7 +181,7 @@ ssize_t sock_send(void *ptr, int size){
 }
 
 //recieve from wire, returns length
-int sock_rec(void *ptr, int size, int waittick){
+int sock_rec_(void *ptr, int size, int waittick){
     int len=0;
     struct pcap_pkthdr pkt_h;
  
@@ -194,15 +194,38 @@ int sock_rec(void *ptr, int size, int waittick){
 }
 #endif
 
+int sock_rec(void *ptr, int size, int waittick){
+    int len=0;
+    len=sock_rec_(ptr, size, waittick);
+    if (!len) {
+       printf("can't recvfrom!\n");
+       exit(1);
+    }
+    return len;
+}
+
 void rtl83xx_scan(int verbose){
+    typedef struct sw_reply SW_REPLY;
+    struct sw_reply { 
+     struct rrcp_helloreply_packet_t pktr;
+     SW_REPLY *prev;
+    };
     int len = 0;
-    int cnt_replies = 0;
+    int cnt_h_replies = 0;
+    int cnt_r_replies = 0;
+    int rep;
     struct rrcp_packet_t pkt;
     struct rrcp_helloreply_packet_t pktr;
+    SW_REPLY *hello_reply=NULL;
+    SW_REPLY *rep_reply=NULL;
+    SW_REPLY *current=NULL;
+    SW_REPLY *next_rep_reply;
 
     memcpy(pkt.ether_dhost,mac_bcast,6);
     memcpy(pkt.ether_shost,my_mac,6);
     pkt.ether_type=htons(0x8899);
+
+/* scan based on Hello packets */
     pkt.rrcp_proto=0x01;
     pkt.rrcp_opcode=0x00;
     pkt.rrcp_isreply=0;
@@ -210,14 +233,10 @@ void rtl83xx_scan(int verbose){
 
     sock_send(&pkt, sizeof(pkt));
 
-    if (verbose){
-	printf("  switch MAC/port        via MAC/port      vendor_id/chip_id\n");
-    }
-
     usleep(1000);
     while(1){
 	memset(&pktr,0,sizeof(pktr));
-	len=sock_rec(&pktr, sizeof(pktr),5000);
+	len=sock_rec_(&pktr, sizeof(pktr),5000);
 	if (len >14 &&
 	    (memcmp(pktr.ether_dhost,my_mac,6)==0)&&
 	    pktr.ether_type==htons(0x8899) &&
@@ -225,36 +244,131 @@ void rtl83xx_scan(int verbose){
 	    pktr.rrcp_opcode==0x00 &&
 	    pktr.rrcp_isreply==1 &&
 	    pktr.rrcp_authkey==htons(0x2379)){
+              if ( (hello_reply=malloc(sizeof(SW_REPLY))) == NULL ) { printf("malloc\n"); _exit(1); }
+              memcpy(&hello_reply->pktr,&pktr,sizeof(pktr));
+              hello_reply->prev=current;
+              current=hello_reply;
+	      cnt_h_replies++;
+	} else break;
+    }
+
+/* scan based on REP packets */
+    current=NULL;
+    pkt.rrcp_proto=0x02;
+    pkt.rrcp_opcode=0x00;
+    pkt.rrcp_isreply=0;
+    pkt.rrcp_authkey=0x0000;
+
+    sock_send(&pkt, sizeof(pkt));
+
+    usleep(1000);
+    while(1){
+	memset(&pktr,0,sizeof(pktr));
+	len=sock_rec_(&pktr, sizeof(pktr),5000);
+	if (len >14 &&
+	    (memcmp(pktr.ether_dhost,my_mac,6)==0)&&
+	    pktr.ether_type==htons(0x8899) &&
+	    pktr.rrcp_proto==0x02 &&
+	    pktr.rrcp_opcode==0x00 &&
+	    pktr.rrcp_isreply==1 ){
+              if ( (rep_reply=malloc(sizeof(SW_REPLY))) == NULL ) { printf("malloc\n"); _exit(1); }
+              memcpy(&rep_reply->pktr,&pktr,sizeof(pktr));
+              rep_reply->prev=current;
+              current=rep_reply;
+	      cnt_r_replies++;
+	} else break;
+    }
+
+/* print result */
+    if (cnt_h_replies || cnt_r_replies){
+       if (verbose){
+  	   printf("  switch MAC/port        via MAC/port      vendor_id/chip_id REP\n");
+       }else{
+           printf("  switch MAC      Hello REP\n");
+       }
+    }else{
+       printf("No switch found.\n");
+       return;
+    }
+    if (cnt_h_replies){
+       while (hello_reply != NULL){
+                // We have REP reply from this switch?
+                next_rep_reply=NULL;
+                current=rep_reply;
+                rep=0;
+                while (current != NULL){
+                 if (memcmp(&hello_reply->pktr.ether_shost,&current->pktr.ether_shost,6)==0){
+                    rep++; 
+                    if (next_rep_reply == NULL){
+                      rep_reply=rep_reply->prev;
+                    }else{
+                      next_rep_reply->prev=current->prev;
+                    }
+                    free(current);
+                    break;
+                 }else{
+                  next_rep_reply=current;
+                  current=current->prev;
+                 }
+                }
+
 		if (verbose){
-		    printf("%02x:%02x:%02x:%02x:%02x:%02x/%-2d %02x:%02x:%02x:%02x:%02x:%02x/%-2d 0x%08x/0x%04x\n",
-			pktr.ether_shost[0],
-			pktr.ether_shost[1],
-			pktr.ether_shost[2],
-			pktr.ether_shost[3],
-			pktr.ether_shost[4],
-			pktr.ether_shost[5],
-			map_port_number_from_physical_to_logical(pktr.rrcp_downlink_port),
-			pktr.rrcp_uplink_mac[0],
-			pktr.rrcp_uplink_mac[1],
-			pktr.rrcp_uplink_mac[2],
-			pktr.rrcp_uplink_mac[3],
-			pktr.rrcp_uplink_mac[4],
-			pktr.rrcp_uplink_mac[5],
-			map_port_number_from_physical_to_logical(pktr.rrcp_uplink_port),
-//			pktr.rrcp_uplink_port,
-			pktr.rrcp_vendor_id,
-			pktr.rrcp_chip_id);
+		    printf("%02x:%02x:%02x:%02x:%02x:%02x/%-2d %02x:%02x:%02x:%02x:%02x:%02x/%-2d 0x%08x/0x%04x  %s\n",
+			hello_reply->pktr.ether_shost[0],
+			hello_reply->pktr.ether_shost[1],
+			hello_reply->pktr.ether_shost[2],
+			hello_reply->pktr.ether_shost[3],
+			hello_reply->pktr.ether_shost[4],
+			hello_reply->pktr.ether_shost[5],
+			map_port_number_from_physical_to_logical(hello_reply->pktr.rrcp_downlink_port),
+			hello_reply->pktr.rrcp_uplink_mac[0],
+			hello_reply->pktr.rrcp_uplink_mac[1],
+			hello_reply->pktr.rrcp_uplink_mac[2],
+			hello_reply->pktr.rrcp_uplink_mac[3],
+			hello_reply->pktr.rrcp_uplink_mac[4],
+			hello_reply->pktr.rrcp_uplink_mac[5],
+			map_port_number_from_physical_to_logical(hello_reply->pktr.rrcp_uplink_port),
+			hello_reply->pktr.rrcp_vendor_id,
+			hello_reply->pktr.rrcp_chip_id,
+                        (rep)?"Yes":"No");
 		}else{
-		    printf("%02x:%02x:%02x:%02x:%02x:%02x\n",
-			pktr.ether_shost[0],
-			pktr.ether_shost[1],
-			pktr.ether_shost[2],
-			pktr.ether_shost[3],
-			pktr.ether_shost[4],
-			pktr.ether_shost[5]);
+		    printf("%02x:%02x:%02x:%02x:%02x:%02x   +    %c\n",
+			hello_reply->pktr.ether_shost[0],
+			hello_reply->pktr.ether_shost[1],
+			hello_reply->pktr.ether_shost[2],
+			hello_reply->pktr.ether_shost[3],
+			hello_reply->pktr.ether_shost[4],
+			hello_reply->pktr.ether_shost[5],
+                        (rep)?'+':'-');
 		}
-		cnt_replies++;
-	}
+            current=hello_reply->prev;
+            free(hello_reply);
+            hello_reply=current;
+       }
+    }
+    if (cnt_r_replies){
+       while (rep_reply != NULL){
+                if (verbose){
+                    printf("%02x:%02x:%02x:%02x:%02x:%02x    No hello-reply, RRCP disable?           Yes\n",
+			rep_reply->pktr.ether_shost[0],
+			rep_reply->pktr.ether_shost[1],
+			rep_reply->pktr.ether_shost[2],
+			rep_reply->pktr.ether_shost[3],
+			rep_reply->pktr.ether_shost[4],
+			rep_reply->pktr.ether_shost[5]);
+                }else{
+		    printf("%02x:%02x:%02x:%02x:%02x:%02x   -    +\n",
+			rep_reply->pktr.ether_shost[0],
+			rep_reply->pktr.ether_shost[1],
+			rep_reply->pktr.ether_shost[2],
+			rep_reply->pktr.ether_shost[3],
+			rep_reply->pktr.ether_shost[4],
+			rep_reply->pktr.ether_shost[5]);
+                }
+            current=rep_reply->prev;
+            free(rep_reply);
+            rep_reply=current;
+       }
     }
 }
 

@@ -94,9 +94,20 @@ void sncprintf(char *str, size_t size, const char *format, ...) {
     }
 }
 
+char *rrcp_config_get_portname(char *buffer, int buffer_size, int port_number, int port_number_phys)
+{
+    if (port_number_phys<=23){
+	snprintf(buffer,buffer_size,"FastEthernet0/%d",port_number);
+    }else{
+	snprintf(buffer,buffer_size,"GigabitEthernet0/%d",port_number);
+    }
+    return buffer;
+}
+
 void rrcp_config_bin2text(char *sc, int l)
 {
     int i,port,port_phys,port2,port2_phys;
+    char pn[64];
 
     sprintf(sc,"!\n");
     {
@@ -148,40 +159,46 @@ void rrcp_config_bin2text(char *sc, int l)
     }
 
     for(port=1;port<=switchtypes[switchtype].num_ports;port++){
-    int is_trunk=0;
+	int is_trunk=0;
 	port_phys=map_port_number_from_logical_to_physical(port);
 	is_trunk=(swconfig.vlan_port_insert_vid.bitmap&(1<<port_phys))>>port_phys;
-	sncprintf(sc,l,"interface FastEthernet0/%d\n",port);
+	sncprintf(sc,l,"interface %s\n",rrcp_config_get_portname(pn,sizeof(pn),port,port_phys));
 	sncprintf(sc,l," %sshutdown\n", (swconfig.port_disable.bitmap&(1<<port_phys)) ? "":"no ");
-	if (is_trunk){
-	    char vlanlist[256],s[16];
-	    vlanlist[0]=0;
-	    for(i=0;i<32;i++){
-		if(swconfig.vlan_entry.bitmap[i]&(1<<port_phys)){
-		    sprintf(s,"%d",swconfig.vlan_vid[i]);
-		    if (vlanlist[0]!=0){
-			strcat(vlanlist,",");
+	if (swconfig.vlan.s.config.enable){
+	    //print vlan-related lines only if vlans are enabled globally by this config
+	    if (is_trunk){
+		char vlanlist[256],s[16];
+		vlanlist[0]=0;
+		for(i=0;i<32;i++){
+		    if(swconfig.vlan_entry.bitmap[i]&(1<<port_phys)){
+			sprintf(s,"%d",swconfig.vlan_vid[i]);
+			if (vlanlist[0]!=0){
+			    strcat(vlanlist,",");
+			}
+			strcat(vlanlist,s);
 		    }
-		    strcat(vlanlist,s);
-		}		
+		}
+		sncprintf(sc,l," switchport trunk allowed vlan %s\n",vlanlist);
+	    }else{
+		sncprintf(sc,l," switchport access vlan %d\n",swconfig.vlan_vid[swconfig.vlan.s.port_vlan_index[port_phys]]);
 	    }
-	    sncprintf(sc,l," switchport trunk allowed vlan %s\n",vlanlist);
-	}else{
-	    sncprintf(sc,l," switchport access vlan %d\n",swconfig.vlan_vid[swconfig.vlan.s.port_vlan_index[port_phys]]);
+	    sncprintf(sc,l," switchport mode %s\n",is_trunk ? "trunk":"access");
 	}
-	sncprintf(sc,l," switchport mode %s\n",is_trunk ? "trunk":"access");
 	sncprintf(sc,l," rate-limit input %s\n",bandwidth_text[swconfig.bandwidth.rxtx[port_phys].rx]);
 	sncprintf(sc,l," rate-limit output %s\n",bandwidth_text[swconfig.bandwidth.rxtx[port_phys].tx]);
-	if (swconfig.port_monitor.sniff.sniffer & (1<<port_phys)){
-	    for(port2=1;port2<=switchtypes[switchtype].num_ports;port2++){
-		port2_phys=map_port_number_from_logical_to_physical(port2);
-		if ((swconfig.port_monitor.sniff.sniffed_rx & (1<<port2_phys))&&
-		    (swconfig.port_monitor.sniff.sniffed_tx & (1<<port2_phys))){
-		    sncprintf(sc,l," port monitor FastEthernet0/%d\n", port2);
-		}else if (swconfig.port_monitor.sniff.sniffed_rx & (1<<port2_phys)){
-		    sncprintf(sc,l," port monitor FastEthernet0/%d rx\n", port2);
-		}else if (swconfig.port_monitor.sniff.sniffed_tx & (1<<port2_phys)){
-		    sncprintf(sc,l," port monitor FastEthernet0/%d tx\n", port2);
+	if (switchtypes[switchtype].chip_id==rtl8316b){
+	    //port mirroring working only with rtl8316b
+	    if (swconfig.port_monitor.sniff.sniffer & (1<<port_phys)){
+		for(port2=1;port2<=switchtypes[switchtype].num_ports;port2++){
+		    port2_phys=map_port_number_from_logical_to_physical(port2);
+		    if ((swconfig.port_monitor.sniff.sniffed_rx & (1<<port2_phys))&&
+			(swconfig.port_monitor.sniff.sniffed_tx & (1<<port2_phys))){
+			sncprintf(sc,l," port monitor %s\n", rrcp_config_get_portname(pn,sizeof(pn),port2,port2_phys));
+		    }else if (swconfig.port_monitor.sniff.sniffed_rx & (1<<port2_phys)){
+			sncprintf(sc,l," port monitor %s rx\n", rrcp_config_get_portname(pn,sizeof(pn),port2,port2_phys));
+		    }else if (swconfig.port_monitor.sniff.sniffed_tx & (1<<port2_phys)){
+			sncprintf(sc,l," port monitor %s tx\n", rrcp_config_get_portname(pn,sizeof(pn),port2,port2_phys));
+		    }
 		}
 	    }
 	}

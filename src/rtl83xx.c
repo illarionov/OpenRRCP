@@ -207,12 +207,13 @@ void print_vlan_status(void){
 	    (vlan_status & 1<<4) ? "yes" : "no");
     for (port=1;port<=switchtypes[switchtype].num_ports;port++){
 	port_phys=map_port_number_from_logical_to_physical(port);
+	//insert_vid option is available only in rtl8316b
 	printf("%s/%-2d: VLAN_IDX=%02d, VID=%d, Insert_VID=%s, Out_tag_strip=%s\n",
 		ifname,
 		port,
 		vlan_port_vlan.index[port_phys],
 		vlan_vid[vlan_port_vlan.index[port_phys]],
-		vlan_port_insert_vid.bitmap&(1<<port_phys) ? "yes" : "no",
+		(switchtypes[switchtype].chip_id==rtl8316b) ? (vlan_port_insert_vid.bitmap&(1<<port_phys) ? "yes" : "no ") : "N/A",
 		vlan_port_output_tag_descr[(vlan_port_output_tag.bitmap>>(port_phys*2))&3]
 		);
     }
@@ -400,18 +401,18 @@ int main(int argc, char **argv){
 	printf("       rtl83xx_dlink_des1024d ----\"\"----\n");
 	printf("       rtl83xx_compex_ps2216 ----\"\"----\n");
 	printf(" where command may be:\n");
-	printf(" scan [verbose]           - scan network for rrcp-enabled switches\n");
-	printf(" reboot                   - initiate switch reboot\n");
-	printf(" show config              - show current switch config\n");
-	printf(" vlan status              - show low-level vlan confg\n");
+	printf(" scan [verbose]             - scan network for rrcp-enabled switches\n");
+	printf(" reboot                     - initiate switch reboot\n");
+	printf(" show config [full|verbose] - show current switch config\n");
+	printf(" vlan status                - show low-level vlan confg\n");
 	printf(" vlan enable_hvlan [<port>] - configure switch as home-vlan tree with specified uplink port\n");
 	printf(" vlan enable_8021q [<port>] - configure switch as IEEE 802.1Q vlan tree with specified uplink port\n");
 	printf(" restrict-rrcp <list ports> - enable rrcp on specified ports, disable on other\n");
-	printf(" restrict-rrcp status - print rrcp status for all ports\n");
-	printf(" link-status          - print link status for all ports\n");
-	printf(" counters             - print port rx/tx counters for all ports\n");
-	printf(" ping                 - test if switch is responding\n");
-        printf(" write memory         - save current config to EEPROM\n");
+	printf(" restrict-rrcp status       - print rrcp status for all ports\n");
+	printf(" link-status                - print link status for all ports\n");
+	printf(" counters                   - print port rx/tx counters for all ports\n");
+	printf(" ping                       - test if switch is responding\n");
+        printf(" write memory               - save current config to EEPROM\n");
 	exit(0);
     }
     p=argv[0];
@@ -486,7 +487,11 @@ int main(int argc, char **argv){
 	    return(1);
 	}
 	if(strcmp(argv[3],"config")==0){
-	    do_show_config();
+	    if ((argc==5)&&((strcmp(argv[4],"full")==0)||(strcmp(argv[4],"verbose")==0))){
+		do_show_config(1);
+	    }else{
+		do_show_config(0);
+	    }
 	}else{
 	    printf("Unknown sub-command: %s",argv[3]);
 	}

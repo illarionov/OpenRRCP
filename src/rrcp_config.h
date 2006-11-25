@@ -149,6 +149,6 @@ extern const char *wrr_ratio_text[4];
 extern struct t_swconfig swconfig;
 
 void rrcp_config_read_from_switch(void);
-void rrcp_config_bin2text(char *s, int l);
+void rrcp_config_bin2text(char *text_buffer, int buffer_length, int show_defaults);
 
-void do_show_config(void);
+void do_show_config(int verbose);

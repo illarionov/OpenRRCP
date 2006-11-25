@@ -104,7 +104,7 @@ char *rrcp_config_get_portname(char *buffer, int buffer_size, int port_number, i
     return buffer;
 }
 
-void rrcp_config_bin2text(char *sc, int l)
+void rrcp_config_bin2text(char *sc, int l, int show_defaults)
 {
     int i,port,port_phys,port2,port2_phys;
     char pn[64];
@@ -134,10 +134,19 @@ void rrcp_config_bin2text(char *sc, int l)
     }
     {
 	sncprintf(sc,l,"%svlan enable\n", swconfig.vlan.s.config.enable ? "":"no ");
+	if ((switchtypes[switchtype].chip_id!=rtl8316b)&&swconfig.vlan.s.config.dot1q){
+	    sncprintf(sc,l,"! WARNING: dot1q VLANs enabled on hardware, that do not support them properly !\n");
+	}
 	sncprintf(sc,l,"%svlan dot1q enable\n", swconfig.vlan.s.config.dot1q ? "":"no ");
-	sncprintf(sc,l,"%svlan leaky arp\n", swconfig.vlan.s.config.arp_leaky ? "":"no ");
-	sncprintf(sc,l,"%svlan leaky unicast\n", swconfig.vlan.s.config.unicast_leaky ? "":"no ");
-	sncprintf(sc,l,"%svlan leaky multicast\n", swconfig.vlan.s.config.multicast_leaky ? "":"no ");
+	if (show_defaults || swconfig.vlan.s.config.arp_leaky){
+	    sncprintf(sc,l,"%svlan leaky arp\n", swconfig.vlan.s.config.arp_leaky ? "":"no ");
+	}
+	if (show_defaults || swconfig.vlan.s.config.unicast_leaky){
+	    sncprintf(sc,l,"%svlan leaky unicast\n", swconfig.vlan.s.config.unicast_leaky ? "":"no ");
+	}
+	if (show_defaults || swconfig.vlan.s.config.multicast_leaky){
+	    sncprintf(sc,l,"%svlan leaky multicast\n", swconfig.vlan.s.config.multicast_leaky ? "":"no ");
+	}
 	sncprintf(sc,l,"%svlan untagged_frames drop\n", swconfig.vlan.s.config.drop_untagged_frames ? "":"no ");
 	sncprintf(sc,l,"%svlan invalid_vid drop\n", swconfig.vlan.s.config.ingress_filtering ? "":"no ");
 	sncprintf(sc,l,"!\n");
@@ -163,7 +172,9 @@ void rrcp_config_bin2text(char *sc, int l)
 	port_phys=map_port_number_from_logical_to_physical(port);
 	is_trunk=(swconfig.vlan_port_insert_vid.bitmap&(1<<port_phys))>>port_phys;
 	sncprintf(sc,l,"interface %s\n",rrcp_config_get_portname(pn,sizeof(pn),port,port_phys));
-	sncprintf(sc,l," %sshutdown\n", (swconfig.port_disable.bitmap&(1<<port_phys)) ? "":"no ");
+	if (show_defaults || (swconfig.port_disable.bitmap&(1<<port_phys))){
+	    sncprintf(sc,l," %sshutdown\n", (swconfig.port_disable.bitmap&(1<<port_phys)) ? "":"no ");
+	}
 	if (swconfig.vlan.s.config.enable){
 	    //print vlan-related lines only if vlans are enabled globally by this config
 	    if (is_trunk){
@@ -184,8 +195,12 @@ void rrcp_config_bin2text(char *sc, int l)
 	    }
 	    sncprintf(sc,l," switchport mode %s\n",is_trunk ? "trunk":"access");
 	}
-	sncprintf(sc,l," rate-limit input %s\n",bandwidth_text[swconfig.bandwidth.rxtx[port_phys].rx]);
-	sncprintf(sc,l," rate-limit output %s\n",bandwidth_text[swconfig.bandwidth.rxtx[port_phys].tx]);
+	if (show_defaults || swconfig.bandwidth.rxtx[port_phys].rx!=0){
+	    sncprintf(sc,l," rate-limit input %s\n",bandwidth_text[swconfig.bandwidth.rxtx[port_phys].rx]);
+	}
+	if (show_defaults || swconfig.bandwidth.rxtx[port_phys].tx!=0){
+	    sncprintf(sc,l," rate-limit output %s\n",bandwidth_text[swconfig.bandwidth.rxtx[port_phys].tx]);
+	}
 	if (switchtypes[switchtype].chip_id==rtl8316b){
 	    //port mirroring working only with rtl8316b
 	    if (swconfig.port_monitor.sniff.sniffer & (1<<port_phys)){
@@ -202,19 +217,19 @@ void rrcp_config_bin2text(char *sc, int l)
 		}
 	    }
 	}
-	if (swconfig.alt.s.alt_control&(1<<port_phys)){
-	    sncprintf(sc,l," no mac learning enable\n");
-	}else{
-	    sncprintf(sc,l," mac learning enable\n");
+	if (show_defaults || (swconfig.alt.s.alt_control&(1<<port_phys))){
+	    sncprintf(sc,l," %smac learning enable\n",(swconfig.alt.s.alt_control&(1<<port_phys)) ? "no ":"");
 	}
-	if (swconfig.rrcp_byport_disable.bitmap&(1<<port_phys)){
-	    sncprintf(sc,l," no rrcp enable\n");
-	}else{
-	    sncprintf(sc,l," rrcp enable\n");
+	if (show_defaults || !(swconfig.rrcp_byport_disable.bitmap&(1<<port_phys))){
+	    sncprintf(sc,l," %srrcp enable\n",(swconfig.rrcp_byport_disable.bitmap&(1<<port_phys)) ? "no ":"");
 	}
-	sncprintf(sc,l," mls qos cos %d\n", (swconfig.qos_port_priority.bitmap & (1<<port_phys)) ? 7:0);
+	if (show_defaults || (swconfig.qos_port_priority.bitmap & (1<<port_phys))){
+	    sncprintf(sc,l," mls qos cos %d\n", (swconfig.qos_port_priority.bitmap & (1<<port_phys)) ? 7:0);
+	}
 	if (swconfig.port_config.config[port_phys].autoneg){
-	    sncprintf(sc,l," speed auto\n duplex auto\n");
+	    if (show_defaults){
+		sncprintf(sc,l," speed auto\n duplex auto\n");
+	    }
 	}else if (swconfig.port_config.config[port_phys].media_100full){
 	    sncprintf(sc,l," speed 100\n duplex full\n");
 	}else if (swconfig.port_config.config[port_phys].media_100half){
@@ -228,13 +243,13 @@ void rrcp_config_bin2text(char *sc, int l)
     }
 }
 
-void do_show_config(void)
+void do_show_config(int verbose)
 {
     char *text;
 
     text=malloc(65536);
     rrcp_config_read_from_switch();
-    rrcp_config_bin2text(text,65535);
+    rrcp_config_bin2text(text,65535,verbose);
     printf("%s",text);
     free(text);
 }

@@ -79,6 +79,7 @@ union t_rrcp_status {
 } ;
 
 extern struct switchtype_t switchtypes[5];
+extern const int switchtype_n;
 
 extern unsigned int switchtype;
 

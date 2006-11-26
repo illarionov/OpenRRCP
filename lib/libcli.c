@@ -537,7 +537,6 @@ int cli_find_command(struct cli_def *cli, struct cli_command *commands, int num_
 	if (filters[0])
 		c_words = filters[0];
 
-
 	// Deal with ? for help
 	if (!words[start_word]) { return CLI_ERROR; }
 	if (words[start_word][strlen(words[start_word])-1] == '?')
@@ -594,10 +593,16 @@ int cli_find_command(struct cli_def *cli, struct cli_command *commands, int num_
 			{
 				if (start_word == c_words - 1)
 				{
-					cli_error(cli, "Incomplete command: \"%s\"", cli_command_name(cli, c));
-					return CLI_ERROR;
+					if (!c->callback)
+					{
+						cli_error(cli, "Incomplete command: \"%s\"", cli_command_name(cli, c));
+						return CLI_ERROR;
+					}
 				}
-				return cli_find_command(cli, c->children, num_words, words, start_word + 1, filters);
+				else
+				{
+				    return cli_find_command(cli, c->children, num_words, words, start_word + 1, filters);
+				}
 			}
 
 			if (!c->callback)

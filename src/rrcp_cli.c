@@ -135,7 +135,7 @@ int main(int argc, char *argv[])
 	return 1;
     }
 
-    switchtype=1;
+    switchtype=-1;
     while(1) {
 	char c;
 	c = getopt_long (argc, argv, "t:",
@@ -178,15 +178,38 @@ int main(int argc, char *argv[])
 	exit(0);
     }
 
-    printf("! rtl83xx: trying to reach %d-port \"%s %s\" switch at %s\n",
-	    switchtypes[switchtype].num_ports,
-	    switchtypes[switchtype].vendor,
-	    switchtypes[switchtype].model,
-	    ifname);
 
-    printf("Fetching current config from switch\n");
     engage_timeout(10);
     rtl83xx_prepare();
+
+    if (switchtype==-1){
+	switchtype=rrcp_switch_autodetect();
+	printf("detected %s %s\n",
+	    switchtypes[switchtype].vendor,
+	    switchtypes[switchtype].model);
+    }else{
+	if(switchtypes[switchtype].chip_id!=rrcp_switch_autodetect_chip()){
+	    printf("%s: ERROR - Chip mismatch\n"
+		    "Specified switch: %s %s\n"
+		    "Specified chip: %s\n"
+		    "Detected chip: '%s'\n",
+		    argv[0],
+		    switchtypes[switchtype].vendor,
+		    switchtypes[switchtype].model,
+		    switchtypes[switchtype].chip_name,
+		    "");
+	    exit(0);
+	}
+    }
+    {
+	char s[64];
+	sprintf(s,"%s_%s",
+	    switchtypes[switchtype].vendor,
+	    switchtypes[switchtype].model);
+	cli_set_hostname(cli,s);
+    }
+
+    printf("Fetching current config from switch\n");
     rrcp_config_read_from_switch();
     myPid = 0; //clear timeout handler
     

@@ -133,37 +133,56 @@ void rrcp_config_bin2text(char *sc, int l, int show_defaults)
 	sncprintf(sc,l,"!\n");
     }
     {
-	sncprintf(sc,l,"%svlan enable\n", swconfig.vlan.s.config.enable ? "":"no ");
-	if ((switchtypes[switchtype].chip_id!=rtl8316b)&&swconfig.vlan.s.config.dot1q){
-	    sncprintf(sc,l,"! WARNING: dot1q VLANs enabled on hardware, that do not support them properly !\n");
+	if (swconfig.vlan.s.config.enable){
+	    if (swconfig.vlan.s.config.dot1q){
+		if (switchtypes[switchtype].chip_id!=rtl8316b){
+		    sncprintf(sc,l,"! WARNING: 802.1Q VLANs enabled on hardware, that do not support them properly.\n");
+		    sncprintf(sc,l,"! WARNING: Read here: http://openrrcp.org.ru/wiki:rtl8326_dot1q_bug for details.\n");
+		    sncprintf(sc,l,"vlan dot1q force\n");
+		}else{
+		    sncprintf(sc,l,"vlan dot1q\n");
+		}
+	    }else{
+		sncprintf(sc,l,"vlan portbased\n");
+	    }
+	}else{
+	    sncprintf(sc,l,"no vlan\n");
 	}
-	sncprintf(sc,l,"%svlan dot1q enable\n", swconfig.vlan.s.config.dot1q ? "":"no ");
 	if (show_defaults || swconfig.vlan.s.config.arp_leaky){
 	    sncprintf(sc,l,"%svlan leaky arp\n", swconfig.vlan.s.config.arp_leaky ? "":"no ");
-	}
-	if (show_defaults || swconfig.vlan.s.config.unicast_leaky){
-	    sncprintf(sc,l,"%svlan leaky unicast\n", swconfig.vlan.s.config.unicast_leaky ? "":"no ");
 	}
 	if (show_defaults || swconfig.vlan.s.config.multicast_leaky){
 	    sncprintf(sc,l,"%svlan leaky multicast\n", swconfig.vlan.s.config.multicast_leaky ? "":"no ");
 	}
-	sncprintf(sc,l,"%svlan untagged_frames drop\n", swconfig.vlan.s.config.drop_untagged_frames ? "":"no ");
-	sncprintf(sc,l,"%svlan invalid_vid drop\n", swconfig.vlan.s.config.ingress_filtering ? "":"no ");
+	if (show_defaults || swconfig.vlan.s.config.unicast_leaky){
+	    sncprintf(sc,l,"%svlan leaky unicast\n", swconfig.vlan.s.config.unicast_leaky ? "":"no ");
+	}
+	if (show_defaults || swconfig.vlan.s.config.drop_untagged_frames){
+	    sncprintf(sc,l,"%svlan drop untagged_frames\n", swconfig.vlan.s.config.drop_untagged_frames ? "":"no ");
+	}
+	if (show_defaults || !swconfig.vlan.s.config.ingress_filtering){
+	    sncprintf(sc,l,"%svlan drop invalid_vid\n", swconfig.vlan.s.config.ingress_filtering ? "":"no ");
+	}
 	sncprintf(sc,l,"!\n");
     }
     {
-	sncprintf(sc,l,"%sqos tos enable\n", swconfig.qos_config.config.tos_enable ? "":"no ");
-	sncprintf(sc,l,"%sqos dot1p enable\n", swconfig.qos_config.config.dot1p_enable ? "":"no ");
-	sncprintf(sc,l,"%sqos flow-control-jam enable\n", swconfig.qos_config.config.flow_control_jam ? "":"no ");
+	sncprintf(sc,l,"%sqos tos\n", swconfig.qos_config.config.tos_enable ? "":"no ");
+	sncprintf(sc,l,"%sqos dot1p\n", swconfig.qos_config.config.dot1p_enable ? "":"no ");
+	if (show_defaults || swconfig.qos_config.config.flow_control_jam){
+	    sncprintf(sc,l,"%sqos flow-control-jam\n", swconfig.qos_config.config.flow_control_jam ? "":"no ");
+	}
 	sncprintf(sc,l,"wrr-queue ratio %s\n", wrr_ratio_text[swconfig.qos_config.config.wrr_ratio]);
 	sncprintf(sc,l,"!\n");
     }
     {
-	sncprintf(sc,l,"%sflowcontrol dot3x enable\n", swconfig.port_config_global.config.flow_dot3x_disable ? "no ":"");
-	sncprintf(sc,l,"%sflowcontrol backpressure enable\n", swconfig.port_config_global.config.flow_backpressure_disable ? "no ":"");
-	sncprintf(sc,l,"%sstorm-control broadcast enable\n", swconfig.port_config_global.config.storm_control_broadcast_disable ? "no ":"");
-	sncprintf(sc,l,"%sstorm-control broadcast strict\n", swconfig.port_config_global.config.storm_control_broadcast_strict ? "":"no ");
-	sncprintf(sc,l,"%sstorm-control multicast strict\n", swconfig.port_config_global.config.storm_control_multicast_strict ? "":"no ");
+	sncprintf(sc,l,"%sflowcontrol dot3x\n", swconfig.port_config_global.config.flow_dot3x_disable ? "no ":"");
+	sncprintf(sc,l,"%sflowcontrol backpressure\n", swconfig.port_config_global.config.flow_backpressure_disable ? "no ":"");
+	if (swconfig.port_config_global.config.storm_control_broadcast_disable){
+	    sncprintf(sc,l,"no storm-control broadcast\n");
+	}else{
+	    sncprintf(sc,l,"storm-control broadcast %s\n", swconfig.port_config_global.config.storm_control_broadcast_strict ? "strict":"relaxed");
+	}
+	sncprintf(sc,l,"%sstorm-control multicast\n", swconfig.port_config_global.config.storm_control_multicast_strict ? "":"no ");
 	sncprintf(sc,l,"!\n");
     }
 

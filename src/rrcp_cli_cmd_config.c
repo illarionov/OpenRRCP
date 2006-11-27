@@ -45,23 +45,35 @@ int cmd_rate_limit(struct cli_def *cli, char *command, char *argv[], int argc)
 
 int cmd_config_int(struct cli_def *cli, char *command, char *argv[], int argc)
 {
-	if (argc < 1)
-	{
-		cli_print(cli, "Specify an interface to configure");
-		return CLI_OK;
-	}
-	if (strcmp(argv[0], "?") == 0)
-	{
-		cli_print(cli, "  Fa0/1");
-		return CLI_OK;
-	}
-	else if (strcasecmp(argv[0], "fa0/1") == 0)
-	{
-		cli_set_configmode(cli, MODE_CONFIG_INT, "0/1");
-	}
-	else
-		cli_print(cli, "Unknown interface %s", argv[0]);
+    if (argc < 1){
+	cli_print(cli, "Specify an interface to configure");
 	return CLI_OK;
+    }
+    if (strcmp(argv[0], "?") == 0){
+	int i;
+	char s1[30],s2[30];
+	for(i=0;i<switchtypes[switchtype].num_ports;i+=2){
+	    cli_print(cli,"%-19s %-19s",rrcp_config_get_portname(s1, sizeof(s1), i+1, i),rrcp_config_get_portname(s2, sizeof(s2), i+2, i+1));
+	}
+	cli_print(cli,"<%d-%d> - reference interface by its number",1,i);
+	return CLI_OK;
+    }else{
+	char *a=argv[0];
+	int int_num=0;
+	char s[10];
+	if ((strlen(a)>0)&&('0'<=(a[strlen(a)-1]))&&((a[strlen(a)-1])<='9'))
+	    int_num+=a[strlen(a)-1]-'0';
+	if ((strlen(a)>1)&&('0'<=(a[strlen(a)-2]))&&((a[strlen(a)-2])<='9'))
+	    int_num+=10*(a[strlen(a)-2]-'0');
+	if (int_num>0 && int_num<=switchtypes[switchtype].num_ports){
+	    sprintf(s,"0/%d",int_num);
+	    cli_set_configmode(cli, MODE_CONFIG, NULL);
+	    cli_set_configmode(cli, MODE_CONFIG_INT, s);
+	}else{
+	    cli_print(cli, "Unknown interface %s", argv[0]);
+	}
+    }
+    return CLI_OK;
 }
 
 int cmd_config_version(struct cli_def *cli, char *command, char *argv[], int argc)
@@ -70,6 +82,20 @@ int cmd_config_version(struct cli_def *cli, char *command, char *argv[], int arg
 	if (strcmp(switchtypes[switchtype].chip_name,argv[0])!=0){
 	    cli_print(cli, "%%SYS-4-CONFIG_MISMATCH: Configuration from chip '%s' may not be correctly understood on current chip '%s'", argv[0], switchtypes[switchtype].chip_name);
 	}
+    }
+    return CLI_OK;
+}
+
+int cmd_config_hostname(struct cli_def *cli, char *command, char *argv[], int argc)
+{
+    if (argc==1){
+	if (strcmp(argv[0],"?")==0){
+	    cli_print(cli, "Set system's network host name");
+	}else{
+	    cli_set_hostname(cli,argv[0]);
+	}
+    }else{
+	cli_print(cli, "%% Invalid hostname specification");
     }
     return CLI_OK;
 }
@@ -89,7 +115,7 @@ int cmd_config_mac_aging(struct cli_def *cli, char *command, char *argv[], int a
 	    swconfig.alt.s.alt_config.mac_aging_disable=0;
 	    swconfig.alt.s.alt_config.mac_aging_fast=0;
 	}else{
-	    cli_print(cli, "%% Invalid input detected.");
+	    cli_print(cli, "%% Invalid aging time '%s', can be only 0,12 or 300.",argv[0]);
 	}
     }
     return CLI_OK;
@@ -98,7 +124,11 @@ int cmd_config_mac_aging(struct cli_def *cli, char *command, char *argv[], int a
 int cmd_config_rrcp(struct cli_def *cli, char *command, char *argv[], int argc)
 {
     if (argc>0){
-	cli_print(cli, "%% Invalid input detected.");
+	if (strcmp(argv[0],"?")==0){
+	    cli_print(cli, "<CR>");
+	}else{
+	    cli_print(cli, "%% Invalid input detected.");
+	}
     }else{
 	if (strcasecmp(command,"rrcp enable")==0)    swconfig.rrcp_config.config.rrcp_disable=0;
 	if (strcasecmp(command,"no rrcp enable")==0) swconfig.rrcp_config.config.rrcp_disable=1;
@@ -106,6 +136,172 @@ int cmd_config_rrcp(struct cli_def *cli, char *command, char *argv[], int argc)
 	if (strcasecmp(command,"no rrcp echo enable")==0) swconfig.rrcp_config.config.echo_disable=1;
 	if (strcasecmp(command,"rrcp loop-detect enable")==0)    swconfig.rrcp_config.config.loop_enable=1;
 	if (strcasecmp(command,"no rrcp loop-detect enable")==0) swconfig.rrcp_config.config.loop_enable=0;
+    }
+    return CLI_OK;
+}
+
+int cmd_config_vlan(struct cli_def *cli, char *command, char *argv[], int argc)
+{
+    if (argc>0){
+	if (strcmp(argv[0],"?")==0){
+	    cli_print(cli, "<CR>");
+	}else{
+	    cli_print(cli, "%% Invalid input detected.");
+	}
+    }else{
+	if (strcasecmp(command,"no vlan")==0) {
+	    swconfig.vlan.s.config.dot1q=0;
+	    swconfig.vlan.s.config.enable=0;
+	    swconfig.vlan.s.config.drop_untagged_frames=0;
+	    swconfig.vlan.s.config.ingress_filtering=0;
+	}
+	if (strcasecmp(command,"vlan portbased")==0) {swconfig.vlan.s.config.dot1q=0; swconfig.vlan.s.config.enable=1;}
+	if (strcasecmp(command,"vlan dot1q")==0){
+	    if (switchtypes[switchtype].chip_id!=rtl8316b){
+		cli_print(cli, "%% IEEE 802.1Q VLANs not supported properly on this hardware. Use 'force' to persevere");
+		return CLI_ERROR;
+	    }else{
+	        swconfig.vlan.s.config.dot1q=1;
+		swconfig.vlan.s.config.enable=1;
+	    }
+	}
+	if (strcasecmp(command,"vlan dot1q force")==0){
+	    if (switchtypes[switchtype].chip_id!=rtl8316b){
+		cli_print(cli, "%% WARNING: Enabled IEEE 802.1Q VLANs on hardware, that do not supported them properly");
+	    }
+	    swconfig.vlan.s.config.dot1q=1;
+	    swconfig.vlan.s.config.enable=1;
+	}
+    }
+    return CLI_OK;
+}
+
+int cmd_config_vlan_leaky(struct cli_def *cli, char *command, char *argv[], int argc)
+{
+    if (argc>0){
+	if (strcmp(argv[0],"?")==0){
+	    cli_print(cli, "<CR>");
+	}else{
+	    cli_print(cli, "%% Invalid input detected.");
+	}
+    }else{
+	if (strcasecmp(command,"no vlan leaky arp")==0) swconfig.vlan.s.config.arp_leaky=0;
+	if (strcasecmp(command,"vlan leaky multicast")==0) swconfig.vlan.s.config.multicast_leaky=1;
+	if (strcasecmp(command,"no vlan leaky multicast")==0) swconfig.vlan.s.config.multicast_leaky=0;
+	if (strcasecmp(command,"vlan leaky unicast")==0) swconfig.vlan.s.config.unicast_leaky=1;
+	if (strcasecmp(command,"no vlan leaky unicast")==0) swconfig.vlan.s.config.unicast_leaky=0;
+    }
+    return CLI_OK;
+}
+
+int cmd_config_vlan_drop(struct cli_def *cli, char *command, char *argv[], int argc)
+{
+    if (argc>0){
+	if (strcmp(argv[0],"?")==0){
+	    cli_print(cli, "<CR>");
+	}else{
+	    cli_print(cli, "%% Invalid input detected.");
+	}
+    }else{
+	if (strcasecmp(command,"vlan drop untagged_frames")==0) swconfig.vlan.s.config.drop_untagged_frames=1;
+	if (strcasecmp(command,"no vlan drop untagged_frames")==0) swconfig.vlan.s.config.drop_untagged_frames=0;
+	if (strcasecmp(command,"vlan drop invalid_vid")==0) swconfig.vlan.s.config.ingress_filtering=1;
+	if (strcasecmp(command,"no vlan drop invalid_vid")==0) swconfig.vlan.s.config.ingress_filtering=0;
+    }
+    return CLI_OK;
+}
+
+int cmd_config_qos(struct cli_def *cli, char *command, char *argv[], int argc)
+{
+    if (argc>0){
+	if (strcmp(argv[0],"?")==0){
+	    cli_print(cli, "<CR>");
+	}else{
+	    cli_print(cli, "%% Invalid input detected.");
+	}
+    }else{
+	if (strcasecmp(command,"qos tos")==0) swconfig.qos_config.config.tos_enable=1;
+	if (strcasecmp(command,"no qos tos")==0) swconfig.qos_config.config.tos_enable=0;
+	if (strcasecmp(command,"qos dot1p")==0) swconfig.qos_config.config.dot1p_enable=1;
+	if (strcasecmp(command,"no qos dot1p")==0) swconfig.qos_config.config.dot1p_enable=0;
+	if (strcasecmp(command,"qos flow-control-jam")==0) swconfig.qos_config.config.flow_control_jam=1;
+	if (strcasecmp(command,"no qos flow-control-jam")==0) swconfig.qos_config.config.flow_control_jam=0;
+	if (strcasecmp(command,"no qos wrr-queue ratio")==0) swconfig.qos_config.config.wrr_ratio=3;
+    }
+    return CLI_OK;
+}
+
+int cmd_config_qos_wrr_queue_ratio(struct cli_def *cli, char *command, char *argv[], int argc)
+{
+    if (argc>0){
+	if (strcmp(argv[0],"?")==0){
+	    int i;
+	    for (i=0;i<4;i++){
+		cli_print(cli, "%s",wrr_ratio_text[i]);
+	    }
+	}else{
+	    int i,hit;
+	    hit=0;
+	    for (i=0;i<4;i++){
+		if (strcmp(wrr_ratio_text[i],argv[0])==0){
+		    swconfig.qos_config.config.wrr_ratio=i;
+		    hit=1;
+		}
+	    }
+	    if (!hit){
+		cli_print(cli, "%% Invalid input detected.");
+	    }
+	}
+    }else{
+	cli_print(cli, "%% Please specify ratio");
+    }
+    return CLI_OK;
+}
+
+int cmd_config_flowcontrol(struct cli_def *cli, char *command, char *argv[], int argc)
+{
+    if (argc>0){
+	if (strcmp(argv[0],"?")==0){
+	    cli_print(cli, "<CR>");
+	}else{
+	    cli_print(cli, "%% Invalid input detected.");
+	}
+    }else{
+	if (strcasecmp(command,"flowcontrol dot3x")==0) swconfig.port_config_global.config.flow_dot3x_disable=0;
+	if (strcasecmp(command,"no flowcontrol dot3x")==0) swconfig.port_config_global.config.flow_dot3x_disable=1;
+	if (strcasecmp(command,"flowcontrol backpressure")==0) swconfig.port_config_global.config.flow_backpressure_disable=0;
+	if (strcasecmp(command,"no flowcontrol backpressure")==0) swconfig.port_config_global.config.flow_backpressure_disable=1;
+    }
+    return CLI_OK;
+}
+
+int cmd_config_stormcontrol(struct cli_def *cli, char *command, char *argv[], int argc)
+{
+    if (argc>0){
+	if (strcmp(argv[0],"?")==0){
+	    cli_print(cli, "<CR>");
+	}else{
+	    cli_print(cli, "%% Invalid input detected.");
+	}
+    }else{
+	if (strcasecmp(command,"no storm-control broadcast")==0) {
+	    swconfig.port_config_global.config.storm_control_broadcast_disable=1;
+	    swconfig.port_config_global.config.storm_control_broadcast_strict=0;
+	}
+	if (strcasecmp(command,"storm-control broadcast relaxed")==0) {
+	    swconfig.port_config_global.config.storm_control_broadcast_disable=0;
+	    swconfig.port_config_global.config.storm_control_broadcast_strict=0;
+	}
+	if (strcasecmp(command,"storm-control broadcast strict")==0) {
+	    swconfig.port_config_global.config.storm_control_broadcast_disable=0;
+	    swconfig.port_config_global.config.storm_control_broadcast_strict=1;
+	}
+	if (strcasecmp(command,"no storm-control multicast")==0) {
+	    swconfig.port_config_global.config.storm_control_multicast_strict=0;
+	}
+	if (strcasecmp(command,"storm-control multicast")==0) {
+	    swconfig.port_config_global.config.storm_control_multicast_strict=1;
+	}
     }
     return CLI_OK;
 }
@@ -136,26 +332,97 @@ void cmd_config_register_commands(struct cli_def *cli)
 
     cli_register_command(cli, NULL, "version", cmd_config_version, PRIVILEGE_PRIVILEGED, MODE_CONFIG, "");
 
+    cli_register_command(cli, NULL, "hostname", cmd_config_hostname, PRIVILEGE_PRIVILEGED, MODE_CONFIG, "Set system's network host name");
+
     c=cli_register_command(cli, NULL, "mac-address-table", NULL, PRIVILEGE_PRIVILEGED, MODE_CONFIG, "Configure the MAC address table");
     cli_register_command(cli, c, "aging-time", cmd_config_mac_aging, PRIVILEGE_PRIVILEGED, MODE_CONFIG, "Set MAC address table entry maximum age");
+    
+    { // rrcp config
+	c=cli_register_command(cli, NULL, "rrcp", NULL, PRIVILEGE_PRIVILEGED, MODE_CONFIG, "Global RRCP configuration subcommand");
+	cli_register_command(cli, c, "enable", cmd_config_rrcp, PRIVILEGE_PRIVILEGED, MODE_CONFIG, "Enable RRCP");
+	c2=cli_register_command(cli, no, "rrcp", NULL, PRIVILEGE_PRIVILEGED, MODE_CONFIG, "Global RRCP configuration subcommand");
+	cli_register_command(cli, c2, "enable", cmd_config_rrcp, PRIVILEGE_PRIVILEGED, MODE_CONFIG, "Enable RRCP");
 
-    c=cli_register_command(cli, NULL, "rrcp", NULL, PRIVILEGE_PRIVILEGED, MODE_CONFIG, "Global RRCP configuration subcommand");
-    cli_register_command(cli, c, "enable", cmd_config_rrcp, PRIVILEGE_PRIVILEGED, MODE_CONFIG, "Enable RRCP");
-    c2=cli_register_command(cli, no, "rrcp", NULL, PRIVILEGE_PRIVILEGED, MODE_CONFIG, "Global RRCP configuration subcommand");
-    cli_register_command(cli, c2, "enable", cmd_config_rrcp, PRIVILEGE_PRIVILEGED, MODE_CONFIG, "Enable RRCP");
+	c3=cli_register_command(cli, c, "echo", NULL, PRIVILEGE_PRIVILEGED, MODE_CONFIG, "Global RRCP Echo Protocol configuration subcommand");
+	cli_register_command(cli, c3, "enable", cmd_config_rrcp, PRIVILEGE_PRIVILEGED, MODE_CONFIG, "Enable RRCP Echo Protocol");
+	c3=cli_register_command(cli, c2, "echo", NULL, PRIVILEGE_PRIVILEGED, MODE_CONFIG, "Global RRCP Echo Protocol configuration subcommand");
+	cli_register_command(cli, c3, "enable", cmd_config_rrcp, PRIVILEGE_PRIVILEGED, MODE_CONFIG, "Enable RRCP Echo Protocol");
 
-    c3=cli_register_command(cli, c, "echo", NULL, PRIVILEGE_PRIVILEGED, MODE_CONFIG, "Global RRCP Echo Protocol configuration subcommand");
-    cli_register_command(cli, c3, "enable", cmd_config_rrcp, PRIVILEGE_PRIVILEGED, MODE_CONFIG, "Enable RRCP Echo Protocol");
-    c3=cli_register_command(cli, c2, "echo", NULL, PRIVILEGE_PRIVILEGED, MODE_CONFIG, "Global RRCP Echo Protocol configuration subcommand");
-    cli_register_command(cli, c3, "enable", cmd_config_rrcp, PRIVILEGE_PRIVILEGED, MODE_CONFIG, "Enable RRCP Echo Protocol");
+	c3=cli_register_command(cli, c, "loop-detect", NULL, PRIVILEGE_PRIVILEGED, MODE_CONFIG, "Global RRCP-based loop detection configuration subcommand");
+	cli_register_command(cli, c3, "enable", cmd_config_rrcp, PRIVILEGE_PRIVILEGED, MODE_CONFIG, "Enable RRCP-based loop detection");
+	c3=cli_register_command(cli, c2, "loop-detect", NULL, PRIVILEGE_PRIVILEGED, MODE_CONFIG, "Global RRCP-based loop detection configuration subcommand");
+	cli_register_command(cli, c3, "enable", cmd_config_rrcp, PRIVILEGE_PRIVILEGED, MODE_CONFIG, "Enable RRCP-based loop detection");
+    }
 
-    c3=cli_register_command(cli, c, "loop-detect", NULL, PRIVILEGE_PRIVILEGED, MODE_CONFIG, "Global RRCP-based loop detection configuration subcommand");
-    cli_register_command(cli, c3, "enable", cmd_config_rrcp, PRIVILEGE_PRIVILEGED, MODE_CONFIG, "Enable RRCP-based loop detection");
-    c3=cli_register_command(cli, c2, "loop-detect", NULL, PRIVILEGE_PRIVILEGED, MODE_CONFIG, "Global RRCP-based loop detection configuration subcommand");
-    cli_register_command(cli, c3, "enable", cmd_config_rrcp, PRIVILEGE_PRIVILEGED, MODE_CONFIG, "Enable RRCP-based loop detection");
+    { // vlan config
+	struct cli_command *vlan,*no_vlan,*vlan_leaky,*no_vlan_leaky,*vlan_drop,*no_vlan_drop;
 
+	vlan=cli_register_command(cli, NULL, "vlan", NULL, PRIVILEGE_PRIVILEGED, MODE_CONFIG, "Global VLAN mode");
+	no_vlan=cli_register_command(cli, no, "vlan", cmd_config_vlan, PRIVILEGE_PRIVILEGED, MODE_CONFIG, "Disable VLAN support globally");
+	cli_register_command(cli, vlan, "portbased", cmd_config_vlan, PRIVILEGE_PRIVILEGED, MODE_CONFIG, "Enable port-based VLANs only");
+	c2=cli_register_command(cli, vlan, "dot1q", cmd_config_vlan, PRIVILEGE_PRIVILEGED, MODE_CONFIG, "Enable full IEEE 802.1Q tagged VLANs");
+	cli_register_command(cli, c2, "force", cmd_config_vlan, PRIVILEGE_PRIVILEGED, MODE_CONFIG, "Enable IEEE 802.1Q VLANs even on buggy hardware");
+
+	vlan_leaky=cli_register_command(cli, vlan, "leaky", NULL, PRIVILEGE_PRIVILEGED, MODE_CONFIG, "Allow certain type of packets to be switched beetween VLANs");
+	no_vlan_leaky=cli_register_command(cli, no_vlan, "leaky", NULL, PRIVILEGE_PRIVILEGED, MODE_CONFIG, "Disallow certain type of packets to be switched beetween VLANs");
+	cli_register_command(cli, vlan_leaky, "arp", cmd_config_vlan_leaky, PRIVILEGE_PRIVILEGED, MODE_CONFIG, "Allow ARP packets to be switched beetween VLANs");
+	cli_register_command(cli, no_vlan_leaky, "arp", cmd_config_vlan_leaky, PRIVILEGE_PRIVILEGED, MODE_CONFIG, "Disallow ARP packets to be switched beetween VLANs");
+	cli_register_command(cli, vlan_leaky, "multicast", cmd_config_vlan_leaky, PRIVILEGE_PRIVILEGED, MODE_CONFIG, "Allow multicast packets to be switched beetween VLANs");
+	cli_register_command(cli, no_vlan_leaky, "multicast", cmd_config_vlan_leaky, PRIVILEGE_PRIVILEGED, MODE_CONFIG, "Disallow multicast packets to be switched beetween VLANs");
+	cli_register_command(cli, vlan_leaky, "unicast", cmd_config_vlan_leaky, PRIVILEGE_PRIVILEGED, MODE_CONFIG, "Allow unicast packets to be switched beetween VLANs");
+	cli_register_command(cli, no_vlan_leaky, "unicast", cmd_config_vlan_leaky, PRIVILEGE_PRIVILEGED, MODE_CONFIG, "Disallow unicast packets to be switched beetween VLANs");
+
+	vlan_drop=cli_register_command(cli, vlan, "drop", NULL, PRIVILEGE_PRIVILEGED, MODE_CONFIG, "Allow dropping certain types of non-conforming packets");
+	no_vlan_drop=cli_register_command(cli, no_vlan, "drop", NULL, PRIVILEGE_PRIVILEGED, MODE_CONFIG, "Disallow dropping certain types of non-conforming packets");
+	cli_register_command(cli, vlan_drop, "untagged_frames", cmd_config_vlan_drop, PRIVILEGE_PRIVILEGED, MODE_CONFIG, "Drop ALL untagged packets, on all ports");
+	cli_register_command(cli, no_vlan_drop, "untagged_frames", cmd_config_vlan_drop, PRIVILEGE_PRIVILEGED, MODE_CONFIG, "Do not drop untagged packets");
+	cli_register_command(cli, vlan_drop, "invalid_vid", cmd_config_vlan_drop, PRIVILEGE_PRIVILEGED, MODE_CONFIG, "Drop tagged frames with VID, that is invalid on this port");
+	cli_register_command(cli, no_vlan_drop, "invalid_vid", cmd_config_vlan_drop, PRIVILEGE_PRIVILEGED, MODE_CONFIG, "Do not drop tagged frames with VID, that is invalid on this port");
+    }
+    
+    { // qos config
+	struct cli_command *qos,*no_qos;
+
+	qos=cli_register_command(cli, NULL, "qos", NULL, PRIVILEGE_PRIVILEGED, MODE_CONFIG, "Global Quality-of-Service configuration");
+	no_qos=cli_register_command(cli, no, "qos", cmd_config_qos, PRIVILEGE_PRIVILEGED, MODE_CONFIG, "Global Quality-of-Service configuration");
+	cli_register_command(cli, qos, "tos", cmd_config_qos, PRIVILEGE_PRIVILEGED, MODE_CONFIG, "Trust TOS value in IP header of incoming packets");
+	cli_register_command(cli, no_qos, "tos", cmd_config_qos, PRIVILEGE_PRIVILEGED, MODE_CONFIG, "Do not trust TOS value in IP header of incoming packets");
+	cli_register_command(cli, qos, "dot1p", cmd_config_qos, PRIVILEGE_PRIVILEGED, MODE_CONFIG, "Trust 802.1p tag value of incoming packets");
+	cli_register_command(cli, no_qos, "dot1p", cmd_config_qos, PRIVILEGE_PRIVILEGED, MODE_CONFIG, "Do not 802.1p tag value of incoming packets");
+	cli_register_command(cli, qos, "flow-control-jam", cmd_config_qos, PRIVILEGE_PRIVILEGED, MODE_CONFIG, "Temprorary jam port, from which high-priority frame has come - strange feathure, use with care!");
+	cli_register_command(cli, no_qos, "flow-control-jam", cmd_config_qos, PRIVILEGE_PRIVILEGED, MODE_CONFIG, "Do not temprorary jam port, from which high-priority frame has come");
+	c=cli_register_command(cli, qos, "wrr-queue", NULL, PRIVILEGE_PRIVILEGED, MODE_CONFIG, "Configure Weighed Round-Robin queue");
+	cli_register_command(cli, c, "ratio", cmd_config_qos_wrr_queue_ratio, PRIVILEGE_PRIVILEGED, MODE_CONFIG, "Configure ratio of high-priority vs. low-priority traffic to pass");
+	c=cli_register_command(cli, no_qos, "wrr-queue", NULL, PRIVILEGE_PRIVILEGED, MODE_CONFIG, "Configure Weighed Round-Robin queue");
+	cli_register_command(cli, c, "ratio", cmd_config_qos, PRIVILEGE_PRIVILEGED, MODE_CONFIG, "Configure default high-priority vs. low-priority traffic ratio");
+    }
+
+    { // flowcontrol config
+	struct cli_command *flowcontrol,*no_flowcontrol;
+
+	flowcontrol=cli_register_command(cli, NULL, "flowcontrol", NULL, PRIVILEGE_PRIVILEGED, MODE_CONFIG, "Flow control configuration");
+	no_flowcontrol=cli_register_command(cli, no, "flowcontrol", cmd_config_flowcontrol, PRIVILEGE_PRIVILEGED, MODE_CONFIG, "Flow control configuration");
+	cli_register_command(cli, flowcontrol, "dot3x", cmd_config_flowcontrol, PRIVILEGE_PRIVILEGED, MODE_CONFIG, "Enable IEEE 802.3x flow control");
+	cli_register_command(cli, no_flowcontrol, "dot3x", cmd_config_flowcontrol, PRIVILEGE_PRIVILEGED, MODE_CONFIG, "Disable IEEE 802.3x flow control");
+	cli_register_command(cli, flowcontrol, "backpressure", cmd_config_flowcontrol, PRIVILEGE_PRIVILEGED, MODE_CONFIG, "Enable half-duplex back pressure flow control");
+	cli_register_command(cli, no_flowcontrol, "backpressure", cmd_config_flowcontrol, PRIVILEGE_PRIVILEGED, MODE_CONFIG, "Disable half-duplex back pressure flow control");
+    }
+
+    { // storm-control config
+	struct cli_command *stormcontrol,*no_stormcontrol,*stormcontrol_broadcast;
+
+	stormcontrol=cli_register_command(cli, NULL, "storm-control", NULL, PRIVILEGE_PRIVILEGED, MODE_CONFIG, "Storm-contol (preventing certain excessive traffic) configuration");
+	no_stormcontrol=cli_register_command(cli, no, "storm-control", cmd_config_flowcontrol, PRIVILEGE_PRIVILEGED, MODE_CONFIG, "Storm-contol (preventing certain excessive traffic) configuration");
+	stormcontrol_broadcast=cli_register_command(cli, stormcontrol, "broadcast", cmd_config_stormcontrol, PRIVILEGE_PRIVILEGED, MODE_CONFIG, "Storm-control on broadcast traffic");
+	cli_register_command(cli, stormcontrol_broadcast, "relaxed", cmd_config_stormcontrol, PRIVILEGE_PRIVILEGED, MODE_CONFIG, "Enable relaxed storm-control on broadcast traffic");
+	cli_register_command(cli, stormcontrol_broadcast, "strict", cmd_config_stormcontrol, PRIVILEGE_PRIVILEGED, MODE_CONFIG, "Enable strict storm-control on broadcast traffic");
+	cli_register_command(cli, no_stormcontrol, "broadcast", cmd_config_stormcontrol, PRIVILEGE_PRIVILEGED, MODE_CONFIG, "Disable storm-control on broadcast traffic");
+	cli_register_command(cli, stormcontrol, "multicast", cmd_config_stormcontrol, PRIVILEGE_PRIVILEGED, MODE_CONFIG, "Enable strict storm-control on multicast traffic");
+	cli_register_command(cli, no_stormcontrol, "multicast", cmd_config_stormcontrol, PRIVILEGE_PRIVILEGED, MODE_CONFIG, "Disable storm-control on multicast traffic");
+    }
 
     cli_register_command(cli, NULL, "interface", cmd_config_int, PRIVILEGE_PRIVILEGED, MODE_CONFIG, "Configure an interface");
+    cli_register_command(cli, NULL, "interface", cmd_config_int, PRIVILEGE_PRIVILEGED, MODE_CONFIG_INT, "Configure another interface");
 
     // Interface config mode
     noi=cli_register_command(cli, NULL, "no", cmd_dummytest, PRIVILEGE_PRIVILEGED, MODE_CONFIG_INT, "Negate a command or set its defaults");

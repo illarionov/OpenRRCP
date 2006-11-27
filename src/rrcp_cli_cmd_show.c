@@ -33,7 +33,28 @@
 
 int cmd_show_version(struct cli_def *cli, char *command, char *argv[], int argc)
 {
-    cli_print(cli, "OpenRRCP CLI ver %s",RRCP_CLI_VERSION);
+    cli_print(cli, "OpenRRCP CLI, Version %s",RRCP_CLI_VERSION);
+    cli_print(cli, "http://openrrcp.org.ru/");
+    cli_print(cli, "Licensed under terms of GPL");
+    cli_print(cli, "http://www.gnu.org/licenses/gpl.html#SEC1\n");
+
+    cli_print(cli, "%d FastEthernet/IEEE 802.3 interface(s)",switchtypes[switchtype].num_ports >24 ? 24 : switchtypes[switchtype].num_ports);
+    if (switchtypes[switchtype].num_ports >24){
+	cli_print(cli, "%d Gigabit Ethernet/IEEE 802.3 interface(s)\n",switchtypes[switchtype].num_ports >24 ? switchtypes[switchtype].num_ports-24 : 0);
+    }
+
+    cli_print(cli, "\nBase ethernet MAC Address:  %02x:%02x:%02x:%02x:%02x:%02x",
+		    dest_mac[0],
+		    dest_mac[1],
+		    dest_mac[2],
+		    dest_mac[3],
+		    dest_mac[4],
+		    dest_mac[5]);
+    cli_print(cli, "Vendor: %s",switchtypes[switchtype].vendor);
+    cli_print(cli, "Model: %s",switchtypes[switchtype].model);
+    cli_print(cli, "Chip: %s",chipnames[switchtypes[switchtype].chip_id]);
+    cli_print(cli, "802.1Q support: %s",(switchtypes[switchtype].chip_id==rtl8316b) ? "Yes" : "No/Buggy");
+    cli_print(cli, "Facing host interface: %s",ifname);
     return CLI_OK;
 }
 

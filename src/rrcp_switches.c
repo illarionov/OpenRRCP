@@ -22,9 +22,20 @@
     This would be appreciated, however not required.
 */
 
+#include "rrcp_io.h"
 #include "rrcp_switches.h"
 
+const int chipname_n = 3;
+
+char* chipnames [3] = {
+    "unknown",
+    "rtl8316b",
+    "rtl8326"
+};
+
 unsigned int switchtype;
+
+const int switchtype_n = 5;
 
 struct switchtype_t switchtypes[5] = {
     {
@@ -74,4 +85,36 @@ struct switchtype_t switchtypes[5] = {
     }
 };
 
-const int switchtype_n = 5;
+uint16_t rrcp_switch_autodetect_chip(void){
+    uint16_t saved_reg,tmp1,tmp2,tmp3;
+    uint16_t detected_chiptype=unknown;
+    
+    //first step - try to write mirroring control register (present on rtl8316b, absent on rtl8326(s))
+    saved_reg=rtl83xx_readreg16(0x0219);
+    rtl83xx_setreg16(0x0219,0x0000);
+    tmp1=rtl83xx_readreg16(0x0219);
+    rtl83xx_setreg16(0x0219,0x55aa);
+    tmp2=rtl83xx_readreg16(0x0219);
+    rtl83xx_setreg16(0x0219,0xffff);
+    tmp3=rtl83xx_readreg16(0x0219);
+    rtl83xx_setreg16(0x0219,saved_reg);
+
+    if (tmp1==0x0000 && tmp2==0x55aa && tmp3==0xffff){
+        detected_chiptype=rtl8316b;
+    }else{
+	detected_chiptype=rtl8326;
+    }
+    return(detected_chiptype);
+}
+
+uint16_t rrcp_switch_autodetect(void){
+    uint16_t detected_chiptype;
+
+    detected_chiptype=rrcp_switch_autodetect_chip();
+
+    if(detected_chiptype==rtl8316b){
+	return 0; // generic rtl8316b
+    }else{
+	return 1; // generic rtl8326
+    }
+}

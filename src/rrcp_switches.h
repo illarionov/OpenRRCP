@@ -78,8 +78,13 @@ union t_rrcp_status {
         uint32_t signlelong;
 } ;
 
-extern struct switchtype_t switchtypes[5];
-extern const int switchtype_n;
+extern const int chipname_n;
+extern char* chipnames [3];
 
 extern unsigned int switchtype;
+extern const int switchtype_n;
+extern struct switchtype_t switchtypes[5];
 
+uint16_t rrcp_switch_autodetect_chip(void);
+
+uint16_t rrcp_switch_autodetect(void);

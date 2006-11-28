@@ -66,8 +66,9 @@ void rrcp_config_read_from_switch(void)
     for(i=0;i<6;i++){
 	swconfig.port_monitor.raw[i]=rtl83xx_readreg16(0x0219+i);
     }
+    swconfig.alt_config.raw=rtl83xx_readreg16(0x0300);
     for(i=0;i<2;i++){
-	swconfig.alt.raw[i]=rtl83xx_readreg16(0x0300+i);
+	swconfig.alt_mask.raw[i]=rtl83xx_readreg16(0x0301+i);
     }
     swconfig.qos_config.raw=rtl83xx_readreg16(0x0400);
     swconfig.qos_port_priority.raw[0]=rtl83xx_readreg16(0x0401);
@@ -116,9 +117,9 @@ void rrcp_config_bin2text(char *sc, int l, int show_defaults)
     }
     {
 	int mac_aging_time=-1;
-	if (swconfig.alt.s.alt_config.mac_aging_disable){
+	if (swconfig.alt_config.s.config.mac_aging_disable){
 	    mac_aging_time=0;
-	}else if (swconfig.alt.s.alt_config.mac_aging_fast){
+	}else if (swconfig.alt_config.s.config.mac_aging_fast){
 	    mac_aging_time=12;
 	}else{
 	    mac_aging_time=300;
@@ -185,8 +186,8 @@ void rrcp_config_bin2text(char *sc, int l, int show_defaults)
 	sncprintf(sc,l,"%sstorm-control multicast\n", swconfig.port_config_global.config.storm_control_multicast_strict ? "":"no ");
 	sncprintf(sc,l,"!\n");
     }
-    if (show_defaults || swconfig.alt.s.alt_config.stp_filter){
-	sncprintf(sc,l,"%sspanning-tree bpdufilter enable\n", swconfig.alt.s.alt_config.stp_filter ? "":"no ");
+    if (show_defaults || swconfig.alt_config.s.config.stp_filter){
+	sncprintf(sc,l,"%sspanning-tree bpdufilter enable\n", swconfig.alt_config.s.config.stp_filter ? "":"no ");
 	sncprintf(sc,l,"!\n");
     }
 
@@ -240,8 +241,9 @@ void rrcp_config_bin2text(char *sc, int l, int show_defaults)
 		}
 	    }
 	}
-	if (show_defaults || (swconfig.alt.s.alt_control&(1<<port_phys))){
-	    sncprintf(sc,l," %smac-learn disable\n",(swconfig.alt.s.alt_control&(1<<port_phys)) ? "":"no ");
+
+	if (show_defaults || (swconfig.alt_mask.mask&(1<<port_phys))){
+	    sncprintf(sc,l," %smac-learn disable\n",(swconfig.alt_mask.mask&(1<<port_phys)) ? "":"no ");
 	}
 	if (show_defaults || !(swconfig.rrcp_byport_disable.bitmap&(1<<port_phys))){
 	    sncprintf(sc,l," %srrcp enable\n",(swconfig.rrcp_byport_disable.bitmap&(1<<port_phys)) ? "no ":"");

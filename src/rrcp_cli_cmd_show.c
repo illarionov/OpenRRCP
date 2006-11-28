@@ -79,6 +79,66 @@ int cmd_show_config(struct cli_def *cli, char *command, char *argv[], int argc)
     return CLI_OK;
 }
 
+int cmd_show_interfaces(struct cli_def *cli, char *command, char *argv[], int argc)
+{
+    if (argc < 1){
+	cli_print(cli, "%% Specify an interface");
+	return CLI_ERROR;
+    }
+    if (strcmp(argv[0], "?") == 0){
+	int i;
+	char s1[30],s2[30];
+	for(i=0;i<switchtypes[switchtype].num_ports;i+=2){
+	    cli_print(cli,"%-19s %-19s",rrcp_config_get_portname(s1, sizeof(s1), i+1, i),rrcp_config_get_portname(s2, sizeof(s2), i+2, i+1));
+	}
+	cli_print(cli,"<%d-%d> - reference interface by its number",1,i);
+	return CLI_OK;
+    }else{
+	char *a=argv[0];
+	int port,port_phys;
+	port=0;
+	char s[20];
+
+	if ((strlen(a)>0)&&('0'<=(a[strlen(a)-1]))&&((a[strlen(a)-1])<='9'))
+	    port+=a[strlen(a)-1]-'0';
+	if ((strlen(a)>1)&&('0'<=(a[strlen(a)-2]))&&((a[strlen(a)-2])<='9'))
+	    port+=10*(a[strlen(a)-2]-'0');
+	if (port>0 && port<=switchtypes[switchtype].num_ports){
+	    union {
+        	uint8_t raw;
+        	struct t_rtl83xx_port_link_status struc;
+    	    } link_status;
+	    char *sp[4] = {"10","100","1000","???"};
+
+	    port_phys=map_port_number_from_logical_to_physical(port);
+	    link_status.raw=(uint8_t)(rtl83xx_readreg16(0x0619+port_phys/2)>>(8*(port_phys%2)));
+	    cli_print(cli, "%s is %s, line protocol is %s",
+		rrcp_config_get_portname(s, sizeof(s), port, port_phys),
+		(swconfig.port_disable.bitmap&(1<<port_phys)) ? "administratively down" : 
+		    (link_status.struc.link ? "up" : "down"),
+		link_status.struc.link ? "up (connected)" : "down (notconnect)");
+	    if (link_status.struc.link){
+		cli_print(cli, "  %s, %sMb/s",
+		    link_status.struc.duplex ? "Full-duplex" : "Half-duplex",
+		    sp[link_status.struc.speed]);
+	    }
+	    cli_print(cli, "  PHY auto-negotiation %s",
+		swconfig.port_config.config[port_phys].autoneg ? "on" : "off");
+	    cli_print(cli, "  PHY capability:%s%s%s%s%s%s%s",
+		swconfig.port_config.config[port_phys].media_10half ? " 10HD" : "",
+		swconfig.port_config.config[port_phys].media_10full ? " 10FD" : "",
+		swconfig.port_config.config[port_phys].media_100half ? " 100HD" : "",
+		swconfig.port_config.config[port_phys].media_100full ? " 100FD" : "",
+		swconfig.port_config.config[port_phys].media_1000full ? " 1000FD" : "",
+		swconfig.port_config.config[port_phys].pause ? " PAUSE" : "",
+		swconfig.port_config.config[port_phys].pause_asy ? " PAUSE_ASY" : "");
+	}else{
+	    cli_print(cli, "Unknown interface %s", argv[0]);
+	}
+    }
+    return CLI_OK;
+}
+
 int cmd_test(struct cli_def *cli, char *command, char *argv[], int argc)
 {
     int i;
@@ -100,4 +160,5 @@ void cmd_show_register_commands(struct cli_def *cli)
     c2 = cli_register_command(cli, c, "running-config", cmd_show_config, PRIVILEGE_PRIVILEGED, MODE_EXEC, "Current operating configuration");
     cli_register_command(cli, c2, "full", cmd_show_config, PRIVILEGE_PRIVILEGED, MODE_EXEC, "Current operating configuration including default statements");
     cli_register_command(cli, c, "startup-config", cmd_test, PRIVILEGE_PRIVILEGED, MODE_EXEC, "Contents of startup configuration");
+    cli_register_command(cli, c, "interfaces", cmd_show_interfaces, PRIVILEGE_UNPRIVILEGED, MODE_EXEC, "Interface status and configuration");
 }

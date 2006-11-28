@@ -59,13 +59,13 @@ int cmd_config_mac_aging(struct cli_def *cli, char *command, char *argv[], int a
 	    cli_print(cli, "  <0>        Enter 0 to disable aging");
 	    cli_print(cli, "  <12|300>   Aging time in seconds");
 	}else if (strcmp(argv[0],"0")==0){
-	    swconfig.alt.s.alt_config.mac_aging_disable=1;
+	    swconfig.alt_config.s.config.mac_aging_disable=1;
 	}else if (strcmp(argv[0],"12")==0){
-	    swconfig.alt.s.alt_config.mac_aging_disable=0;
-	    swconfig.alt.s.alt_config.mac_aging_fast=1;
+	    swconfig.alt_config.s.config.mac_aging_disable=0;
+	    swconfig.alt_config.s.config.mac_aging_fast=1;
 	}else if (strcmp(argv[0],"300")==0){
-	    swconfig.alt.s.alt_config.mac_aging_disable=0;
-	    swconfig.alt.s.alt_config.mac_aging_fast=0;
+	    swconfig.alt_config.s.config.mac_aging_disable=0;
+	    swconfig.alt_config.s.config.mac_aging_fast=0;
 	}else{
 	    cli_print(cli, "%% Invalid aging time '%s', can be only 0,12 or 300.",argv[0]);
 	}
@@ -267,9 +267,9 @@ int cmd_config_spanning_tree(struct cli_def *cli, char *command, char *argv[], i
 	    cli_print(cli, "%% Invalid input detected.");
 	}
     }else{
-	if (strcasecmp(command,"spanning-tree bpdufilter enable")==0) swconfig.alt.s.alt_config.stp_filter=1;
+	if (strcasecmp(command,"spanning-tree bpdufilter enable")==0) swconfig.alt_config.s.config.stp_filter=1;
 	if ((strcasecmp(command,"no spanning-tree bpdufilter enable")==0)||
-	    (strcasecmp(command,"spanning-tree bpdufilter disable")==0)) swconfig.alt.s.alt_config.stp_filter=0;
+	    (strcasecmp(command,"spanning-tree bpdufilter disable")==0)) swconfig.alt_config.s.config.stp_filter=0;
     }
     return CLI_OK;
 }

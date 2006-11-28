@@ -532,7 +532,7 @@ int cli_find_command(struct cli_def *cli, struct cli_command *commands, int num_
 {
 	struct cli_command *c=NULL;
 	int c_words = num_words;
-	int m=0;
+	int matches=0;
 
 	if (filters[0])
 		c_words = filters[0];
@@ -560,14 +560,21 @@ int cli_find_command(struct cli_def *cli, struct cli_command *commands, int num_
 				continue;
 			if (c2->mode != cli->mode && c2->mode != MODE_ANY)
 				continue;
+			// try exact match
+			if (strcasecmp(c2->command, words[start_word])==0){
+			    matches=1;
+			    c=c2;
+			    break;
+			}
+			// try partial match
 			if (strncasecmp(c2->command, words[start_word], strlen(words[start_word]))==0){
-			    m++;
+			    matches++;
 			    c=c2;
 			}
 		}
 	}
 	//continule only if there is exactly one match
-	if (m==1)
+	if (matches==1)
 	{
 		// drop out of config submode
 		if (cli->mode > MODE_CONFIG && c->mode == MODE_CONFIG)
@@ -712,8 +719,12 @@ int cli_find_command(struct cli_def *cli, struct cli_command *commands, int num_
 		}
 	}
 
-	cli_error(cli, "Invalid %s \"%s\"", commands->parent ? "argument" : "command", words[start_word]);
-	return CLI_ERROR;
+	if (words[start_word][0]=='!'){
+		return CLI_OK;
+	}else{
+		cli_error(cli, "Invalid %s \"%s\"", commands->parent ? "argument" : "command", words[start_word]);
+		return CLI_ERROR;
+	}
 }
 
 int cli_run_command(struct cli_def *cli, char *command)

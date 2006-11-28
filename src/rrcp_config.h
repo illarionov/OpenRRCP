@@ -22,55 +22,60 @@
     This would be appreciated, however not required.
 */
 
+#include <stdint.h>
+
     struct t_swconfig {
 	union {//0x0200
 	    struct  t_rrcp_config{
-		unsigned short
+		uint16_t
 		rrcp_disable:1,
 		echo_disable:1,
 		loop_enable:1,
 		reserved:13;
 	    } config;
-	    unsigned short raw;
+	    uint16_t raw;
 	} rrcp_config;
 	union {//0x0201
-	    unsigned long bitmap;
-	    unsigned short raw[2];
+	    uint32_t bitmap;
+	    uint16_t raw[2];
 	} rrcp_byport_disable;
 	union {
 	    struct t_rxtx {
-    		unsigned char
+    		uint8_t
 		rx:4,
 		tx:4;
 	    } rxtx[32];
-	    unsigned short raw[16];
+	    uint16_t raw[16];
 	} bandwidth;
 	union {
 	    struct t_sniff{
-		unsigned long sniffer;
-		unsigned long sniffed_rx;
-		unsigned long sniffed_tx;
+		uint32_t sniffer;
+		uint32_t sniffed_rx;
+		uint32_t sniffed_tx;
 	    } sniff;
-	    unsigned short raw[6];
+	    uint16_t raw[6];
 	} port_monitor; // 0x0219..0x021e, supported only on rtl8316b
 	union {
-	    struct t_alt_s{
+	    struct t_alt_config_s{
 		struct  t_alt_config{
-		    unsigned short
+		    uint16_t
 		    mac_aging_disable:1,
 		    mac_aging_fast:1,
 		    stp_filter:1,
 		    mac_drop_unknown:1,
 		    reserved:12;
-		} alt_config;
-		unsigned short alt_control;
+		} config;
 	    }s;
-	    unsigned short raw[2];    
-	} alt; // 0x0300..0x0302
+	    uint16_t raw;    
+	} alt_config; // 0x0300
+	union {
+	    uint32_t mask;
+	    uint16_t raw[2];    
+	} alt_mask; // 0x0301..0x0302
 	union {
 	    struct t_vlan_s{
 		struct  t_vlan_s_config{
-		    unsigned short
+		    uint16_t
 		    enable:1,
 		    unicast_leaky:1,
 		    arp_leaky:1,
@@ -80,41 +85,41 @@
 		    ingress_filtering:1,
 		    reserved:9;
 		} config;
-		unsigned char port_vlan_index[26];
+		uint8_t port_vlan_index[26];
 	    }s;
-	    unsigned short raw[14];    
+	    uint16_t raw[14];    
 	} vlan;
 	union {
-	    unsigned long long bitmap;
-	    unsigned short raw[4];
+	    uint32_t bitmap;
+	    uint16_t raw[4];
 	} vlan_port_output_tag;
 	union {
-	    unsigned long bitmap[32];
-	    unsigned short raw[64];
+	    uint32_t bitmap[32];
+	    uint16_t raw[64];
 	} vlan_entry;
-	unsigned short vlan_vid[32];
+	uint16_t vlan_vid[32];
 	union {
-	    unsigned long bitmap;
-	    unsigned short raw[2];
+	    uint32_t bitmap;
+	    uint16_t raw[2];
 	} vlan_port_insert_vid;
 	union {
 	    struct  t_qos_s_config{
-		unsigned short
+		uint16_t
 		    tos_enable:1,
 		    dot1p_enable:1,
 		    flow_ondemand_disable:1,
 		    wrr_ratio:2,
 		    reserved:11;
 	    } config;
-	    unsigned short raw;
+	    uint16_t raw;
 	} qos_config;
 	union {
-	    unsigned long bitmap;
-	    unsigned short raw[2];
+	    uint32_t bitmap;
+	    uint16_t raw[2];
 	} qos_port_priority;
 	union {
 	    struct  t_port_config_global_config{
-		unsigned short
+		uint16_t
 		    flow_dot3x_disable:1,
 		    flow_backpressure_disable:1,
 		    storm_control_broadcast_strict:1,
@@ -122,15 +127,15 @@
 		    storm_control_broadcast_disable:1,
 		    reserved:11;
 	    } config;
-	    unsigned short raw;
+	    uint16_t raw;
 	} port_config_global;
 	union {
-	    unsigned long bitmap;
-	    unsigned short raw[2];
+	    uint32_t bitmap;
+	    uint16_t raw[2];
 	} port_disable;
 	union {
 	    struct  t_port_config_config{
-		unsigned char
+		uint8_t
 		    media_10half:1,
 		    media_10full:1,
 		    media_100half:1,
@@ -140,7 +145,7 @@
 		    pause_asy:1,
 		    autoneg:1;
 	    } config[26];
-	    unsigned short raw[13];
+	    uint16_t raw[13];
 	} port_config;
     } ;
 

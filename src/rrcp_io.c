@@ -461,7 +461,7 @@ int do_write_eeprom(uint16_t addr,uint16_t data){
 }
 
 //returns 1 if got response
-unsigned long rtl83xx_ping(void){
+uint32_t rtl83xx_ping(void){
     int i,len = 0;
     struct rrcp_packet_t pkt,pktr;
 

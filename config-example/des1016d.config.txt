@@ -8,8 +8,7 @@ rrcp enable
 rrcp echo enable
 no rrcp loop-detect enable
 !
-vlan enable
-vlan dot1q enable
+vlan dot1q
 no vlan leaky arp
 no vlan leaky unicast
 no vlan leaky multicast

@@ -25,7 +25,7 @@
 #include "rrcp_io.h"
 #include "rrcp_switches.h"
 
-const int chipname_n = 3;
+const uint32_t chipname_n = 3;
 
 char* chipnames [3] = {
     "unknown",
@@ -33,9 +33,9 @@ char* chipnames [3] = {
     "rtl8326"
 };
 
-unsigned int switchtype;
+uint32_t switchtype;
 
-const int switchtype_n = 5;
+const uint32_t switchtype_n = 5;
 
 struct switchtype_t switchtypes[5] = {
     {

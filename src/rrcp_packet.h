@@ -22,7 +22,6 @@
     This would be appreciated, however not required.
 */
 
-//#include <sys/types.h>
 #include <stdint.h>
 
 #ifndef ETH_ALEN 

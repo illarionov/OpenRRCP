@@ -58,4 +58,4 @@ void rtl83xx_setreg16reg16(uint16_t regno, uint16_t regval);
 
 int do_write_eeprom(uint16_t addr,uint16_t data);
 
-unsigned long rtl83xx_ping(void);
+uint32_t rtl83xx_ping(void);

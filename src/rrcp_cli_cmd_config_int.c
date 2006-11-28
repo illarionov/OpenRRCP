@@ -78,23 +78,19 @@ int cmd_config_int_shutdown(struct cli_def *cli, char *command, char *argv[], in
 	int port,port_phys;
 	port=atoi(strrchr(cli->modestring,'/')+1);
 	port_phys=map_port_number_from_logical_to_physical(port);
-	if (strcasecmp(command,"shutdown")==0) swconfig.port_disable.bitmap|=(1<<port_phys);
-	if (strcasecmp(command,"no shutdown")==0) swconfig.port_disable.bitmap&=(~(1<<port_phys));
+	if (strcasecmp(command,"shutdown")==0)
+	    swconfig.port_disable.bitmap |= (1<<port_phys);
+	else if (strcasecmp(command,"no shutdown")==0)
+	    swconfig.port_disable.bitmap &= (~(1<<port_phys));
+	else
+	    cli_print(cli, "Internal error on command '%s'",command);
     }
     return CLI_OK;
 }
 
 int cmd_config_int_switchport(struct cli_def *cli, char *command, char *argv[], int argc)
 {
-    if (argc>0){
-	if (strcmp(argv[0],"?")==0){
-	    cli_print(cli, "<CR>");
-	}else{
-	    cli_print(cli, "%% Invalid input detected.");
-	}
-    }else{
-	cli_print(cli, "%% Not implemented yet.");
-    }
+    cli_print(cli, "%% Not implemented yet.");
     return CLI_OK;
 }
 
@@ -141,7 +137,16 @@ int cmd_config_int_mac_learning(struct cli_def *cli, char *command, char *argv[]
 	    cli_print(cli, "%% Invalid input detected.");
 	}
     }else{
-	cli_print(cli, "%% Not implemented yet.");
+	int port,port_phys;
+	port=atoi(strrchr(cli->modestring,'/')+1);
+	port_phys=map_port_number_from_logical_to_physical(port);
+	if (strcasecmp(command,"mac-learn disable")==0)
+	    swconfig.alt_mask.mask |= (1<<port_phys);
+	else if ((strcasecmp(command,"mac-learn enable")==0)||
+	         (strcasecmp(command,"no mac-learn disable")==0))
+	    swconfig.alt_mask.mask &= (~(1<<port_phys));
+	else
+	    cli_print(cli, "Internal error on command '%s'",command);
     }
     return CLI_OK;
 }
@@ -155,27 +160,50 @@ int cmd_config_int_rrcp(struct cli_def *cli, char *command, char *argv[], int ar
 	    cli_print(cli, "%% Invalid input detected.");
 	}
     }else{
-	cli_print(cli, "%% Not implemented yet.");
+	int port,port_phys;
+	port=atoi(strrchr(cli->modestring,'/')+1);
+	port_phys=map_port_number_from_logical_to_physical(port);
+	if (strcasecmp(command,"rrcp enable")==0)
+	    swconfig.rrcp_byport_disable.bitmap &= (~(1<<port_phys));
+	else if (strcasecmp(command,"no rrcp enable")==0)
+	    swconfig.rrcp_byport_disable.bitmap |= (1<<port_phys);
+	else
+	    cli_print(cli, "Internal error on command '%s'",command);
     }
     return CLI_OK;
 }
 
 int cmd_config_int_mls(struct cli_def *cli, char *command, char *argv[], int argc)
 {
+    int port,port_phys;
+    port=atoi(strrchr(cli->modestring,'/')+1);
+    port_phys=map_port_number_from_logical_to_physical(port);
     if (argc>0){
 	if (strcmp(argv[0],"?")==0){
-	    cli_print(cli, "<CR>");
+	    cli_print(cli, "0 - Set CoS value in incoming packets to 0 (low prioriry)");
+	    cli_print(cli, "7 - Set CoS value in incoming packets to 7 (high prioriry)");
+	    return CLI_OK;
+	}else if (strcmp(argv[0],"0")==0){
+	    swconfig.qos_port_priority.bitmap &= (~(1<<port_phys));
+	}else if (strcmp(argv[0],"7")==0){
+	    swconfig.qos_port_priority.bitmap |= (1<<port_phys);
 	}else{
 	    cli_print(cli, "%% Invalid input detected.");
+	    return CLI_ERROR;
 	}
     }else{
-	cli_print(cli, "%% Not implemented yet.");
+	cli_print(cli, "%% Specify new CoS value (0 or 7)");
     }
     return CLI_OK;
 }
 
 int cmd_config_int_speed_duplex(struct cli_def *cli, char *command, char *argv[], int argc)
 {
+    // Note: a software reset of whole switch is required to re-negotiate speed/duplex on any port
+    int port,port_phys;
+    port=atoi(strrchr(cli->modestring,'/')+1);
+    port_phys=map_port_number_from_logical_to_physical(port);
+
     if (argc>0){
 	if (strcmp(argv[0],"?")==0){
 	    cli_print(cli, "<CR>");
@@ -183,7 +211,73 @@ int cmd_config_int_speed_duplex(struct cli_def *cli, char *command, char *argv[]
 	    cli_print(cli, "%% Invalid input detected.");
 	}
     }else{
-	cli_print(cli, "%% Not implemented yet.");
+	if (strcasecmp(command,"speed 10")==0){
+	    swconfig.port_config.config[port_phys].autoneg=0;
+	    swconfig.port_config.config[port_phys].media_10half=0;
+	    swconfig.port_config.config[port_phys].media_10full=1;
+	    swconfig.port_config.config[port_phys].media_100half=0;
+	    swconfig.port_config.config[port_phys].media_100full=0;
+	    swconfig.port_config.config[port_phys].media_1000full=0;
+	}else if (strcasecmp(command,"speed 100")==0){
+	    swconfig.port_config.config[port_phys].autoneg=0;
+	    swconfig.port_config.config[port_phys].media_10half=0;
+	    swconfig.port_config.config[port_phys].media_10full=0;
+	    swconfig.port_config.config[port_phys].media_100half=0;
+	    swconfig.port_config.config[port_phys].media_100full=1;
+	    swconfig.port_config.config[port_phys].media_1000full=0;
+	}else if (strcasecmp(command,"speed 1000")==0){
+	    char s[32];
+	    if (port_phys<24){
+		cli_print(cli, "%% Gigabit speed is not supported on port %s",rrcp_config_get_portname(s, sizeof(s), port, port_phys));
+	    }
+	    swconfig.port_config.config[port_phys].autoneg=0;
+	    swconfig.port_config.config[port_phys].media_10half=0;
+	    swconfig.port_config.config[port_phys].media_10full=0;
+	    swconfig.port_config.config[port_phys].media_100half=0;
+	    swconfig.port_config.config[port_phys].media_100full=0;
+	    swconfig.port_config.config[port_phys].media_1000full=1;
+	}else if (strcasecmp(command,"speed auto")==0){
+	    swconfig.port_config.config[port_phys].autoneg=1;
+	    swconfig.port_config.config[port_phys].media_10half=1;
+	    swconfig.port_config.config[port_phys].media_10full=1;
+	    swconfig.port_config.config[port_phys].media_100half=1;
+	    swconfig.port_config.config[port_phys].media_100full=1;
+	    if (port_phys>=24){
+		swconfig.port_config.config[port_phys].media_1000full=1;
+	    }
+	}else if (strcasestr(command,"duplex")==command){
+	    if (swconfig.port_config.config[port_phys].autoneg){
+		cli_print(cli, "%% Duplex can not be set until speed is set to non-auto value");
+		return CLI_ERROR;
+	    }
+	    if (strcasecmp(command,"duplex half")==0){
+		if (swconfig.port_config.config[port_phys].media_1000full && port_phys>=24){
+		    cli_print(cli, "%% Half-duplex Gigabit mode is not supported");
+		    return CLI_ERROR;
+		}
+		if (swconfig.port_config.config[port_phys].media_10full){
+		    swconfig.port_config.config[port_phys].media_10full=0;
+		    swconfig.port_config.config[port_phys].media_10half=1;
+		}
+		if (swconfig.port_config.config[port_phys].media_100full){
+		    swconfig.port_config.config[port_phys].media_100full=0;
+		    swconfig.port_config.config[port_phys].media_100half=1;
+		}
+	    }else if (strcasecmp(command,"duplex full")==0){
+		if (swconfig.port_config.config[port_phys].media_10half){
+		    swconfig.port_config.config[port_phys].media_10half=0;
+		    swconfig.port_config.config[port_phys].media_10full=1;
+		}
+		if (swconfig.port_config.config[port_phys].media_100half){
+		    swconfig.port_config.config[port_phys].media_100half=0;
+		    swconfig.port_config.config[port_phys].media_100full=1;
+		}
+	    }else{
+		cli_print(cli, "Internal error on command '%s'",command);
+	    }
+	}else{
+	    cli_print(cli, "Internal error on command '%s'",command);
+	}
     }
     return CLI_OK;
 }
@@ -233,6 +327,7 @@ void cmd_config_int_register_commands(struct cli_def *cli)
 	struct cli_command *mac;
 	mac=cli_register_command(cli, NULL, "mac-learn", cmd_config_int_mac_learning, PRIVILEGE_PRIVILEGED, MODE_CONFIG_INT, "MAC interface commands");
 	cli_register_command(cli, mac, "disable", cmd_config_int_mac_learning, PRIVILEGE_PRIVILEGED, MODE_CONFIG_INT, "MAC address learning control");
+	cli_register_command(cli, mac, "enable", cmd_config_int_mac_learning, PRIVILEGE_PRIVILEGED, MODE_CONFIG_INT, "MAC address learning control");
 	mac=cli_register_command(cli, no, "mac-learn", cmd_config_int_mac_learning, PRIVILEGE_PRIVILEGED, MODE_CONFIG_INT, "MAC interface commands");
 	cli_register_command(cli, mac, "disable", cmd_config_int_mac_learning, PRIVILEGE_PRIVILEGED, MODE_CONFIG_INT, "MAC address learning control");
     }
@@ -254,12 +349,12 @@ void cmd_config_int_register_commands(struct cli_def *cli)
 	speed=cli_register_command(cli, NULL, "speed", NULL, PRIVILEGE_PRIVILEGED, MODE_CONFIG_INT, "Configure port speed operation");
 	cli_register_command(cli, speed, "10", cmd_config_int_speed_duplex, PRIVILEGE_PRIVILEGED, MODE_CONFIG_INT, "Force 10 Mbps operation");
 	cli_register_command(cli, speed, "100", cmd_config_int_speed_duplex, PRIVILEGE_PRIVILEGED, MODE_CONFIG_INT, "Force 100 Mbps operation");
+	cli_register_command(cli, speed, "1000", cmd_config_int_speed_duplex, PRIVILEGE_PRIVILEGED, MODE_CONFIG_INT, "Force 1 Gbps operation");
 	cli_register_command(cli, speed, "auto", cmd_config_int_speed_duplex, PRIVILEGE_PRIVILEGED, MODE_CONFIG_INT, "Enable AUTO speed configuration");
     }
     {
 	struct cli_command *duplex;
 	duplex=cli_register_command(cli, NULL, "duplex", NULL, PRIVILEGE_PRIVILEGED, MODE_CONFIG_INT, "Configure duplex operation");
-	cli_register_command(cli, duplex, "auto", cmd_config_int_speed_duplex, PRIVILEGE_PRIVILEGED, MODE_CONFIG_INT, "Enable AUTO speed configuration");
 	cli_register_command(cli, duplex, "full", cmd_config_int_speed_duplex, PRIVILEGE_PRIVILEGED, MODE_CONFIG_INT, "Force full duplex operation");
 	cli_register_command(cli, duplex, "half", cmd_config_int_speed_duplex, PRIVILEGE_PRIVILEGED, MODE_CONFIG_INT, "Force half-duplex operation");
     }

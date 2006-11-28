@@ -28,54 +28,6 @@
 #include "rrcp_switches.h"
 #include "rrcp_cli_cmd_show.h"
 
-#define MODE_CONFIG_INT		10
-
-int cmd_rate_limit(struct cli_def *cli, char *command, char *argv[], int argc)
-{
-    int rate=0;
-    if (strncasecmp("no ", command,3)==0){
-	rate=100;
-    }else if ((argc==0)||(strcmp(argv[0], "?") == 0))
-    {
-	cli_print(cli, "  128K 256K 512K 1M 2M 4M 8M 100M");
-	return CLI_OK;
-    }
-    return CLI_OK;
-}
-
-int cmd_config_int(struct cli_def *cli, char *command, char *argv[], int argc)
-{
-    if (argc < 1){
-	cli_print(cli, "Specify an interface to configure");
-	return CLI_OK;
-    }
-    if (strcmp(argv[0], "?") == 0){
-	int i;
-	char s1[30],s2[30];
-	for(i=0;i<switchtypes[switchtype].num_ports;i+=2){
-	    cli_print(cli,"%-19s %-19s",rrcp_config_get_portname(s1, sizeof(s1), i+1, i),rrcp_config_get_portname(s2, sizeof(s2), i+2, i+1));
-	}
-	cli_print(cli,"<%d-%d> - reference interface by its number",1,i);
-	return CLI_OK;
-    }else{
-	char *a=argv[0];
-	int int_num=0;
-	char s[10];
-	if ((strlen(a)>0)&&('0'<=(a[strlen(a)-1]))&&((a[strlen(a)-1])<='9'))
-	    int_num+=a[strlen(a)-1]-'0';
-	if ((strlen(a)>1)&&('0'<=(a[strlen(a)-2]))&&((a[strlen(a)-2])<='9'))
-	    int_num+=10*(a[strlen(a)-2]-'0');
-	if (int_num>0 && int_num<=switchtypes[switchtype].num_ports){
-	    sprintf(s,"0/%d",int_num);
-	    cli_set_configmode(cli, MODE_CONFIG, NULL);
-	    cli_set_configmode(cli, MODE_CONFIG_INT, s);
-	}else{
-	    cli_print(cli, "Unknown interface %s", argv[0]);
-	}
-    }
-    return CLI_OK;
-}
-
 int cmd_config_version(struct cli_def *cli, char *command, char *argv[], int argc)
 {
     if (argc==1){
@@ -224,8 +176,6 @@ int cmd_config_qos(struct cli_def *cli, char *command, char *argv[], int argc)
 	if (strcasecmp(command,"no qos tos")==0) swconfig.qos_config.config.tos_enable=0;
 	if (strcasecmp(command,"qos dot1p")==0) swconfig.qos_config.config.dot1p_enable=1;
 	if (strcasecmp(command,"no qos dot1p")==0) swconfig.qos_config.config.dot1p_enable=0;
-	if (strcasecmp(command,"qos flow-control-jam")==0) swconfig.qos_config.config.flow_control_jam=1;
-	if (strcasecmp(command,"no qos flow-control-jam")==0) swconfig.qos_config.config.flow_control_jam=0;
 	if (strcasecmp(command,"no qos wrr-queue ratio")==0) swconfig.qos_config.config.wrr_ratio=3;
     }
     return CLI_OK;
@@ -271,6 +221,8 @@ int cmd_config_flowcontrol(struct cli_def *cli, char *command, char *argv[], int
 	if (strcasecmp(command,"no flowcontrol dot3x")==0) swconfig.port_config_global.config.flow_dot3x_disable=1;
 	if (strcasecmp(command,"flowcontrol backpressure")==0) swconfig.port_config_global.config.flow_backpressure_disable=0;
 	if (strcasecmp(command,"no flowcontrol backpressure")==0) swconfig.port_config_global.config.flow_backpressure_disable=1;
+	if (strcasecmp(command,"flowcontrol ondemand-disable")==0) swconfig.qos_config.config.flow_ondemand_disable=1;
+	if (strcasecmp(command,"no flowcontrol ondemand-disable")==0) swconfig.qos_config.config.flow_ondemand_disable=0;
     }
     return CLI_OK;
 }
@@ -306,29 +258,27 @@ int cmd_config_stormcontrol(struct cli_def *cli, char *command, char *argv[], in
     return CLI_OK;
 }
 
-int cmd_config_int_exit(struct cli_def *cli, char *command, char *argv[], int argc)
+int cmd_config_spanning_tree(struct cli_def *cli, char *command, char *argv[], int argc)
 {
-	cli_set_configmode(cli, MODE_CONFIG, NULL);
-	return CLI_OK;
-}
-
-int cmd_dummytest(struct cli_def *cli, char *command, char *argv[], int argc)
-{
-    int i;
-    cli_print(cli, "called %s with \"%s\"", __FUNCTION__, command);
-    cli_print(cli, "%d arguments:", argc);
-    for (i = 0; i < argc; i++)
-    {
-	cli_print(cli, "	%s", argv[i]);
+    if (argc>0){
+	if (strcmp(argv[0],"?")==0){
+	    cli_print(cli, "<CR>");
+	}else{
+	    cli_print(cli, "%% Invalid input detected.");
+	}
+    }else{
+	if (strcasecmp(command,"spanning-tree bpdufilter enable")==0) swconfig.alt.s.alt_config.stp_filter=1;
+	if ((strcasecmp(command,"no spanning-tree bpdufilter enable")==0)||
+	    (strcasecmp(command,"spanning-tree bpdufilter disable")==0)) swconfig.alt.s.alt_config.stp_filter=0;
     }
     return CLI_OK;
 }
 
 void cmd_config_register_commands(struct cli_def *cli)
 {
-    struct cli_command *c,*c2,*c3,*no,*noi;
+    struct cli_command *c,*c2,*c3,*no;
 
-    no=cli_register_command(cli, NULL, "no", cmd_dummytest, PRIVILEGE_PRIVILEGED, MODE_CONFIG, "Negate a command or set its defaults");
+    no=cli_register_command(cli, NULL, "no", NULL, PRIVILEGE_PRIVILEGED, MODE_CONFIG, "Negate a command or set its defaults");
 
     cli_register_command(cli, NULL, "version", cmd_config_version, PRIVILEGE_PRIVILEGED, MODE_CONFIG, "");
 
@@ -389,8 +339,6 @@ void cmd_config_register_commands(struct cli_def *cli)
 	cli_register_command(cli, no_qos, "tos", cmd_config_qos, PRIVILEGE_PRIVILEGED, MODE_CONFIG, "Do not trust TOS value in IP header of incoming packets");
 	cli_register_command(cli, qos, "dot1p", cmd_config_qos, PRIVILEGE_PRIVILEGED, MODE_CONFIG, "Trust 802.1p tag value of incoming packets");
 	cli_register_command(cli, no_qos, "dot1p", cmd_config_qos, PRIVILEGE_PRIVILEGED, MODE_CONFIG, "Do not 802.1p tag value of incoming packets");
-	cli_register_command(cli, qos, "flow-control-jam", cmd_config_qos, PRIVILEGE_PRIVILEGED, MODE_CONFIG, "Temprorary jam port, from which high-priority frame has come - strange feathure, use with care!");
-	cli_register_command(cli, no_qos, "flow-control-jam", cmd_config_qos, PRIVILEGE_PRIVILEGED, MODE_CONFIG, "Do not temprorary jam port, from which high-priority frame has come");
 	c=cli_register_command(cli, qos, "wrr-queue", NULL, PRIVILEGE_PRIVILEGED, MODE_CONFIG, "Configure Weighed Round-Robin queue");
 	cli_register_command(cli, c, "ratio", cmd_config_qos_wrr_queue_ratio, PRIVILEGE_PRIVILEGED, MODE_CONFIG, "Configure ratio of high-priority vs. low-priority traffic to pass");
 	c=cli_register_command(cli, no_qos, "wrr-queue", NULL, PRIVILEGE_PRIVILEGED, MODE_CONFIG, "Configure Weighed Round-Robin queue");
@@ -406,6 +354,8 @@ void cmd_config_register_commands(struct cli_def *cli)
 	cli_register_command(cli, no_flowcontrol, "dot3x", cmd_config_flowcontrol, PRIVILEGE_PRIVILEGED, MODE_CONFIG, "Disable IEEE 802.3x flow control");
 	cli_register_command(cli, flowcontrol, "backpressure", cmd_config_flowcontrol, PRIVILEGE_PRIVILEGED, MODE_CONFIG, "Enable half-duplex back pressure flow control");
 	cli_register_command(cli, no_flowcontrol, "backpressure", cmd_config_flowcontrol, PRIVILEGE_PRIVILEGED, MODE_CONFIG, "Disable half-duplex back pressure flow control");
+	cli_register_command(cli, flowcontrol, "ondemand-disable", cmd_config_flowcontrol, PRIVILEGE_PRIVILEGED, MODE_CONFIG, "Allow on demand temporary disabling all flow control on port, where high-priority frame has arrived - use with care!");
+	cli_register_command(cli, no_flowcontrol, "ondemand-disable", cmd_config_flowcontrol, PRIVILEGE_PRIVILEGED, MODE_CONFIG, "Do not allow on demand disabling of flow control");
     }
 
     { // storm-control config
@@ -421,71 +371,15 @@ void cmd_config_register_commands(struct cli_def *cli)
 	cli_register_command(cli, no_stormcontrol, "multicast", cmd_config_stormcontrol, PRIVILEGE_PRIVILEGED, MODE_CONFIG, "Disable storm-control on multicast traffic");
     }
 
-    cli_register_command(cli, NULL, "interface", cmd_config_int, PRIVILEGE_PRIVILEGED, MODE_CONFIG, "Configure an interface");
-    cli_register_command(cli, NULL, "interface", cmd_config_int, PRIVILEGE_PRIVILEGED, MODE_CONFIG_INT, "Configure another interface");
+    { // spanning-tree config
+	struct cli_command *spanning_tree,*no_spanning_tree;
 
-    // Interface config mode
-    noi=cli_register_command(cli, NULL, "no", cmd_dummytest, PRIVILEGE_PRIVILEGED, MODE_CONFIG_INT, "Negate a command or set its defaults");
-    cli_register_command(cli, NULL, "shutdown", cmd_dummytest, PRIVILEGE_PRIVILEGED, MODE_CONFIG_INT, "Shutdown the selected interface");
-    cli_register_command(cli, noi, "shutdown", cmd_dummytest, PRIVILEGE_PRIVILEGED, MODE_CONFIG_INT, "Shutdown the selected interface");
-
-    {
-	struct cli_command *switchport,*switchport_mode,*switchport_access,*switchport_trunk,*switchport_trunk_allowed,*switchport_trunk_native;
-	switchport=cli_register_command(cli, NULL, "switchport", cmd_dummytest, PRIVILEGE_PRIVILEGED, MODE_CONFIG_INT, "Set switching mode characteristics");
-	switchport_mode=cli_register_command(cli, switchport, "mode", cmd_dummytest, PRIVILEGE_PRIVILEGED, MODE_CONFIG_INT, "Set trunking mode of the interface");
-	cli_register_command(cli, switchport_mode, "access", cmd_dummytest, PRIVILEGE_PRIVILEGED, MODE_CONFIG_INT, "Set trunking mode to ACCESS unconditionally");
-	cli_register_command(cli, switchport_mode, "trunk", cmd_dummytest, PRIVILEGE_PRIVILEGED, MODE_CONFIG_INT, "Set trunking mode to TRUNK unconditionally");  
-	switchport_access=cli_register_command(cli, switchport, "access", cmd_dummytest, PRIVILEGE_PRIVILEGED, MODE_CONFIG_INT, "Set access mode characteristics of the interface");
-	cli_register_command(cli, switchport, "vlan", cmd_dummytest, PRIVILEGE_PRIVILEGED, MODE_CONFIG_INT, "Set VLAN when interface is in access mode");
-	switchport_trunk=cli_register_command(cli, switchport, "trunk", cmd_dummytest, PRIVILEGE_PRIVILEGED, MODE_CONFIG_INT, "Set trunking characteristics of the interface");
-	switchport_trunk_allowed=cli_register_command(cli, switchport_trunk, "allowed", cmd_dummytest, PRIVILEGE_PRIVILEGED, MODE_CONFIG_INT, "Set allowed VLAN characteristics when interface is in trunking mode");
-	cli_register_command(cli, switchport_trunk_allowed, "vlan", cmd_dummytest, PRIVILEGE_PRIVILEGED, MODE_CONFIG_INT, "Set allowed VLANs when interface is in trunking mode");
-	switchport_trunk_native=cli_register_command(cli, switchport_trunk, "allowed", cmd_dummytest, PRIVILEGE_PRIVILEGED, MODE_CONFIG_INT, "Set trunking native characteristics when interface is in trunking mode");
-	cli_register_command(cli, switchport_trunk_native, "vlan", cmd_dummytest, PRIVILEGE_PRIVILEGED, MODE_CONFIG_INT, "Set native VLAN when interface is in trunking mode");
-    }
-    {
-	struct cli_command *rate_limit;
-	rate_limit=cli_register_command(cli, NULL, "rate-limit", NULL, PRIVILEGE_PRIVILEGED, MODE_CONFIG_INT, "Rate Limit");
-	cli_register_command(cli, rate_limit, "input", cmd_rate_limit, PRIVILEGE_PRIVILEGED, MODE_CONFIG_INT, "Rate limit on input");
-	cli_register_command(cli, rate_limit, "output", cmd_rate_limit, PRIVILEGE_PRIVILEGED, MODE_CONFIG_INT, "Rate limit on output");
-	rate_limit=cli_register_command(cli, noi, "rate-limit", NULL, PRIVILEGE_PRIVILEGED, MODE_CONFIG_INT, "Rate Limit");
-	cli_register_command(cli, rate_limit, "input", cmd_rate_limit, PRIVILEGE_PRIVILEGED, MODE_CONFIG_INT, "Rate limit on input");
-	cli_register_command(cli, rate_limit, "output", cmd_rate_limit, PRIVILEGE_PRIVILEGED, MODE_CONFIG_INT, "Rate limit on output");
-    }
-    {
-	struct cli_command *mac,*learning;
-	mac=cli_register_command(cli, NULL, "mac", cmd_dummytest, PRIVILEGE_PRIVILEGED, MODE_CONFIG_INT, "MAC interface commands");
-	learning=cli_register_command(cli, mac, "learning", cmd_dummytest, PRIVILEGE_PRIVILEGED, MODE_CONFIG_INT, "MAC address learning control");
-	cli_register_command(cli, learning, "enable", cmd_dummytest, PRIVILEGE_PRIVILEGED, MODE_CONFIG_INT, "Enable MAC address learning on this port");
-	mac=cli_register_command(cli, noi, "mac", cmd_dummytest, PRIVILEGE_PRIVILEGED, MODE_CONFIG_INT, "MAC interface commands");
-	learning=cli_register_command(cli, mac, "learning", cmd_dummytest, PRIVILEGE_PRIVILEGED, MODE_CONFIG_INT, "MAC address learning control");
-	cli_register_command(cli, learning, "enable", cmd_dummytest, PRIVILEGE_PRIVILEGED, MODE_CONFIG_INT, "Enable MAC address learning on this port");
-    }
-    {
-	struct cli_command *rrcp;
-	rrcp=cli_register_command(cli, NULL, "rrcp", NULL, PRIVILEGE_PRIVILEGED, MODE_CONFIG_INT, "RRCP protocol control");
-	cli_register_command(cli, rrcp, "enable", cmd_dummytest, PRIVILEGE_PRIVILEGED, MODE_CONFIG_INT, "Enable RRCP protocol on this port");
-	rrcp=cli_register_command(cli, noi, "rrcp", NULL, PRIVILEGE_PRIVILEGED, MODE_CONFIG_INT, "RRCP protocol control");
-	cli_register_command(cli, rrcp, "enable", cmd_dummytest, PRIVILEGE_PRIVILEGED, MODE_CONFIG_INT, "Enable RRCP protocol on this port");
-    }
-    {
-	struct cli_command *mls,*qos;
-	mls=cli_register_command(cli, NULL, "mls", NULL, PRIVILEGE_PRIVILEGED, MODE_CONFIG_INT, "mls interface commands");
-	qos=cli_register_command(cli, mls, "qos", NULL, PRIVILEGE_PRIVILEGED, MODE_CONFIG_INT, "qos command keyword");
-	cli_register_command(cli, qos, "cos", cmd_dummytest, PRIVILEGE_PRIVILEGED, MODE_CONFIG_INT, "cos keyword");
-    }
-    {
-	struct cli_command *speed;
-	speed=cli_register_command(cli, NULL, "speed", NULL, PRIVILEGE_PRIVILEGED, MODE_CONFIG_INT, "Configure port speed operation");
-	cli_register_command(cli, speed, "10", cmd_dummytest, PRIVILEGE_PRIVILEGED, MODE_CONFIG_INT, "Force 10 Mbps operation");
-	cli_register_command(cli, speed, "100", cmd_dummytest, PRIVILEGE_PRIVILEGED, MODE_CONFIG_INT, "Force 100 Mbps operation");
-	cli_register_command(cli, speed, "auto", cmd_dummytest, PRIVILEGE_PRIVILEGED, MODE_CONFIG_INT, "Enable AUTO speed configuration");
-    }
-    {
-	struct cli_command *duplex;
-	duplex=cli_register_command(cli, NULL, "duplex", NULL, PRIVILEGE_PRIVILEGED, MODE_CONFIG_INT, "Configure duplex operation");
-	cli_register_command(cli, duplex, "auto", cmd_dummytest, PRIVILEGE_PRIVILEGED, MODE_CONFIG_INT, "Enable AUTO speed configuration");
-	cli_register_command(cli, duplex, "full", cmd_dummytest, PRIVILEGE_PRIVILEGED, MODE_CONFIG_INT, "Force full duplex operation");
-	cli_register_command(cli, duplex, "half", cmd_dummytest, PRIVILEGE_PRIVILEGED, MODE_CONFIG_INT, "Force half-duplex operation");
+	spanning_tree=cli_register_command(cli, NULL, "spanning-tree", NULL, PRIVILEGE_PRIVILEGED, MODE_CONFIG, "Spanning Tree Subsystem");
+	no_spanning_tree=cli_register_command(cli, no, "spanning-tree", cmd_config_spanning_tree, PRIVILEGE_PRIVILEGED, MODE_CONFIG, "Spanning Tree Subsystem");
+	c=cli_register_command(cli, spanning_tree, "bpdufilter", cmd_config_spanning_tree, PRIVILEGE_PRIVILEGED, MODE_CONFIG, "Don't send or receive BPDUs on this interface");
+	cli_register_command(cli, c, "enable", cmd_config_spanning_tree, PRIVILEGE_PRIVILEGED, MODE_CONFIG, "Enable BPDU filtering for this interface");
+	cli_register_command(cli, c, "disable", cmd_config_spanning_tree, PRIVILEGE_PRIVILEGED, MODE_CONFIG, "Disable BPDU filtering for this interface");
+	c=cli_register_command(cli, no_spanning_tree, "bpdufilter", cmd_config_spanning_tree, PRIVILEGE_PRIVILEGED, MODE_CONFIG, "Don't send or receive BPDUs on this interface");
+	cli_register_command(cli, c, "enable", cmd_config_spanning_tree, PRIVILEGE_PRIVILEGED, MODE_CONFIG, "Disable BPDU filtering for this interface");
     }
 }

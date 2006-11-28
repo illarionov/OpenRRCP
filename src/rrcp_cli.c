@@ -40,6 +40,7 @@
 #include "../lib/libcli.h"
 #include "rrcp_cli_cmd_show.h"
 #include "rrcp_cli_cmd_config.h"
+#include "rrcp_cli_cmd_config_int.h"
 
 #define CLITEST_PORT		8000
 
@@ -88,11 +89,12 @@ int main(int argc, char *argv[])
     int on = 1;
 
     cli = cli_init();
-    cli_set_banner(cli, "libcli test environment");
-    cli_set_hostname(cli, "router");
+    cli_set_banner(cli, "OpenRRCP CLI Version 0.1.91");
+    cli_set_hostname(cli, "rrcpswitch");
 
     cmd_show_register_commands(cli);
     cmd_config_register_commands(cli);
+    cmd_config_int_register_commands(cli);
 
 //    cli_set_auth_callback(cli, check_auth);
 //    cli_set_enable_callback(cli, check_enable);

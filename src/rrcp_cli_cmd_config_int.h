@@ -24,4 +24,4 @@
 
 #include "../lib/libcli.h"
 
-void cmd_config_register_commands(struct cli_def *cli);
+void cmd_config_int_register_commands(struct cli_def *cli);

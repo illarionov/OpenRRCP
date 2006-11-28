@@ -166,23 +166,27 @@ void rrcp_config_bin2text(char *sc, int l, int show_defaults)
 	sncprintf(sc,l,"!\n");
     }
     {
-	sncprintf(sc,l,"%sqos tos\n", swconfig.qos_config.config.tos_enable ? "":"no ");
-	sncprintf(sc,l,"%sqos dot1p\n", swconfig.qos_config.config.dot1p_enable ? "":"no ");
-	if (show_defaults || swconfig.qos_config.config.flow_control_jam){
-	    sncprintf(sc,l,"%sqos flow-control-jam\n", swconfig.qos_config.config.flow_control_jam ? "":"no ");
-	}
+	sncprintf(sc,l,"%smls qos trust tos\n", swconfig.qos_config.config.tos_enable ? "":"no ");
+	sncprintf(sc,l,"%smls qos trust dot1p\n", swconfig.qos_config.config.dot1p_enable ? "":"no ");
 	sncprintf(sc,l,"wrr-queue ratio %s\n", wrr_ratio_text[swconfig.qos_config.config.wrr_ratio]);
 	sncprintf(sc,l,"!\n");
     }
     {
 	sncprintf(sc,l,"%sflowcontrol dot3x\n", swconfig.port_config_global.config.flow_dot3x_disable ? "no ":"");
 	sncprintf(sc,l,"%sflowcontrol backpressure\n", swconfig.port_config_global.config.flow_backpressure_disable ? "no ":"");
+	if (show_defaults || swconfig.qos_config.config.flow_ondemand_disable){
+	    sncprintf(sc,l,"%sflowcontrol ondemand-disable\n", swconfig.qos_config.config.flow_ondemand_disable ? "":"no ");
+	}
 	if (swconfig.port_config_global.config.storm_control_broadcast_disable){
 	    sncprintf(sc,l,"no storm-control broadcast\n");
 	}else{
 	    sncprintf(sc,l,"storm-control broadcast %s\n", swconfig.port_config_global.config.storm_control_broadcast_strict ? "strict":"relaxed");
 	}
 	sncprintf(sc,l,"%sstorm-control multicast\n", swconfig.port_config_global.config.storm_control_multicast_strict ? "":"no ");
+	sncprintf(sc,l,"!\n");
+    }
+    if (show_defaults || swconfig.alt.s.alt_config.stp_filter){
+	sncprintf(sc,l,"%sspanning-tree bpdufilter enable\n", swconfig.alt.s.alt_config.stp_filter ? "":"no ");
 	sncprintf(sc,l,"!\n");
     }
 
@@ -237,7 +241,7 @@ void rrcp_config_bin2text(char *sc, int l, int show_defaults)
 	    }
 	}
 	if (show_defaults || (swconfig.alt.s.alt_control&(1<<port_phys))){
-	    sncprintf(sc,l," %smac learning enable\n",(swconfig.alt.s.alt_control&(1<<port_phys)) ? "no ":"");
+	    sncprintf(sc,l," %smac-learn disable\n",(swconfig.alt.s.alt_control&(1<<port_phys)) ? "":"no ");
 	}
 	if (show_defaults || !(swconfig.rrcp_byport_disable.bitmap&(1<<port_phys))){
 	    sncprintf(sc,l," %srrcp enable\n",(swconfig.rrcp_byport_disable.bitmap&(1<<port_phys)) ? "no ":"");

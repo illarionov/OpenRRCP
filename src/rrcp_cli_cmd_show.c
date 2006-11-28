@@ -40,7 +40,7 @@ int cmd_show_version(struct cli_def *cli, char *command, char *argv[], int argc)
 
     cli_print(cli, "%d FastEthernet/IEEE 802.3 interface(s)",switchtypes[switchtype].num_ports >24 ? 24 : switchtypes[switchtype].num_ports);
     if (switchtypes[switchtype].num_ports >24){
-	cli_print(cli, "%d Gigabit Ethernet/IEEE 802.3 interface(s)\n",switchtypes[switchtype].num_ports >24 ? switchtypes[switchtype].num_ports-24 : 0);
+	cli_print(cli, "%d Gigabit Ethernet/IEEE 802.3 interface(s)",switchtypes[switchtype].num_ports >24 ? switchtypes[switchtype].num_ports-24 : 0);
     }
 
     cli_print(cli, "\nBase ethernet MAC Address:  %02x:%02x:%02x:%02x:%02x:%02x",

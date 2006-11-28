@@ -52,7 +52,7 @@
 		unsigned long sniffed_tx;
 	    } sniff;
 	    unsigned short raw[6];
-	} port_monitor;
+	} port_monitor; // 0x0219..0x021e, supported only on rtl8316b
 	union {
 	    struct t_alt_s{
 		struct  t_alt_config{
@@ -66,7 +66,7 @@
 		unsigned short alt_control;
 	    }s;
 	    unsigned short raw[2];    
-	} alt;
+	} alt; // 0x0300..0x0302
 	union {
 	    struct t_vlan_s{
 		struct  t_vlan_s_config{
@@ -102,7 +102,7 @@
 		unsigned short
 		    tos_enable:1,
 		    dot1p_enable:1,
-		    flow_control_jam:1,
+		    flow_ondemand_disable:1,
 		    wrr_ratio:2,
 		    reserved:11;
 	    } config;

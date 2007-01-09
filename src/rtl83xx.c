@@ -430,8 +430,10 @@ int main(int argc, char **argv){
 	switchtype=3;
     }else if (strstr(p,"rtl83xx_compex_ps2216")==argv[0]+strlen(argv[0])-21){
 	switchtype=4;
+    }else if (strstr(p,"rtl83xx_ovislink_fsh2402gt")==argv[0]+strlen(argv[0])-26){
+	switchtype=5;
     }else {
-	printf("%s: unknown chip type\n",argv[0]);
+	printf("%s: unknown switch/chip type\n",argv[0]);
 	exit(0);
     }
 

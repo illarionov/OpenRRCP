@@ -1,0 +1,40 @@
+------------------------ OpenRRCP 0.1.92 ---------------------------------------
+Tue Nov 28 18:36:28 MSK 2006
+	* much work on rrcp_cli applcation - however still not fully functional
+	* code cleanup
+	* fixed some 64-bit platform-related issues
+	* REP (Realtek Echo Protocol) imlementation - greately improves 'scan' mode
+	* new homepage including hardware compatilibity list and brief chip description
+	  http://openrrcp.org.ru/
+	* too much small fixes and improvement to name all
+
+------------------------ OpenRRCP 0.1.91 ---------------------------------------
+Mon Nov 13 12:47:22 MSK 2006
+	* Initial *BSD (libdnet) port by amelnik
+	* new developers arena (svn and trac-based)
+	  http://dev.openrrcp.org.ru/
+	* new developers/contributors (amelnik,alex001). Thanks, guys!
+
+------------------------ OpenRRCP 0.1.90 ---------------------------------------
+Tue Sep 21 15:12:10 MSD 2006
+	* added rrcp_cli applcation to configure switch in cisco CLI-like fashion
+	  (not yet functional)
+	* code cleanup
+
+------------------------ OpenRRCP 0.1 ------------------------------------------
+Wed Sep 20 13:01:58 MSD 2006
+	* added "show config" command - a first step in ongoing effort to make
+	  rrcp-enabled switches configurable in cisco catalyst-like fashion
+	  (see des1016d.config.txt file)
+	* added vlan command with subcommands status, enable_hvlan,
+	  enable_8021q sub-commands
+	* added specific support for switches:
+	    - D-Link DES-1024D
+	    - D-Link DES-1016D h/w rev. D1
+	    - Compex PS2216
+        * code cleanup
+	* added copyright clauses to each file and LICENCE file
+
+---------------------- OpenRRCP 0.0 --------------------------------------------
+Oct 7 2005
+	* first publuc release

@@ -413,7 +413,8 @@ int main(int argc, char **argv){
 	printf(" link-status                - print link status for all ports\n");
 	printf(" counters                   - print port rx/tx counters for all ports\n");
 	printf(" ping                       - test if switch is responding\n");
-        printf(" write memory               - save current config to EEPROM\n");
+	printf(" write memory               - save current config to EEPROM\n");
+	printf(" eeprom mac-address <mac>   - set <mac> as new switch MAC address and reboots\n");
 	exit(0);
     }
     p=argv[0];
@@ -532,22 +533,39 @@ int main(int argc, char **argv){
             printf("Unknown sub-command: %s\n",argv[3]);
         }
     }else if(strcmp(argv[2],"restrict-rrcp")==0){
+	if (argc<4){
+	    printf("No list of allowed-port specified!\n");
+	}else{ 
+	    if(strcmp(argv[3],"status")==0){
+		print_rrcp_status();
+	    } else if (str_portlist_to_array(argv[3],&rrcp_ena_port[0],switchtypes[switchtype].num_ports)==0){
+		do_restrict_rrcp(&rrcp_ena_port[0]);
+	    }else{
+		printf("Invalid list of ports. Valid form:\n");
+		printf("                                  1         - one port\n");
+		printf("                                  1,5, .. x - list port\n");
+		printf("                                  1-5       - range of ports\n");
+		printf("                                  1,5,8-10, .. x - mix list and range of ports\n");
+	    }
+	}
+    }else if(strcmp(argv[2],"eeprom")==0){
         if (argc<4){
-            printf("No list of allowed-port specified!\n");
-        } else { 
-                 if(strcmp(argv[3],"status")==0){
-                  print_rrcp_status();
-                 }
-                 else if (str_portlist_to_array(argv[3],&rrcp_ena_port[0],switchtypes[switchtype].num_ports)==0){
-                   do_restrict_rrcp(&rrcp_ena_port[0]);
-                 }else{
-                   printf("Invalid list of ports. Valid form:\n");
-                   printf("                                  1         - one port\n");
-                   printf("                                  1,5, .. x - list port\n");
-                   printf("                                  1-5       - range of ports\n");
-                   printf("                                  1,5,8-10, .. x - mix list and range of ports\n");
-                 }
-               }
+            printf("No sub-command specified! available subcommands are:\n");
+            printf("mac-address\n");
+        }
+        if(strcmp(argv[3],"mac-address")==0){
+	    if ((sscanf(argv[4], "%02x:%02x:%02x:%02x:%02x:%02x",x,x+1,x+2,x+3,x+4,x+5)==6)||
+	        (sscanf(argv[4], "%02x%02x.%02x%02x.%02x%02x",x,x+1,x+2,x+3,x+4,x+5)==6)){
+		for (i=0;i<6;i+=2){
+		    if (do_write_eeprom(0x12+i,(unsigned short)x[i]+256*(unsigned short)x[i+1])) {printf("error writing eeprom!\n");exit(1);}
+		}
+		do_reboot();
+	    }else{
+		printf("malformed mac-address: '%s'!\n",argv[4]);exit(1);
+	    }
+        }else{
+            printf("Unknown sub-command: %s\n",argv[3]);
+        }
     }else{
 	printf("unknown command: %s\n",argv[2]);
     }

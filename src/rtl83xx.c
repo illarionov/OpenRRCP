@@ -388,6 +388,35 @@ void print_rrcp_status(void){
     }
 }
 
+void do_loopdetect(int state){
+  if (state) rtl83xx_setreg16(0x0200,rtl83xx_readreg16(0x0200)|0x4);
+  else rtl83xx_setreg16(0x0200,rtl83xx_readreg16(0x0200)&0xFFFB);
+}
+
+void print_loopd_status  (void){
+ unsigned int EnLoopDet;
+ unsigned int LoopFault;
+ uint32_t port_status;
+ int i; 
+
+ EnLoopDet=rtl83xx_readreg16(0x0200)&0x4;
+ printf("LoopDetect: %s",(EnLoopDet)?"Enable":"Disable");
+ if (!EnLoopDet){
+  printf("\n");
+ }else{
+  LoopFault=rtl83xx_readreg16(0x102)&0x4; 
+  printf(", Status: %s\n", (LoopFault)?"LOOP detected":"no error");
+  if (LoopFault) {
+   port_status=rtl83xx_readreg32(0x0101);
+   for(i=1;i<=switchtypes[switchtype].num_ports;i++){
+    printf("%s/%-2d: ",ifname,i);
+    if ( ((port_status>>(map_port_number_from_logical_to_physical(i)))&0x1) == 1) printf("Loop\n");
+    else printf("ok\n");
+   }
+  }
+ }
+}
+
 int main(int argc, char **argv){
     unsigned int x[6];
     int i;
@@ -410,6 +439,8 @@ int main(int argc, char **argv){
 	printf(" vlan enable_8021q [<port>] - configure switch as IEEE 802.1Q vlan tree with specified uplink port\n");
 	printf(" restrict-rrcp <list ports> - enable rrcp on specified ports, disable on other\n");
 	printf(" restrict-rrcp status       - print rrcp status for all ports\n");
+	printf(" loopdetect enable|disable  - loop detect function on/off\n"); 
+	printf(" loopdetect status          - loop detect status\n"); 
 	printf(" link-status                - print link status for all ports\n");
 	printf(" counters                   - print port rx/tx counters for all ports\n");
 	printf(" ping                       - test if switch is responding\n");
@@ -563,6 +594,24 @@ int main(int argc, char **argv){
 	    }else{
 		printf("malformed mac-address: '%s'!\n",argv[4]);exit(1);
 	    }
+        }else{
+            printf("Unknown sub-command: %s\n",argv[3]);
+        }
+    }else if(strcmp(argv[2],"loopdetect")==0){
+        if (argc<4){
+            printf("No sub-command specified! available subcommands are:\n");
+            printf("enable\n");
+            printf("disable\n");
+            printf("status\n");
+        }
+        else if(strcmp(argv[3],"status")==0){
+		  print_loopd_status();
+        }
+        else if(strcmp(argv[3],"enable")==0){
+		  do_loopdetect(1);
+        }
+        else if(strcmp(argv[3],"disable")==0){
+		  do_loopdetect(0);
         }else{
             printf("Unknown sub-command: %s\n",argv[3]);
         }

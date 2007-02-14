@@ -158,15 +158,15 @@ void rtl83xx_prepare(){
  memset(filter_app,0,sizeof(filter_app));
  snprintf(filter_app, sizeof(filter_app), "ether proto 0x8899 and not ether src %s", addr_ntoa(&intf_mac));
  if (pcap_lookupnet(ifname, &net, &mask, errbuf) < 0){ net = 0;mask = 0;}
- if ((handle = pcap_open_live(ifname, 128, 0, 0, errbuf))== NULL) errx(2, "pcap_open_live: %s", errbuf);
+ if ((handle = pcap_open_live(ifname, 128, 0, 3, errbuf))== NULL) errx(2, "pcap_open_live: %s", errbuf);
 #if defined(BSD) && defined(BIOCIMMEDIATE)
  {
   int on = 1;
   if (ioctl(pcap_fileno(handle), BIOCIMMEDIATE, &on) < 0) errx(2, "BIOCIMMEDIATE");
  }
 #endif
-    if (pcap_compile(handle, &filter, filter_app, 1, mask) < 0) errx(2, "bad pcap filter: %s", pcap_geterr(handle));
-    if (pcap_setfilter(handle, &filter) < 0) errx(2, "bad pcap filter: %s", pcap_geterr(handle));
+ if (pcap_compile(handle, &filter, filter_app, 1, mask) < 0) errx(2, "bad pcap filter: %s", pcap_geterr(handle));
+ if (pcap_setfilter(handle, &filter) < 0) errx(2, "bad pcap filter: %s", pcap_geterr(handle));
 }
 
 //send to wire
@@ -183,13 +183,19 @@ ssize_t sock_send(void *ptr, int size){
 //recieve from wire, returns length
 int sock_rec_(void *ptr, int size, int waittick){
     int len=0;
+    int i=0;
     struct pcap_pkthdr pkt_h;
  
-    rcvbuf=pcap_next(handle,&pkt_h);
-    if (rcvbuf==NULL) return 0;
-    if (pkt_h.caplen > size) len=size;
-    else len=pkt_h.caplen;
-    memcpy(ptr,rcvbuf,len);
+    while(i++ < 11){
+     rcvbuf=pcap_next(handle,&pkt_h);
+     if (rcvbuf!=NULL) break;
+     usleep(waittick);     
+    }
+    if (rcvbuf!=NULL){
+     if (pkt_h.caplen > size) len=size;
+     else len=pkt_h.caplen;
+     memcpy(ptr,rcvbuf,len);
+    }
     return len;
 }
 #endif

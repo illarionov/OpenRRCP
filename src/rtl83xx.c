@@ -388,6 +388,26 @@ void print_rrcp_status(void){
     }
 }
 
+void do_port_disable(unsigned short int *arr,unsigned short int val){
+    int i;
+    uint32_t portmask;
+
+    portmask=swconfig.port_disable.bitmap=0;
+    for(i=0;i<switchtypes[switchtype].num_ports;i++){
+      portmask|=(((*(arr+map_port_number_from_physical_to_logical(i)-1))&0x1)<<i);
+    }
+    swconfig.port_disable.raw[0]=rtl83xx_readreg16(0x0608);
+    if (switchtypes[switchtype].num_ports > 16) swconfig.port_disable.raw[1]=rtl83xx_readreg16(0x0609);
+
+    if (val) swconfig.port_disable.bitmap&=~portmask; 
+    else swconfig.port_disable.bitmap|=portmask;
+
+    rtl83xx_setreg16(0x0608,swconfig.port_disable.raw[0]);
+    if (switchtypes[switchtype].num_ports > 16) rtl83xx_setreg16(0x0609,swconfig.port_disable.raw[1]);
+    
+    if (!val) printf ("Warning! This setting(s) can be saved and be forged after reboot\n");
+}
+
 void do_loopdetect(int state){
   if (state) rtl83xx_setreg16(0x0200,rtl83xx_readreg16(0x0200)|0x4);
   else rtl83xx_setreg16(0x0200,rtl83xx_readreg16(0x0200)&0xFFFB);
@@ -417,12 +437,116 @@ void print_loopd_status  (void){
  }
 }
 
+int port_mode_encode(int mode,char *arg){
+ if (mode){ //flow control
+   if (strcmp(arg,"none")==0) return(0);
+   if (strcmp(arg,"asym2remote")==0)  return(0x20);
+   if (strcmp(arg,"symmetric")==0)  return(0x40);
+   if (strcmp(arg,"asym2local")==0) return(0x60);
+ }else{ //speed
+   if (strcmp(arg,"auto")==0) return(0);
+   if (strcmp(arg,"10h")==0)  return(0x1);
+   if (strcmp(arg,"10f")==0)  return(0x2);
+   if (strcmp(arg,"100h")==0) return(0x4);
+   if (strcmp(arg,"100f")==0) return(0x8);
+   if (strcmp(arg,"1000")==0) return(0x10);
+}
+ return(-1); 
+}
+
+void do_port_config(int mode,unsigned short int *arr, int val){
+  int i;
+  int phys_port;
+  int log_port0;
+  int log_port1;
+
+/* 
+ * mode = 0 - set speed
+ * mode = 1 - set flow control
+ */ 
+
+  for(i=0;i<switchtypes[switchtype].num_ports/2;i++){
+    swconfig.port_config.raw[i]=rtl83xx_readreg16(0x060a+i);
+  }
+
+  for(i=1;i<=switchtypes[switchtype].num_ports;i++){
+    if(*(arr+i-1)){
+      phys_port=map_port_number_from_logical_to_physical(i);
+      if (!mode){
+         if ( (val==0x10) && (phys_port!=24) && (phys_port!=25) ){ // Small protection against the fool ;)
+            printf("Port %i can't be set in 1000Mbit/s\n",i);
+            continue;
+         }
+         swconfig.port_config.config[phys_port].autoneg=0;
+         swconfig.port_config.config[phys_port].media_10half=0;
+         swconfig.port_config.config[phys_port].media_10full=0;
+         swconfig.port_config.config[phys_port].media_100half=0;
+         swconfig.port_config.config[phys_port].media_100full=0;
+         swconfig.port_config.config[phys_port].media_1000full=0;
+      }
+      switch (val){
+        case 0x1:
+               swconfig.port_config.config[phys_port].media_10half=0x1;
+               break;
+        case 0x2:
+               swconfig.port_config.config[phys_port].media_10full=0x1;
+               break;
+        case 0x4:
+               swconfig.port_config.config[phys_port].media_100half=0x1;
+               break;
+        case 0x8:
+               swconfig.port_config.config[phys_port].media_100full=0x1;
+               break;
+        case 0x10:
+               swconfig.port_config.config[phys_port].media_1000full=0x1;
+               break;
+        case 0x20:
+               swconfig.port_config.config[phys_port].pause=0x1;
+               swconfig.port_config.config[phys_port].pause_asy=0;
+               break;
+        case 0x40:
+               swconfig.port_config.config[phys_port].pause=0;
+               swconfig.port_config.config[phys_port].pause_asy=0x1;
+               break;
+        case 0x60:
+               swconfig.port_config.config[phys_port].pause=0x1;
+               swconfig.port_config.config[phys_port].pause_asy=0x1;
+               break;
+        default:
+               if (mode){
+                  swconfig.port_config.config[phys_port].pause=0;
+                  swconfig.port_config.config[phys_port].pause_asy=0;
+               }else{
+                  swconfig.port_config.config[phys_port].autoneg=1;
+                  swconfig.port_config.config[phys_port].media_10half=1;
+                  swconfig.port_config.config[phys_port].media_10full=1;
+                  swconfig.port_config.config[phys_port].media_100half=1;
+                  swconfig.port_config.config[phys_port].media_100full=1;
+                  if ( (phys_port==24) || (phys_port==25) ){
+                    swconfig.port_config.config[phys_port].media_1000full=1;
+                  }
+               }
+      }
+    }
+  }
+  for(i=0;i<switchtypes[switchtype].num_ports/2;i++){
+    log_port0=map_port_number_from_physical_to_logical(i*2);
+    log_port1=map_port_number_from_physical_to_logical(i*2+1);
+    if (*(arr+log_port0-1) || *(arr+log_port1-1)){ // write 2 switch only changed value
+      rtl83xx_setreg16(0x060a+i,swconfig.port_config.raw[i]);
+    }
+  }
+  if (val) printf ("Warning! This setting(s) can be saved and be forged after hardware reset\n");
+  printf("This operation requires a SOFT reset to force restart the auto-negotiation process\n");
+}
+
 int main(int argc, char **argv){
     unsigned int x[6];
     int i;
     char *p;
     int root_port=-1;
-    unsigned short int rrcp_ena_port[26];
+    int media_speed;
+    unsigned short int port_list[26];
 
     if (argc<3){
 	printf("Usage: rtl8316b <if-name|xx:xx:xx:xx:xx:xx@if-name> <command> [<argument>]\n");
@@ -430,6 +554,7 @@ int main(int argc, char **argv){
 	printf("       rtl83xx_dlink_des1016d ----\"\"----\n");
 	printf("       rtl83xx_dlink_des1024d ----\"\"----\n");
 	printf("       rtl83xx_compex_ps2216 ----\"\"----\n");
+        printf("       rtl83xx_ovislink_fsh2402gt ----\"\"----\n");
 	printf(" where command may be:\n");
 	printf(" scan [verbose]             - scan network for rrcp-enabled switches\n");
 	printf(" reboot                     - initiate switch reboot\n");
@@ -443,6 +568,9 @@ int main(int argc, char **argv){
 	printf(" loopdetect status          - loop detect status\n"); 
 	printf(" link-status                - print link status for all ports\n");
 	printf(" counters                   - print port rx/tx counters for all ports\n");
+	printf(" port <list ports> enable|disable  - enable/disable specified port(s)\n");
+	printf(" port <list ports> media <speed>   - set speed/duplex on specified port(s)\n");
+	printf(" port <list ports> flowctrl <mode> - set flow control mode on specified port(s)\n");
 	printf(" ping                       - test if switch is responding\n");
 	printf(" write memory               - save current config to EEPROM\n");
 	printf(" eeprom mac-address <mac>   - set <mac> as new switch MAC address and reboots\n");
@@ -569,8 +697,8 @@ int main(int argc, char **argv){
 	}else{ 
 	    if(strcmp(argv[3],"status")==0){
 		print_rrcp_status();
-	    } else if (str_portlist_to_array(argv[3],&rrcp_ena_port[0],switchtypes[switchtype].num_ports)==0){
-		do_restrict_rrcp(&rrcp_ena_port[0]);
+	    } else if (str_portlist_to_array(argv[3],&port_list[0],switchtypes[switchtype].num_ports)==0){
+		do_restrict_rrcp(&port_list[0]);
 	    }else{
 		printf("Invalid list of ports. Valid form:\n");
 		printf("                                  1         - one port\n");
@@ -615,6 +743,42 @@ int main(int argc, char **argv){
         }else{
             printf("Unknown sub-command: %s\n",argv[3]);
         }
+    }else if(strcmp(argv[2],"port")==0){
+        if (argc<5){
+            printf("No sub-command specified! available subcommands are:\n");
+            printf("<list of ports> enable\n");
+            printf("<list of ports> disable\n");
+            printf("<list of ports> media auto|10h|10f|100h|100f|1000\n");
+	    printf("<list of ports> flowctrl none|asym2remote|symmetric|asym2local\n");
+        } else if (str_portlist_to_array(argv[3],&port_list[0],switchtypes[switchtype].num_ports)!=0){
+		 printf("Invalid list of ports. Valid form:\n");
+		 printf("                                  1         - one port\n");
+		 printf("                                  1,5, .. x - list port\n");
+		 printf("                                  1-5       - range of ports\n");
+		 printf("                                  1,5,8-10, .. x - mix list and range of ports\n");
+	  } else if(strcmp(argv[4],"enable")==0){
+                 do_port_disable(&port_list[0],1);
+          } else if(strcmp(argv[4],"disable")==0){
+                 do_port_disable(&port_list[0],0);
+          } else if(strcmp(argv[4],"media")==0){
+                   if (argc<6){
+                        printf("No speed specified! Available options: auto|10h|10f|100h|100f|1000\n");
+                   }else if ((media_speed=port_mode_encode(0,argv[5])) < 0) {
+                        printf("Invalid speed specified! Valid form: auto|10h|10f|100h|100f|1000\n");
+		   }else{
+                     do_port_config(0,&port_list[0],media_speed);
+                   }
+          } else if(strcmp(argv[4],"flowctrl")==0){
+                   if (argc<6){
+                        printf("No mode specified! Available options: none|asym2remote|symmetric|asym2local\n");
+                   }else if ((media_speed=port_mode_encode(1,argv[5])) < 0) {
+                        printf("Invalid mode specified! Valid form: none|asym2remote|symmetric|asym2local\n");
+		   }else{
+                     do_port_config(1,&port_list[0],media_speed);
+                   }
+          }else{
+             printf("Unknown sub-command: %s\n",argv[4]);
+          }
     }else{
 	printf("unknown command: %s\n",argv[2]);
     }

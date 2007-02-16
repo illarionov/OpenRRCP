@@ -27,6 +27,7 @@
 #include <stdint.h>
 #include <string.h>
 #include <sys/time.h>
+#include <ctype.h>
 
 #ifndef __linux__
 #include <sys/socket.h>
@@ -454,6 +455,13 @@ int port_mode_encode(int mode,char *arg){
  return(-1); 
 }
 
+int bandwidth_encode(char *arg){
+ int i;
+ for(i=0;i<strlen(arg);i++) arg[i]=toupper(arg[i]);
+ for(i=0;i<8;i++) if (strcmp(arg,bandwidth_text[i])==0) return(i);
+ return(-1);
+}
+
 void do_port_config(int mode,unsigned short int *arr, int val){
   int i;
   int phys_port;
@@ -536,8 +544,59 @@ void do_port_config(int mode,unsigned short int *arr, int val){
       rtl83xx_setreg16(0x060a+i,swconfig.port_config.raw[i]);
     }
   }
+  printf("This operation requires a (soft) reset to force restart the auto-negotiation process\n");
+  printf("If used hard reset, don't forget make \"write memory\"\n");
+}
+
+void do_port_config_bandwidth(int dir,unsigned short int *arr, int val){
+  int i;
+  int phys_port;
+  int log_port0;
+  int log_port1;
+
+  for(i=0;i<switchtypes[switchtype].num_ports/2;i++){
+    swconfig.bandwidth.raw[i]=rtl83xx_readreg16(0x020a+i);
+  }
+
+  for(i=1;i<=switchtypes[switchtype].num_ports;i++){
+    if(*(arr+i-1)){
+      phys_port=map_port_number_from_logical_to_physical(i);
+      if ( !dir || (dir == 1)) swconfig.bandwidth.rxtx[phys_port].rx=val&0x7;
+      if ( !dir || (dir == 2)) swconfig.bandwidth.rxtx[phys_port].tx=val&0x7;
+    }
+  }
+
+  for(i=0;i<switchtypes[switchtype].num_ports/2;i++){
+    log_port0=map_port_number_from_physical_to_logical(i*2);
+    log_port1=map_port_number_from_physical_to_logical(i*2+1);
+    if (*(arr+log_port0-1) || *(arr+log_port1-1)){ // write 2 switch only changed value
+      rtl83xx_setreg16(0x020a+i,swconfig.bandwidth.raw[i]);
+    }
+  }
   if (val) printf ("Warning! This setting(s) can be saved and be forged after hardware reset\n");
-  printf("This operation requires a SOFT reset to force restart the auto-negotiation process\n");
+}
+
+void do_port_config_mirror(int dir,unsigned short int *arr, int dest_port ){
+  int i,step;
+  
+  swconfig.port_monitor.sniff.sniffer=0;
+  swconfig.port_monitor.sniff.sniffed_tx=0;
+  swconfig.port_monitor.sniff.sniffed_rx=0;
+
+  if (dir < 3){
+    swconfig.port_monitor.sniff.sniffer=0x1<<map_port_number_from_logical_to_physical(dest_port);
+    for(i=0;i<switchtypes[switchtype].num_ports;i++){
+      if ( !dir || (dir==1) ) 
+          swconfig.port_monitor.sniff.sniffed_rx|=(((*(arr+map_port_number_from_physical_to_logical(i)-1))&0x1)<<i);
+      if ( !dir || (dir==2) ) 
+          swconfig.port_monitor.sniff.sniffed_tx|=(((*(arr+map_port_number_from_physical_to_logical(i)-1))&0x1)<<i);
+    }
+  }
+
+  step=(switchtypes[switchtype].num_ports > 16)?1:2;
+  for (i=0;i<6;i+=step){
+    rtl83xx_setreg16(0x219+i, swconfig.port_monitor.raw[0+i]);
+  }
 }
 
 int main(int argc, char **argv){
@@ -546,6 +605,9 @@ int main(int argc, char **argv){
     char *p;
     int root_port=-1;
     int media_speed;
+    int direction; 
+    int bandw;
+    int shift;
     unsigned short int port_list[26];
 
     if (argc<3){
@@ -571,6 +633,8 @@ int main(int argc, char **argv){
 	printf(" port <list ports> enable|disable  - enable/disable specified port(s)\n");
 	printf(" port <list ports> media <speed>   - set speed/duplex on specified port(s)\n");
 	printf(" port <list ports> flowctrl <mode> - set flow control mode on specified port(s)\n");
+	printf(" port <list ports> bandwidth <arg> - set bandwidth on specified port(s)\n");
+	printf(" port <list ports> mirror <arg>    - mirroring port(s)\n");
 	printf(" ping                       - test if switch is responding\n");
 	printf(" write memory               - save current config to EEPROM\n");
 	printf(" eeprom mac-address <mac>   - set <mac> as new switch MAC address and reboots\n");
@@ -750,6 +814,8 @@ int main(int argc, char **argv){
             printf("<list of ports> disable\n");
             printf("<list of ports> media auto|10h|10f|100h|100f|1000\n");
 	    printf("<list of ports> flowctrl none|asym2remote|symmetric|asym2local\n");
+            printf("<list of ports> bandwidth [tx|rx] 100M|128k|256k|512k|1M|2M|4M|8M\n");
+            printf("<list of ports> mirror [tx|rx|off] <destination port>\n");
         } else if (str_portlist_to_array(argv[3],&port_list[0],switchtypes[switchtype].num_ports)!=0){
 		 printf("Invalid list of ports. Valid form:\n");
 		 printf("                                  1         - one port\n");
@@ -776,6 +842,59 @@ int main(int argc, char **argv){
 		   }else{
                      do_port_config(1,&port_list[0],media_speed);
                    }
+          } else if(strcmp(argv[4],"bandwidth")==0){
+                   direction=-1; bandw=-1;shift=0;
+                   switch (argc){
+                      case 7:
+                             if (strcmp(argv[5],"rx")==0){
+				direction=1; shift++;
+                             }else if (strcmp(argv[5],"tx")==0){
+                                direction=2; shift++;
+                             }
+                      case 6:
+                             if ( (bandw=bandwidth_encode(argv[5+shift])) >= 0 ) {
+                                if (!shift) direction=0;
+                                break;
+                             }
+                      default:
+                             printf("Invalid bandwidth specified! Valid options: tx|rx,100M|128k|256k|512k|1M|2M|4M|8M\n");
+                   }
+                   if ( (direction >= 0) && (bandw >= 0) ) do_port_config_bandwidth(direction,&port_list[0],bandw);
+          } else if(strcmp(argv[4],"mirror")==0){
+                   direction=-1; shift=0;
+		   if (switchtypes[switchtype].chip_id != 1){
+                      printf ("This function can not work on the devices constructed not on rtl8316b\n");
+                   } 
+                   switch (argc){
+                      case 7:
+                             if (strcmp(argv[5],"rx")==0){
+				direction=1; shift++;
+                             }else if (strcmp(argv[5],"tx")==0){
+                                direction=2; shift++;
+                             }else{
+                                printf("Invalid option specified! Available options: [tx|rx|off] <dest. port>\n");
+                                break;
+                             }
+                      case 6:
+                             if (strcmp(argv[5],"off")==0){
+                                direction=3;
+                             }else{
+                               root_port=atoi(argv[5+shift]);
+                               if ( (root_port < 1) || (root_port > switchtypes[switchtype].num_ports) ){
+                                 direction=-1;
+                                 printf ("Incorrect destination port\n");
+                               }else if (port_list[root_port-1]){
+                                 direction=-1;
+                                 printf ("Destination port in list of source port\n");
+                               }else{
+                                if (!shift) direction=0;
+                               }
+                             }
+                             break;
+                      default:
+                        printf("No options specified! Available options: [tx|rx|off] <dest. port>\n");
+                   } 
+                   if (direction >= 0) do_port_config_mirror(direction,&port_list[0],root_port);
           }else{
              printf("Unknown sub-command: %s\n",argv[4]);
           }

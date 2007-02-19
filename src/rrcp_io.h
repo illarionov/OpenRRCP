@@ -26,6 +26,7 @@
 #include <stdint.h>
 
 extern char ifname[128];
+extern uint16_t authkey;
 extern unsigned char my_mac[6];
 extern unsigned char dest_mac[6];
 extern unsigned char mac_bcast[6];
@@ -57,5 +58,7 @@ void rtl83xx_setreg16(uint16_t regno, uint32_t regval);
 void rtl83xx_setreg16reg16(uint16_t regno, uint16_t regval);
 
 int do_write_eeprom(uint16_t addr,uint16_t data);
+
+int do_read_eeprom(uint16_t addr,uint16_t *data);
 
 uint32_t rtl83xx_ping(void);

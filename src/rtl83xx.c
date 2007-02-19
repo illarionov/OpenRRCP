@@ -329,6 +329,31 @@ void do_write_memory(){
  }
 }
 
+void do_write_eeprom_defaults(){
+ int i;
+ uint16_t data;
+
+ if (do_write_eeprom(0x01,0x0a80)) {printf("write eeprom\n");exit(1);}
+ if (do_write_eeprom(0x03,0x0155)) {printf("write eeprom\n");exit(1);}
+ if (do_write_eeprom(0x0d,0)) {printf("write eeprom\n");exit(1);}
+ if (do_write_eeprom(0x0f,0)) {printf("write eeprom\n");exit(1);}
+ if (do_write_eeprom(0x11,0)) {printf("write eeprom\n");exit(1);}
+ if (do_write_eeprom(0x23,0x0004)) {printf("write eeprom\n");exit(1);}
+ if (do_read_eeprom(0x25,&data) != 0) {printf("read eeprom\n");exit(1);}
+ else if (do_write_eeprom(0x25,data&0xffe1)) {printf("write eeprom\n");exit(1);}
+ if (do_read_eeprom(0x27,&data) != 0) {printf("read eeprom\n");exit(1);}
+ else if (do_write_eeprom(0x27,data&0xfffe)) {printf("write eeprom\n");exit(1);}
+ if (do_write_eeprom(0x29,0)) {printf("write eeprom\n");exit(1);}
+ if (do_write_eeprom(0x2f,0x0010)) {printf("write eeprom\n");exit(1);}
+ if (do_write_eeprom(0x31,0)) {printf("write eeprom\n");exit(1);}
+ if (do_write_eeprom(0x33,0)) {printf("write eeprom\n");exit(1);}
+ if (do_write_eeprom(0x39,0x0010)) {printf("write eeprom\n");exit(1);}
+ for(i=0;i<12;i++){
+    if (do_write_eeprom(0x3b+i*2,0xafaf)) {printf("write eeprom\n");exit(1);}
+ }
+ if (switchtypes[switchtype].num_ports==26) {if (do_write_eeprom(0x53,0xbfbf)) {printf("write eeprom\n");exit(1);}}
+}
+
 int str_portlist_to_array(char *list,unsigned short int *arr,unsigned int arrlen){
 short int i,k;
 char *s,*c,*n;
@@ -601,6 +626,7 @@ void do_port_config_mirror(int dir,unsigned short int *arr, int dest_port ){
 
 int main(int argc, char **argv){
     unsigned int x[6];
+    unsigned int ak;
     int i;
     char *p;
     int root_port=-1;
@@ -611,7 +637,7 @@ int main(int argc, char **argv){
     unsigned short int port_list[26];
 
     if (argc<3){
-	printf("Usage: rtl8316b <if-name|xx:xx:xx:xx:xx:xx@if-name> <command> [<argument>]\n");
+	printf("Usage: rtl8316b <if-name|xx:xx:xx:xx:xx:xx@if-name|auth-xx:xx:xx:xx:xx:xx@if-name> <command> [<argument>]\n");
 	printf("       rtl8326 ----\"\"----\n");
 	printf("       rtl83xx_dlink_des1016d ----\"\"----\n");
 	printf("       rtl83xx_dlink_des1024d ----\"\"----\n");
@@ -638,6 +664,8 @@ int main(int argc, char **argv){
 	printf(" ping                       - test if switch is responding\n");
 	printf(" write memory               - save current config to EEPROM\n");
 	printf(" eeprom mac-address <mac>   - set <mac> as new switch MAC address and reboots\n");
+	printf(" eeprom default             - save to EEPROM chip-default values\n");
+        printf(" authkey <hex-value>        - set new authkey\n"); 
 	exit(0);
     }
     p=argv[0];
@@ -661,7 +689,16 @@ int main(int argc, char **argv){
 	exit(0);
     }
 
-    if (sscanf(argv[1], "%x:%x:%x:%x:%x:%x@%s",x,x+1,x+2,x+3,x+4,x+5,ifname)==7){
+    if (sscanf(argv[1], "%x-%x:%x:%x:%x:%x:%x@%s",&ak,x,x+1,x+2,x+3,x+4,x+5,ifname)==8){
+        if (ak > 0xffff) {
+          printf("invalid authkey 0x%x\n",ak);
+  	  exit(0);
+        }
+        authkey=(uint16_t)ak;
+	for (i=0;i<6;i++){
+	    dest_mac[i]=(unsigned char)x[i];
+	}
+    }else if (sscanf(argv[1], "%x:%x:%x:%x:%x:%x@%s",x,x+1,x+2,x+3,x+4,x+5,ifname)==7){
 	for (i=0;i<6;i++){
 	    dest_mac[i]=(unsigned char)x[i];
 	}
@@ -786,9 +823,24 @@ int main(int argc, char **argv){
 	    }else{
 		printf("malformed mac-address: '%s'!\n",argv[4]);exit(1);
 	    }
+        }else if(strcmp(argv[3],"default")==0){
+            do_write_eeprom_defaults();
         }else{
             printf("Unknown sub-command: %s\n",argv[3]);
         }
+    }else if(strcmp(argv[2],"authkey")==0){
+       if (argc<4){
+            printf("No value specified!\n");
+       }else if (sscanf(argv[3],"%04x",&ak) != 1){
+          printf("Invalid value\n");
+       }else{
+         if (ak > 0xffff) { printf("Invalid value\n");}
+         else{
+           rtl83xx_setreg16(0x209,ak);
+           printf ("Setting of new authkey is no save into EEPROM and may be forged after reboot.\n");
+           printf ("After change authkey switch not answering on broadcast \"Hello\" scan, be close.\n"); 
+         }
+       }  
     }else if(strcmp(argv[2],"loopdetect")==0){
         if (argc<4){
             printf("No sub-command specified! available subcommands are:\n");

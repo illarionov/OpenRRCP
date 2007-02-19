@@ -55,6 +55,7 @@
 #include "rrcp_switches.h"
 
 char ifname[128] = "";
+uint16_t authkey = 0x2379;
 unsigned char my_mac[6] = {0x00, 0x00, 0x11, 0x22, 0x33, 0x44};
 unsigned char dest_mac[6] = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
 unsigned char mac_bcast[6] = {0xff, 0xff, 0xff, 0xff, 0xff, 0xff};
@@ -235,7 +236,7 @@ void rtl83xx_scan(int verbose){
     pkt.rrcp_proto=0x01;
     pkt.rrcp_opcode=0x00;
     pkt.rrcp_isreply=0;
-    pkt.rrcp_authkey=htons(0x2379);
+    pkt.rrcp_authkey=htons(authkey);
 
     sock_send(&pkt, sizeof(pkt));
 
@@ -249,7 +250,7 @@ void rtl83xx_scan(int verbose){
 	    pktr.rrcp_proto==0x01 &&
 	    pktr.rrcp_opcode==0x00 &&
 	    pktr.rrcp_isreply==1 &&
-	    pktr.rrcp_authkey==htons(0x2379)){
+	    pktr.rrcp_authkey==htons(authkey)){
               if ( (hello_reply=malloc(sizeof(SW_REPLY))) == NULL ) { printf("malloc\n"); _exit(1); }
               memcpy(&hello_reply->pktr,&pktr,sizeof(pktr));
               hello_reply->prev=current;
@@ -388,7 +389,7 @@ uint32_t rtl83xx_readreg32(uint16_t regno){
     pkt.rrcp_proto=0x01;
     pkt.rrcp_opcode=0x01;//0=hello; 1=get; 2=set
     pkt.rrcp_isreply=0;
-    pkt.rrcp_authkey=htons(0x2379);
+    pkt.rrcp_authkey=htons(authkey);
     pkt.rrcp_reg_addr=regno;
     pkt.rrcp_reg_data=0;
 
@@ -404,7 +405,7 @@ uint32_t rtl83xx_readreg32(uint16_t regno){
 	    pktr.rrcp_proto==0x01 &&
 	    pktr.rrcp_opcode==0x01 &&
 	    pktr.rrcp_isreply==1 &&
-	    pktr.rrcp_authkey==htons(0x2379)&&
+	    pktr.rrcp_authkey==htons(authkey)&&
 	    pktr.rrcp_reg_addr==regno){
 	        return(pktr.rrcp_reg_data);
 	}
@@ -418,6 +419,7 @@ uint16_t rtl83xx_readreg16(uint16_t regno){
 void rtl83xx_setreg16(uint16_t regno, uint32_t regval){
     int cnt = 0;
     struct rrcp_packet_t pkt;
+    uint16_t prev_auth=0;
 
     memcpy(pkt.ether_dhost,dest_mac,6);
     memcpy(pkt.ether_shost,my_mac,6);
@@ -425,15 +427,20 @@ void rtl83xx_setreg16(uint16_t regno, uint32_t regval){
     pkt.rrcp_proto=0x01;
     pkt.rrcp_opcode=0x02;//0=hello; 1=get; 2=set
     pkt.rrcp_isreply=0;
-    pkt.rrcp_authkey=htons(0x2379);
+    pkt.rrcp_authkey=htons(authkey);
     pkt.rrcp_reg_addr=regno;
     pkt.rrcp_reg_data=regval;
 
     for (cnt=0;cnt<3;cnt++){
 	sock_send(&pkt, sizeof(pkt));
+        if (!regno) return; // because register 0 self clearing 
+        if (regno == 0x209) { // special hack for new authkey
+           prev_auth=authkey; authkey=(uint16_t)regval; 
+        } 
 	if (rtl83xx_readreg32(regno)==regval){
 	    return;
 	}
+        if (regno == 0x209) { authkey=prev_auth; } // revert authkey if unfinished change 
     }
 //    printf("can't set register 0x%04x to value 0x%04lu (read value is 0x%04lu)\n",regno,regval,rtl83xx_readreg32(regno));
 //    _exit(0);
@@ -455,14 +462,42 @@ uint16_t res;
  return(0xffff);
 }
 
+/* 
+   Concerning algorithm of work with EEPROM the documentation contains a number of discrepancies.
+   Correct data are resulted in tables 22 and 23 chapters 8.26.2 of description RTL8316b.
+
+   register 0217h:
+      bit 0-7  : EEPROM address
+      bit 8-10 : Chip select (EEPROM = 0)
+      bit 11   : Operation Read(1)/Write(0)
+      bit 12   : Status Busy(1)/Idle(0)
+      bit 13   : Operation success status Fail(1)/Success(0)
+      bit 14-15 : reserved
+   
+   register 0218h:
+      bit 0-7  : data written to EEPROM
+      bit 8-15 : data read from EEPROM
+*/
+
 int do_write_eeprom(uint16_t addr,uint16_t data){
 
  rtl83xx_setreg16(0x218,data>>8);
  rtl83xx_setreg16(0x217,addr);
- if ((wait_eeprom()&0x800)!=0) return 1;
+ if ((wait_eeprom()&0x2000)!=0) return 1;
  rtl83xx_setreg16(0x218,data&0x00ff);
  rtl83xx_setreg16(0x217,addr-1);
- if ((wait_eeprom()&0x800)!=0) return 1;
+ if ((wait_eeprom()&0x2000)!=0) return 1;
+ return 0;
+}
+
+int do_read_eeprom(uint16_t addr,uint16_t *data){
+
+ rtl83xx_setreg16(0x217,addr|0x800);
+ if ((wait_eeprom()&0x2000)!=0) return 1;
+ *data=rtl83xx_readreg16(0x218);
+ rtl83xx_setreg16(0x217,(addr-1)|0x800);
+ if ((wait_eeprom()&0x2000)!=0) return 1;
+ *data|=rtl83xx_readreg16(0x218)>>8;
  return 0;
 }
 
@@ -477,7 +512,7 @@ uint32_t rtl83xx_ping(void){
     pkt.rrcp_proto=0x01;
     pkt.rrcp_opcode=0x00;//0=hello; 1=get; 2=set
     pkt.rrcp_isreply=0;
-    pkt.rrcp_authkey=htons(0x2379);
+    pkt.rrcp_authkey=htons(authkey);
 
     sock_send(&pkt, sizeof(pkt));
 
@@ -491,7 +526,7 @@ uint32_t rtl83xx_ping(void){
 	    pktr.rrcp_proto==0x01 &&
 	    pktr.rrcp_opcode==0x00 &&
 	    pktr.rrcp_isreply==1 &&
-	    pktr.rrcp_authkey==htons(0x2379)){
+	    pktr.rrcp_authkey==htons(authkey)){
 	    return 1;
 	}
     }

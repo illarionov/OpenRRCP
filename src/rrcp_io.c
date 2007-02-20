@@ -490,6 +490,14 @@ int do_write_eeprom(uint16_t addr,uint16_t data){
  return 0;
 }
 
+int do_write_eeprom_byte(uint16_t addr,uint8_t data){
+    rtl83xx_setreg16(0x218,((uint16_t)data)&0xff);
+    rtl83xx_setreg16(0x217,addr);
+    if ((wait_eeprom()&0x2000)!=0)
+	return 1;
+    return 0;
+}
+
 int do_read_eeprom(uint16_t addr,uint16_t *data){
 
  rtl83xx_setreg16(0x217,addr|0x800);

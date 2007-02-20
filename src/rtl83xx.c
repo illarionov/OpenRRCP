@@ -691,23 +691,23 @@ int main(int argc, char **argv){
     unsigned short int port_list[26];
 
     if (argc<3){
-	printf("Usage: rtl8316b <if-name|xx:xx:xx:xx:xx:xx@if-name|auth-xx:xx:xx:xx:xx:xx@if-name> <command> [<argument>]\n");
+	printf("Usage: rtl8316b [[authkey-]xx:xx:xx:xx:xx:xx@]if-name <command> [<argument>]\n");
 	printf("       rtl8326 ----\"\"----\n");
 	printf("       rtl83xx_dlink_des1016d ----\"\"----\n");
 	printf("       rtl83xx_dlink_des1024d ----\"\"----\n");
 	printf("       rtl83xx_compex_ps2216 ----\"\"----\n");
         printf("       rtl83xx_ovislink_fsh2402gt ----\"\"----\n");
 	printf(" where command may be:\n");
-	printf(" scan [verbose]             - scan network for rrcp-enabled switches\n");
-	printf(" reboot                     - initiate switch reboot\n");
-	printf(" show config [full|verbose] - show current switch config\n");
-	printf(" vlan status                - show low-level vlan confg\n");
-	printf(" vlan enable_hvlan [<port>] - configure switch as home-vlan tree with specified uplink port\n");
-	printf(" vlan enable_8021q [<port>] - configure switch as IEEE 802.1Q vlan tree with specified uplink port\n");
-	printf(" restrict-rrcp <list ports> - enable rrcp on specified ports, disable on other\n");
-	printf(" restrict-rrcp status       - print rrcp status for all ports\n");
-	printf(" link-status                - print link status for all ports\n");
-	printf(" counters                   - print port rx/tx counters for all ports\n");
+	printf(" scan [verbose]               - scan network for rrcp-enabled switches\n");
+	printf(" reboot                       - initiate switch reboot\n");
+	printf(" show config [full|verbose]   - show current switch config\n");
+	printf(" vlan status                  - show low-level vlan confg\n");
+	printf(" vlan enable_hvlan [<port>]   - configure switch as home-vlan tree with specified uplink port\n");
+	printf(" vlan enable_8021q [<port>]   - configure switch as IEEE 802.1Q vlan tree with specified uplink port\n");
+	printf(" restrict-rrcp <list ports>   - enable rrcp on specified ports, disable on other\n");
+	printf(" restrict-rrcp status         - print rrcp status for all ports\n");
+	printf(" link-status                  - print link status for all ports\n");
+	printf(" counters                     - print port rx/tx counters for all ports\n");
 	printf(" bcast-storm-ctrl enable|disable   - broadcast storm control on/off\n"); 
 	printf(" port <list ports> enable|disable  - enable/disable specified port(s)\n");
 	printf(" port <list ports> media <speed>   - set speed/duplex on specified port(s)\n");
@@ -715,12 +715,12 @@ int main(int argc, char **argv){
 	printf(" port <list ports> bandwidth <arg> - set bandwidth on specified port(s)\n");
 	printf(" port <list ports> mirror <arg>    - mirroring port(s)\n");
 	printf(" port <list ports> learning <arg>  - enable/disable MAC-learning on port(s)\n");
-	printf(" mac-aging <arg>            - address lookup table control\n");
-	printf(" ping                       - test if switch is responding\n");
-	printf(" write memory               - save current config to EEPROM\n");
-	printf(" eeprom mac-address <mac>   - set <mac> as new switch MAC address and reboots\n");
-	printf(" eeprom default             - save to EEPROM chip-default values\n");
-        printf(" authkey <hex-value>        - set new authkey\n"); 
+	printf(" mac-aging <arg>              - address lookup table control\n");
+	printf(" ping                         - test if switch is responding\n");
+	printf(" write memory                 - save current config to EEPROM\n");
+	printf(" eeprom set-mac-address <mac> - set <mac> as new switch MAC address and reboots\n");
+	printf(" eeprom default               - save to EEPROM chip-default values\n");
+        printf(" authkey <hex-value>          - set new authkey\n"); 
 	exit(0);
     }
     p=argv[0];
@@ -869,17 +869,20 @@ int main(int argc, char **argv){
     }else if(strcmp(argv[2],"eeprom")==0){
         if (argc<4){
             printf("No sub-command specified! available subcommands are:\n");
-            printf("mac-address\n");
+            printf("set-mac-address\n");
         }
-        if(strcmp(argv[3],"mac-address")==0){
+        if(strcmp(argv[3],"set-mac-address")==0){
 	    if ((sscanf(argv[4], "%02x:%02x:%02x:%02x:%02x:%02x",x,x+1,x+2,x+3,x+4,x+5)==6)||
 	        (sscanf(argv[4], "%02x%02x.%02x%02x.%02x%02x",x,x+1,x+2,x+3,x+4,x+5)==6)){
-		for (i=0;i<6;i+=2){
-		    if (do_write_eeprom(0x12+i,(unsigned short)x[i]+256*(unsigned short)x[i+1])) {printf("error writing eeprom!\n");exit(1);}
+		for (i=0;i<6;i++){
+		    if (do_write_eeprom_byte(0x12+i,(unsigned char)x[i])){
+			printf ("error writing eeprom!\n");
+			exit(1);
+		    }
 		}
 		do_reboot();
 	    }else{
-		printf("malformed mac-address: '%s'!\n",argv[4]);exit(1);
+		printf("malformed mac address: '%s'!\n",argv[4]);exit(1);
 	    }
         }else if(strcmp(argv[3],"default")==0){
             do_write_eeprom_defaults();

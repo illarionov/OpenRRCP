@@ -146,6 +146,20 @@ void rrcp_config_bin2text(char *sc, int l, int show_defaults)
 	    }else{
 		sncprintf(sc,l,"vlan portbased\n");
 	    }
+	    {
+		int i;
+		char vlanlist[128],s[16];
+
+		vlanlist[0]=0;
+		for(i=0;i<32;i++){
+		    sprintf(s,"%d",swconfig.vlan_vid[i]);
+			if (vlanlist[0]!=0){
+			    strcat(vlanlist,",");
+			}
+		    strcat(vlanlist,s);
+		}
+		sncprintf(sc,l,"! vlan numbers: %s\n",vlanlist);
+	    }
 	}else{
 	    sncprintf(sc,l,"no vlan\n");
 	}
@@ -212,6 +226,9 @@ void rrcp_config_bin2text(char *sc, int l, int show_defaults)
 			}
 			strcat(vlanlist,s);
 		    }
+		}
+		if (vlanlist[0]==0){
+		    strcpy(vlanlist,"none");
 		}
 		sncprintf(sc,l," switchport trunk allowed vlan %s\n",vlanlist);
 	    }else{

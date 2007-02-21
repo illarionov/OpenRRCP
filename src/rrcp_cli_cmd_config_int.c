@@ -90,6 +90,24 @@ int cmd_config_int_shutdown(struct cli_def *cli, char *command, char *argv[], in
 
 int cmd_config_int_switchport(struct cli_def *cli, char *command, char *argv[], int argc)
 {
+    if (argc>0){
+	if (strcmp(argv[0],"?")==0){
+	    cli_print(cli, "<CR>");
+	}else{
+	    cli_print(cli, "%% Invalid input detected.");
+	}
+    }else{
+	int port,port_phys;
+	port=atoi(strrchr(cli->modestring,'/')+1);
+	port_phys=map_port_number_from_logical_to_physical(port);
+	if (strcasecmp(command,"switchport mode trunk")==0)
+	    swconfig.vlan_port_insert_vid.bitmap |= (1<<port_phys);
+	else if (strcasecmp(command,"switchport mode access")==0)
+	    swconfig.vlan_port_insert_vid.bitmap &= (~(1<<port_phys));
+	else
+	    cli_print(cli, "Internal error on command '%s'",command);
+	return CLI_OK;
+    }
     cli_print(cli, "%% Not implemented yet.");
     return CLI_OK;
 }
@@ -302,16 +320,16 @@ void cmd_config_int_register_commands(struct cli_def *cli)
 
     { // will rewrite this later - need to find out how to configure port-based VLANs
 	struct cli_command *switchport,*switchport_mode,*switchport_access,*switchport_trunk,*switchport_trunk_allowed,*switchport_trunk_native;
-	switchport=cli_register_command(cli, NULL, "switchport", cmd_config_int_switchport, PRIVILEGE_PRIVILEGED, MODE_CONFIG_INT, "Set switching mode characteristics");
-	switchport_mode=cli_register_command(cli, switchport, "mode", cmd_config_int_switchport, PRIVILEGE_PRIVILEGED, MODE_CONFIG_INT, "Set trunking mode of the interface");
+	switchport=cli_register_command(cli, NULL, "switchport", NULL, PRIVILEGE_PRIVILEGED, MODE_CONFIG_INT, "Set switching mode characteristics");
+	switchport_mode=cli_register_command(cli, switchport, "mode", NULL, PRIVILEGE_PRIVILEGED, MODE_CONFIG_INT, "Set trunking mode of the interface");
 	cli_register_command(cli, switchport_mode, "access", cmd_config_int_switchport, PRIVILEGE_PRIVILEGED, MODE_CONFIG_INT, "Set trunking mode to ACCESS unconditionally");
 	cli_register_command(cli, switchport_mode, "trunk", cmd_config_int_switchport, PRIVILEGE_PRIVILEGED, MODE_CONFIG_INT, "Set trunking mode to TRUNK unconditionally");  
-	switchport_access=cli_register_command(cli, switchport, "access", cmd_config_int_switchport, PRIVILEGE_PRIVILEGED, MODE_CONFIG_INT, "Set access mode characteristics of the interface");
-	cli_register_command(cli, switchport, "vlan", cmd_config_int_switchport, PRIVILEGE_PRIVILEGED, MODE_CONFIG_INT, "Set VLAN when interface is in access mode");
-	switchport_trunk=cli_register_command(cli, switchport, "trunk", cmd_config_int_switchport, PRIVILEGE_PRIVILEGED, MODE_CONFIG_INT, "Set trunking characteristics of the interface");
-	switchport_trunk_allowed=cli_register_command(cli, switchport_trunk, "allowed", cmd_config_int_switchport, PRIVILEGE_PRIVILEGED, MODE_CONFIG_INT, "Set allowed VLAN characteristics when interface is in trunking mode");
+	switchport_access=cli_register_command(cli, switchport, "access", NULL, PRIVILEGE_PRIVILEGED, MODE_CONFIG_INT, "Set access mode characteristics of the interface");
+	cli_register_command(cli, switchport_access, "vlan", cmd_config_int_switchport, PRIVILEGE_PRIVILEGED, MODE_CONFIG_INT, "Set VLAN when interface is in access mode");
+	switchport_trunk=cli_register_command(cli, switchport, "trunk", NULL, PRIVILEGE_PRIVILEGED, MODE_CONFIG_INT, "Set trunking characteristics of the interface");
+	switchport_trunk_allowed=cli_register_command(cli, switchport_trunk, "allowed", NULL, PRIVILEGE_PRIVILEGED, MODE_CONFIG_INT, "Set allowed VLAN characteristics when interface is in trunking mode");
 	cli_register_command(cli, switchport_trunk_allowed, "vlan", cmd_config_int_switchport, PRIVILEGE_PRIVILEGED, MODE_CONFIG_INT, "Set allowed VLANs when interface is in trunking mode");
-	switchport_trunk_native=cli_register_command(cli, switchport_trunk, "allowed", cmd_config_int_switchport, PRIVILEGE_PRIVILEGED, MODE_CONFIG_INT, "Set trunking native characteristics when interface is in trunking mode");
+	switchport_trunk_native=cli_register_command(cli, switchport_trunk, "native", NULL, PRIVILEGE_PRIVILEGED, MODE_CONFIG_INT, "Set trunking native characteristics when interface is in trunking mode");
 	cli_register_command(cli, switchport_trunk_native, "vlan", cmd_config_int_switchport, PRIVILEGE_PRIVILEGED, MODE_CONFIG_INT, "Set native VLAN when interface is in trunking mode");
     }
     {

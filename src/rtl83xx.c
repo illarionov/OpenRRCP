@@ -704,11 +704,13 @@ int main(int argc, char **argv){
 	printf(" vlan status                  - show low-level vlan confg\n");
 	printf(" vlan enable_hvlan [<port>]   - configure switch as home-vlan tree with specified uplink port\n");
 	printf(" vlan enable_8021q [<port>]   - configure switch as IEEE 802.1Q vlan tree with specified uplink port\n");
+	printf(" vlan disable               - disable all VLAN support\n");
 	printf(" restrict-rrcp <list ports>   - enable rrcp on specified ports, disable on other\n");
 	printf(" restrict-rrcp status         - print rrcp status for all ports\n");
 	printf(" link-status                  - print link status for all ports\n");
 	printf(" counters                     - print port rx/tx counters for all ports\n");
 	printf(" bcast-storm-ctrl enable|disable   - broadcast storm control on/off\n"); 
+	printf(" loopdetect enable|disable         - network loop detect on/off\n"); 
 	printf(" port <list ports> enable|disable  - enable/disable specified port(s)\n");
 	printf(" port <list ports> media <speed>   - set speed/duplex on specified port(s)\n");
 	printf(" port <list ports> flowctrl <mode> - set flow control mode on specified port(s)\n");

@@ -167,8 +167,8 @@ void rrcp_config_bin2text(char *sc, int l, int show_defaults)
 	sncprintf(sc,l,"!\n");
     }
     {
-	sncprintf(sc,l,"%smls qos trust tos\n", swconfig.qos_config.config.tos_enable ? "":"no ");
-	sncprintf(sc,l,"%smls qos trust dot1p\n", swconfig.qos_config.config.dot1p_enable ? "":"no ");
+	sncprintf(sc,l,"%smls qos trust dscp\n", swconfig.qos_config.config.dscp_enable ? "":"no ");
+	sncprintf(sc,l,"%smls qos trust cos\n", swconfig.qos_config.config.cos_enable ? "":"no ");
 	sncprintf(sc,l,"wrr-queue ratio %s\n", wrr_ratio_text[swconfig.qos_config.config.wrr_ratio]);
 	sncprintf(sc,l,"!\n");
     }

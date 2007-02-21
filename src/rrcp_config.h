@@ -105,8 +105,8 @@
 	union {
 	    struct  t_qos_s_config{
 		uint16_t
-		    tos_enable:1,
-		    dot1p_enable:1,
+		    dscp_enable:1,
+		    cos_enable:1,
 		    flow_ondemand_disable:1,
 		    wrr_ratio:2,
 		    reserved:11;

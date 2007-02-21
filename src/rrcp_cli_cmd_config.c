@@ -172,11 +172,11 @@ int cmd_config_qos(struct cli_def *cli, char *command, char *argv[], int argc)
 	    cli_print(cli, "%% Invalid input detected.");
 	}
     }else{
-	if (strcasecmp(command,"qos tos")==0) swconfig.qos_config.config.tos_enable=1;
-	if (strcasecmp(command,"no qos tos")==0) swconfig.qos_config.config.tos_enable=0;
-	if (strcasecmp(command,"qos dot1p")==0) swconfig.qos_config.config.dot1p_enable=1;
-	if (strcasecmp(command,"no qos dot1p")==0) swconfig.qos_config.config.dot1p_enable=0;
-	if (strcasecmp(command,"no qos wrr-queue ratio")==0) swconfig.qos_config.config.wrr_ratio=3;
+	if (strcasecmp(command,"mls qos trust dscp")==0) swconfig.qos_config.config.dscp_enable=1;
+	if (strcasecmp(command,"no mls qos trust dscp")==0) swconfig.qos_config.config.dscp_enable=0;
+	if (strcasecmp(command,"mls qos trust cos")==0) swconfig.qos_config.config.cos_enable=1;
+	if (strcasecmp(command,"no mls qos trust cos")==0) swconfig.qos_config.config.cos_enable=0;
+	if (strcasecmp(command,"no wrr-queue ratio")==0) swconfig.qos_config.config.wrr_ratio=3;
     }
     return CLI_OK;
 }
@@ -331,17 +331,22 @@ void cmd_config_register_commands(struct cli_def *cli)
     }
     
     { // qos config
-	struct cli_command *qos,*no_qos;
+	struct cli_command *mls,*no_mls,*qos,*no_qos,*trust,*no_trust;
 
-	qos=cli_register_command(cli, NULL, "qos", NULL, PRIVILEGE_PRIVILEGED, MODE_CONFIG, "Global Quality-of-Service configuration");
-	no_qos=cli_register_command(cli, no, "qos", cmd_config_qos, PRIVILEGE_PRIVILEGED, MODE_CONFIG, "Global Quality-of-Service configuration");
-	cli_register_command(cli, qos, "tos", cmd_config_qos, PRIVILEGE_PRIVILEGED, MODE_CONFIG, "Trust TOS value in IP header of incoming packets");
-	cli_register_command(cli, no_qos, "tos", cmd_config_qos, PRIVILEGE_PRIVILEGED, MODE_CONFIG, "Do not trust TOS value in IP header of incoming packets");
-	cli_register_command(cli, qos, "dot1p", cmd_config_qos, PRIVILEGE_PRIVILEGED, MODE_CONFIG, "Trust 802.1p tag value of incoming packets");
-	cli_register_command(cli, no_qos, "dot1p", cmd_config_qos, PRIVILEGE_PRIVILEGED, MODE_CONFIG, "Do not 802.1p tag value of incoming packets");
-	c=cli_register_command(cli, qos, "wrr-queue", NULL, PRIVILEGE_PRIVILEGED, MODE_CONFIG, "Configure Weighed Round-Robin queue");
+	mls=cli_register_command(cli, NULL, "mls", NULL, PRIVILEGE_PRIVILEGED, MODE_CONFIG, "Multi-Layer Switch configuration");
+	no_mls=cli_register_command(cli, no, "mls", cmd_config_qos, PRIVILEGE_PRIVILEGED, MODE_CONFIG, "Multi-Layer Switch configuration");
+	qos=cli_register_command(cli, mls, "qos", NULL, PRIVILEGE_PRIVILEGED, MODE_CONFIG, "Global Quality-of-Service configuration");
+	no_qos=cli_register_command(cli, no_mls, "qos", cmd_config_qos, PRIVILEGE_PRIVILEGED, MODE_CONFIG, "Global Quality-of-Service configuration");
+	trust=cli_register_command(cli, qos, "trust", NULL, PRIVILEGE_PRIVILEGED, MODE_CONFIG, "Quality-of-Service trust configuration");
+	no_trust=cli_register_command(cli, no_qos, "trust", cmd_config_qos, PRIVILEGE_PRIVILEGED, MODE_CONFIG, "Quality-of-Service trust configuration");
+	cli_register_command(cli, trust, "dscp", cmd_config_qos, PRIVILEGE_PRIVILEGED, MODE_CONFIG, "Trust DSCP(TOS) value in IP header of incoming packets");
+	cli_register_command(cli, no_trust, "dscp", cmd_config_qos, PRIVILEGE_PRIVILEGED, MODE_CONFIG, "Do not trust DSCP(TOS) value in IP header of incoming packets");
+	cli_register_command(cli, trust, "cos", cmd_config_qos, PRIVILEGE_PRIVILEGED, MODE_CONFIG, "Trust CoS (802.1p) tag value of incoming packets");
+	cli_register_command(cli, no_trust, "cos", cmd_config_qos, PRIVILEGE_PRIVILEGED, MODE_CONFIG, "Do not trust CoS (802.1p) tag value of incoming packets");
+
+	c=cli_register_command(cli, NULL, "wrr-queue", NULL, PRIVILEGE_PRIVILEGED, MODE_CONFIG, "Configure Weighed Round-Robin queue");
 	cli_register_command(cli, c, "ratio", cmd_config_qos_wrr_queue_ratio, PRIVILEGE_PRIVILEGED, MODE_CONFIG, "Configure ratio of high-priority vs. low-priority traffic to pass");
-	c=cli_register_command(cli, no_qos, "wrr-queue", NULL, PRIVILEGE_PRIVILEGED, MODE_CONFIG, "Configure Weighed Round-Robin queue");
+	c=cli_register_command(cli, no, "wrr-queue", NULL, PRIVILEGE_PRIVILEGED, MODE_CONFIG, "Configure Weighed Round-Robin queue");
 	cli_register_command(cli, c, "ratio", cmd_config_qos, PRIVILEGE_PRIVILEGED, MODE_CONFIG, "Configure default high-priority vs. low-priority traffic ratio");
     }
 

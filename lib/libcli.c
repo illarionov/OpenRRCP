@@ -4,7 +4,9 @@
 #include <stdarg.h>
 #include <stdlib.h>
 #include <memory.h>
+#ifdef __linux__
 #include <malloc.h>
+#endif
 #include <string.h>
 #include <ctype.h>
 #include <unistd.h>

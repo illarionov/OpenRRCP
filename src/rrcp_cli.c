@@ -32,6 +32,12 @@
 #include <sys/time.h>
 #include <sys/types.h>
 #include <sys/socket.h>
+
+#ifndef __linux__
+#include <netinet/in.h>
+#include <net/if.h>
+#endif
+
 #include <arpa/inet.h>
 #include "rrcp_packet.h"
 #include "rrcp_io.h"

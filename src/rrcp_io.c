@@ -211,6 +211,13 @@ int sock_rec(void *ptr, int size, int waittick){
     return len;
 }
 
+int istr00mac(const unsigned char *buf){
+int i,res;
+ res=0;
+ for(i=0;i<6;i++) res=+buf[i];
+ return(res);
+}
+
 void rtl83xx_scan(int verbose){
     typedef struct sw_reply SW_REPLY;
     struct sw_reply { 
@@ -221,12 +228,17 @@ void rtl83xx_scan(int verbose){
     int cnt_h_replies = 0;
     int cnt_r_replies = 0;
     int rep;
+    int uplink = 0;
+    int i;
     struct rrcp_packet_t pkt;
     struct rrcp_helloreply_packet_t pktr;
     SW_REPLY *hello_reply=NULL;
     SW_REPLY *rep_reply=NULL;
     SW_REPLY *current=NULL;
     SW_REPLY *next_rep_reply;
+    SW_REPLY *reply4up;
+    unsigned char *hidden_mac=NULL;
+
 
     memcpy(pkt.ether_dhost,mac_bcast,6);
     memcpy(pkt.ether_shost,my_mac,6);
@@ -298,6 +310,47 @@ void rtl83xx_scan(int verbose){
        return;
     }
     if (cnt_h_replies){
+       // search "hidden" devices from uplinks info
+       hidden_mac=malloc((cnt_h_replies+1)*6);
+       if (hidden_mac != NULL){ 
+         // collect all uplinks
+         bzero(hidden_mac,(cnt_h_replies+1)*6);
+         reply4up=hello_reply;
+         while (reply4up != NULL){
+           if (istr00mac(reply4up->pktr.rrcp_uplink_mac)) memcpy(&hidden_mac[uplink++*6],&reply4up->pktr.rrcp_uplink_mac,6);
+           current=reply4up->prev;
+           reply4up=current;
+         }
+         // filter known mac from devices, who answer on Hello-packet
+         for(i=0;i<uplink;i++){
+            reply4up=hello_reply;
+            while (reply4up != NULL){
+              if (memcmp(&reply4up->pktr.ether_shost,&hidden_mac[i*6],6)==0){
+               bzero(&hidden_mac[i*6],6);
+               break;
+              }
+              current=reply4up->prev;
+              reply4up=current;
+            }
+         }
+         // filter known mac from devices, who answer on REP-packet
+         if (cnt_r_replies){
+           for(i=0;i<uplink;i++){
+              reply4up=rep_reply;
+              while (reply4up != NULL){
+                if (istr00mac(&hidden_mac[i*6])){
+                  if (memcmp(&reply4up->pktr.ether_shost,&hidden_mac[i*6],6)==0){
+                   bzero(&hidden_mac[i*6],6);
+                   break;
+                  }
+                }
+                current=reply4up->prev;
+                reply4up=current;
+              }
+            }
+         }
+       } // end of search "hidden" devices
+
        while (hello_reply != NULL){
                 // We have REP reply from this switch?
                 next_rep_reply=NULL;
@@ -319,64 +372,73 @@ void rtl83xx_scan(int verbose){
                  }
                 }
 
-		if (verbose){
-		    printf("%02x:%02x:%02x:%02x:%02x:%02x/%-2d %02x:%02x:%02x:%02x:%02x:%02x/%-2d 0x%08x/0x%04x  %s\n",
+		printf("%02x:%02x:%02x:%02x:%02x:%02x",
 			hello_reply->pktr.ether_shost[0],
 			hello_reply->pktr.ether_shost[1],
 			hello_reply->pktr.ether_shost[2],
 			hello_reply->pktr.ether_shost[3],
 			hello_reply->pktr.ether_shost[4],
-			hello_reply->pktr.ether_shost[5],
-			map_port_number_from_physical_to_logical(hello_reply->pktr.rrcp_downlink_port),
-			hello_reply->pktr.rrcp_uplink_mac[0],
-			hello_reply->pktr.rrcp_uplink_mac[1],
-			hello_reply->pktr.rrcp_uplink_mac[2],
-			hello_reply->pktr.rrcp_uplink_mac[3],
-			hello_reply->pktr.rrcp_uplink_mac[4],
-			hello_reply->pktr.rrcp_uplink_mac[5],
-			map_port_number_from_physical_to_logical(hello_reply->pktr.rrcp_uplink_port),
+			hello_reply->pktr.ether_shost[5]);
+		if (verbose){
+                    printf("/%-2d",map_port_number_from_physical_to_logical(hello_reply->pktr.rrcp_downlink_port));
+		    if (istr00mac(hello_reply->pktr.rrcp_uplink_mac)){
+ 			printf(" %02x:%02x:%02x:%02x:%02x:%02x/%-2d",
+				hello_reply->pktr.rrcp_uplink_mac[0],
+				hello_reply->pktr.rrcp_uplink_mac[1],
+				hello_reply->pktr.rrcp_uplink_mac[2],
+				hello_reply->pktr.rrcp_uplink_mac[3],
+				hello_reply->pktr.rrcp_uplink_mac[4],
+				hello_reply->pktr.rrcp_uplink_mac[5],
+				map_port_number_from_physical_to_logical(hello_reply->pktr.rrcp_uplink_port));
+		     }else{
+ 			printf("                     ");
+		     }
+ 		     printf(" 0x%08x/0x%04x  %s\n",
 			hello_reply->pktr.rrcp_vendor_id,
 			hello_reply->pktr.rrcp_chip_id,
                         (rep)?"Yes":"No");
 		}else{
-		    printf("%02x:%02x:%02x:%02x:%02x:%02x   +    %c\n",
-			hello_reply->pktr.ether_shost[0],
-			hello_reply->pktr.ether_shost[1],
-			hello_reply->pktr.ether_shost[2],
-			hello_reply->pktr.ether_shost[3],
-			hello_reply->pktr.ether_shost[4],
-			hello_reply->pktr.ether_shost[5],
-                        (rep)?'+':'-');
+		    printf("   +    %c\n",(rep)?'+':'-');
 		}
             current=hello_reply->prev;
             free(hello_reply);
             hello_reply=current;
        }
     }
+
     if (cnt_r_replies){
        while (rep_reply != NULL){
-                if (verbose){
-                    printf("%02x:%02x:%02x:%02x:%02x:%02x    No hello-reply, RRCP disable?           Yes\n",
+                printf("%02x:%02x:%02x:%02x:%02x:%02x",
 			rep_reply->pktr.ether_shost[0],
 			rep_reply->pktr.ether_shost[1],
 			rep_reply->pktr.ether_shost[2],
 			rep_reply->pktr.ether_shost[3],
 			rep_reply->pktr.ether_shost[4],
 			rep_reply->pktr.ether_shost[5]);
-                }else{
-		    printf("%02x:%02x:%02x:%02x:%02x:%02x   -    +\n",
-			rep_reply->pktr.ether_shost[0],
-			rep_reply->pktr.ether_shost[1],
-			rep_reply->pktr.ether_shost[2],
-			rep_reply->pktr.ether_shost[3],
-			rep_reply->pktr.ether_shost[4],
-			rep_reply->pktr.ether_shost[5]);
-                }
+                if (verbose) printf("    No hello-reply, RRCP disable?           Yes\n");
+                else printf("   -    +\n");
             current=rep_reply->prev;
             free(rep_reply);
             rep_reply=current;
        }
     }
+
+   if (uplink){ //print info about "hidden devices"
+     for(i=0;i<uplink;i++){
+       if (istr00mac(&hidden_mac[i*6])){
+         printf("%02x:%02x:%02x:%02x:%02x:%02x",
+                hidden_mac[i*6],
+                hidden_mac[i*6+1],
+                hidden_mac[i*6+2],
+                hidden_mac[i*6+3],
+                hidden_mac[i*6+4],
+                hidden_mac[i*6+5]);
+         if (verbose) printf("    No hello-reply, RRCP disable?           No\n");
+         else printf("   -    -\n");
+       }
+     }
+   }
+   if (hidden_mac != NULL) free(hidden_mac);
 }
 
 uint32_t rtl83xx_readreg32(uint16_t regno){

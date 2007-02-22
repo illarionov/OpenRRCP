@@ -872,6 +872,7 @@ int main(int argc, char **argv){
         if (argc<4){
             printf("No sub-command specified! available subcommands are:\n");
             printf("set-mac-address\n");
+            printf("default\n");
         }
         if(strcmp(argv[3],"set-mac-address")==0){
 	    if ((sscanf(argv[4], "%02x:%02x:%02x:%02x:%02x:%02x",x,x+1,x+2,x+3,x+4,x+5)==6)||

@@ -21,7 +21,7 @@
     to it's original author, Andrew Chernyak (nording@yandex.ru)
     This would be appreciated, however not required.
 */
-
+#include <string.h>
 #include "rrcp_io.h"
 #include "rrcp_switches.h"
 
@@ -95,24 +95,48 @@ struct switchtype_t switchtypes[6] = {
 };
 
 uint16_t rrcp_switch_autodetect_chip(void){
-    uint16_t saved_reg,tmp1,tmp2,tmp3;
+    uint16_t saved_reg;
     uint16_t detected_chiptype=unknown;
-    
-    //first step - try to write mirroring control register (present on rtl8316b, absent on rtl8326(s))
-    saved_reg=rtl83xx_readreg16(0x0219);
-    rtl83xx_setreg16(0x0219,0x0000);
-    tmp1=rtl83xx_readreg16(0x0219);
-    rtl83xx_setreg16(0x0219,0x55aa);
-    tmp2=rtl83xx_readreg16(0x0219);
-    rtl83xx_setreg16(0x0219,0xffff);
-    tmp3=rtl83xx_readreg16(0x0219);
-    rtl83xx_setreg16(0x0219,saved_reg);
+    int i,errcnt=0;
+    struct tst{
+      union {
+        uint8_t b[6];
+        uint16_t w[3];
+      };
+    }test1;
+    uint8_t test2[4]={0x0,0x55,0xaa,0xff};
 
-    if (tmp1==0x0000 && tmp2==0x55aa && tmp3==0xffff){
-        detected_chiptype=rtl8316b;
-    }else{
-	detected_chiptype=rtl8326;
+   /*
+     step 1: detect rtl8316b with flash
+   */
+    for(i=0;i<3;i++){
+      if ((errcnt=do_read_eeprom(0x13+i*2,&test1.w[i]))!=0){break;}
     }
+    if (errcnt==0){
+      if (memcmp(&dest_mac[0],&test1.b[0],6)==0) {
+       // here it is possible to note, that the device is equipped by flash-memory
+       return(rtl8316b);
+      }
+    }
+    /*
+      step 2: if step 1 fail, detect rtl8316b without flash
+    */
+    saved_reg=rtl83xx_readreg16(0x0218);
+    for(i=0;i<4;i++){
+      rtl83xx_setreg16(0x0218,test2[i]);
+      if (rtl83xx_readreg16(0x0218) != test2[i]) {
+        errcnt++; 
+        break;
+      }
+    }
+    rtl83xx_setreg16(0x0218,saved_reg);
+
+    if (errcnt) {
+        detected_chiptype=rtl8326;
+    }else{
+	detected_chiptype=rtl8316b;
+    }
+
     return(detected_chiptype);
 }
 

@@ -1,0 +1,35 @@
+sys!=uname -s
+CFLAGS=-s -Wall -O2 -ldnet -lpcap
+.if $(sys)=="NetBSD"
+CFLAGS+=-I/usr/pkg/include -L/usr/pkg/lib
+.elif  $(sys)=="FreeBSD" || $(sys)=="OpenBSD"
+CFLAGS+=-I/usr/local/include -L/usr/local/lib
+.else
+.error Unknown system
+.endif
+
+all: rtl8326 rtl8316b rtl83xx_dlink_des1016d rtl83xx_dlink_des1024d rtl83xx_compex_ps2216 rtl83xx_ovislink_fsh2402gt rrcp_cli
+
+rrcp_cli: rrcp_cli.c rrcp_cli_cmd_show.c rrcp_cli_cmd_config.c rrcp_cli_cmd_config_int.c rrcp_config.c rrcp_io.c rrcp_switches.c
+	gcc $(CFLAGS) -lcrypt rrcp_cli.c rrcp_cli_cmd_show.c rrcp_cli_cmd_config.c rrcp_cli_cmd_config_int.c rrcp_config.c rrcp_io.c rrcp_switches.c ../lib/libcli.c  -o ../bin/rrcp_cli
+
+rtl83xx: rtl83xx.c
+	gcc $(CFLAGS) rtl83xx.c rrcp_io.c rrcp_switches.c rrcp_config.c -o ../bin/rtl83xx
+
+rtl8326: rtl83xx
+	ln -sf rtl83xx ../bin/rtl8326
+
+rtl8316b: rtl83xx
+	ln -sf rtl83xx ../bin/rtl8316b
+
+rtl83xx_dlink_des1024d: rtl83xx
+	ln -sf rtl83xx ../bin/rtl83xx_dlink_des1024d
+
+rtl83xx_dlink_des1016d: rtl83xx
+	ln -sf rtl83xx ../bin/rtl83xx_dlink_des1016d
+
+rtl83xx_compex_ps2216: rtl83xx
+	ln -sf rtl83xx ../bin/rtl83xx_compex_ps2216
+
+rtl83xx_ovislink_fsh2402gt: rtl83xx
+	ln -sf rtl83xx ../bin/rtl83xx_ovislink_fsh2402gt

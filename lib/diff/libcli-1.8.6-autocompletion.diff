@@ -1,0 +1,104 @@
+--- libcli.c.orig	2006-09-20 16:11:59.000000000 +0400
++++ libcli.c	2006-09-20 18:32:46.000000000 +0400
+@@ -578,7 +578,7 @@
+ 			{
+ 				if (start_word == c_words - 1)
+ 				{
+-					cli_error(cli, "Incomplete command");
++					cli_error(cli, "Incomplete command: \"%s\"", cli_command_name(cli, c));
+ 					return CLI_ERROR;
+ 				}
+ 				return cli_find_command(cli, c->children, num_words, words, start_word + 1, filters);
+@@ -730,9 +730,47 @@
+ 	return CLI_OK;
+ }
+ 
+-int cli_get_completions(char *command, char **completions, int max_completions)
++int cli_get_completions(struct cli_def *cli, char *command, char **completions, int max_completions)
+ {
+-	return 0;
++	int l;
++	int matches=0;
++	struct cli_command *c;
++	char *lastword,*sp;
++
++	if (strrchr(command,' ')){
++	    lastword=strrchr(command,' ')+1;
++	}else{
++	    lastword=command;
++	}
++	c=cli->commands;
++	sp=command;
++	while (1){
++		unsigned int l;
++		if ((l=(unsigned int)strchr(sp,' '))==0) break;
++		l-=(unsigned int)sp;
++    		for (; c; c = c->next)
++		{
++			if (strncasecmp(sp, c->command, l) == 0 && c->children && cli->privilege >= c->privilege && (c->mode == cli->mode || c->mode == MODE_ANY))
++			{
++				c=c->children;
++				break;
++			}
++		}
++		sp+=l+1;
++	}
++
++	l=strlen(lastword);
++        for (; c; c = c->next)
++	{
++		if (strncasecmp(c->command, lastword, l) == 0 && (c->callback || c->children) && cli->privilege >= c->privilege && (c->mode == cli->mode || c->mode == MODE_ANY))
++		{
++			completions[matches++]=c->command;
++		}
++        }
++	if (matches==1){
++		return (-1);
++	}
++	return matches;
+ }
+ 
+ void cli_clear_line(int sockfd, char *cmd, int l, int cursor)
+@@ -1139,25 +1177,37 @@
+ 				if (cursor != l) continue;
+ 
+ 				if (l > 0)
+-					num_completions = cli_get_completions(cmd, completions, 128);
++					num_completions = cli_get_completions(cli, cmd, completions, 128);
+ 
+ 				if (num_completions == 0)
+ 				{
+ 					write(sockfd, "\a", 1);
+ 				}
+-				else if (num_completions == 1)
++				else if ((num_completions == 1)||(num_completions == -1))
+ 				{
+ 					// Single completion
+ 					int i;
+ 					for (i = l; i > 0; i--, cursor--)
+ 					{
+-						write(sockfd, "\b", 1);
+-						if (i == ' ') break;
++						if (cmd[i-1] == ' ')
++						{
++							break;
++						}else{
++							write(sockfd, "\b", 1);
++						}
+ 					}
+ 					strcpy((cmd + i), completions[0]);
+-					l += strlen(completions[0]);
++					l = strlen(cmd);
+ 					cursor = l;
+ 					write(sockfd, completions[0], strlen(completions[0]));
++					if (num_completions == -1)
++					{
++						cmd[l]=' ';
++						cmd[l+1]=0;
++						l++;
++						cursor++;					    
++						write(sockfd, " ", 1);
++					}
+ 				}
+ 				else if (lastchar == CTRL('I'))
+ 				{

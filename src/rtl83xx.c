@@ -110,7 +110,7 @@ void print_port_link_status(int port_no, int enabled, unsigned char encoded_stat
     printf("\n");
 }
 
-void print_link_status(void){
+void print_link_status(unsigned short int *arr){
     int i;
     union {
 	uint16_t sh[13];
@@ -134,6 +134,7 @@ void print_link_status(void){
     EnLoopDet=rtl83xx_readreg16(0x0200)&0x4;
     if (EnLoopDet) port_loop_status=rtl83xx_readreg32(0x0101);
     for(i=1;i<=switchtypes[switchtype].num_ports;i++){
+        if (arr) { if (!*(arr+i-1)){ continue;} }
 	print_port_link_status(
 		i,
 		!((u.signlelong>>(map_port_number_from_logical_to_physical(i)))&1),
@@ -150,13 +151,14 @@ void do_softreboot(void){
     rtl83xx_setreg16(0x0000,0x0001);
 }
 
-void print_counters(void){
+void print_counters(unsigned short int *arr){
     int i,port_tr;
     for (i=0;i<=0x0c;i++){
 	rtl83xx_setreg16(0x0700+i,0x0000);//read rx byte, tx byte, drop byte
     }
     printf("port              RX          TX        drop\n");
     for (i=1;i<=switchtypes[switchtype].num_ports;i++){
+        if (arr) { if (!*(arr+i-1)){ continue;} }
 	port_tr=map_port_number_from_logical_to_physical(i);
 	printf("%s/%-2d: %11lu %11lu %11lu\n",
 		ifname,i,
@@ -707,7 +709,8 @@ void print_usage(void){
         printf("       rtl83xx_ovislink_fsh2402gt ----\"\"----\n");
 	printf(" where command may be:\n");
 	printf(" show running-config          - show current switch config\n");
-	printf(" show interface               - print link status for all ports\n");
+	printf(" show interface [<list ports>]- print link status for ports\n");
+	printf(" show interface [<list ports>] summary - print port rx/tx counters\n");
 	printf(" scan [verbose]               - scan network for rrcp-enabled switches\n");
 	printf(" reboot [soft|hard]           - initiate switch reboot\n");
 //	printf(" vlan status                  - show low-level vlan confg\n");
@@ -716,7 +719,6 @@ void print_usage(void){
 //	printf(" vlan disable               - disable all VLAN support\n");
 //	printf(" restrict-rrcp <list ports>   - enable rrcp on specified ports, disable on other\n");
 //	printf(" restrict-rrcp status         - print rrcp status for all ports\n");
-//	printf(" counters                     - print port rx/tx counters for all ports\n");
 //	printf(" bcast-storm-ctrl enable|disable   - broadcast storm control on/off\n"); 
 //	printf(" loopdetect enable|disable         - network loop detect on/off\n"); 
 //	printf(" port <list ports> enable|disable  - enable/disable specified port(s)\n");
@@ -728,7 +730,7 @@ void print_usage(void){
 //	printf(" mac-aging <arg>              - address lookup table control\n");
 	printf(" ping                         - test if switch is responding\n");
 	printf(" write memory                 - save current config to EEPROM\n");
-	printf(" write default                - save to EEPROM chip-default values\n");
+	printf(" write defaults               - save to EEPROM chip-default values\n");
 	printf(" mac-address <mac>            - set <mac> as new switch MAC address and reboots\n");
 //      printf(" authkey <hex-value>          - set new authkey\n"); 
         return;
@@ -746,10 +748,13 @@ int main(int argc, char **argv){
     int shift=0;
     int negate=0;
     int cmd;
+    unsigned short int *p_port_list=NULL;
     unsigned short int port_list[26];
     char *cmd_level_1[]={"show", "config", "scan", "reload", "reboot", "write", "ping", "mac-address",""}; 
     char *show_sub_cmd[]={"running-config","startup-config","interface",""};
     char *scan_sub_cmd[]={"verbose",""};
+    char *show_sub_cmd_l2[]={"full","verbose",""};
+    char *show_sub_cmd_l3[]={"summary",""};
     char *reset_sub_cmd[]={"soft","hard",""};
     char *write_sub_cmd[]={"memory","eeprom","defaults",""};
 
@@ -824,14 +829,46 @@ int main(int argc, char **argv){
                    exit(1);
                 }
                 switch(compare_command(argv[3+shift],&show_sub_cmd[0])){
-                   case 0:
-                          do_show_config(0);
-                          exit(0);
-                   case 1:
+                   case 0: // running-config
+   	                  if (argc == (3+shift+1)){
+	           	     do_show_config(0);
+                             exit(0);
+                          }
+                          switch (compare_command(argv[4+shift],&show_sub_cmd_l2[0])){
+                                 case 0:
+                                 case 1:
+	                                do_show_config(1);
+                                        exit(0);
+                                 default:
+                                        printf("Unknown sub-command: \"%s\", allowed commands:\n",argv[4+shift]);
+                                        print_allow_command(&show_sub_cmd_l2[0]);
+                                        exit(1);
+	                  }
+                   case 1: // startup-config
                           printf("Under construction\n");
                           exit(0);
-                   case 2:
-                          print_link_status();
+                   case 2: // interfaces
+   	                  if (argc == (3+shift+1)){
+                             print_link_status(NULL);
+                             exit(0);
+                          }
+                          if (str_portlist_to_array(argv[4+shift],&port_list[0],switchtypes[switchtype].num_ports)==0){
+                            p_port_list=&port_list[0];
+   	                    if (argc == (4+shift+1)){
+                               print_link_status(p_port_list);
+                               exit(0);
+                            }
+                            shift++;
+                          }
+                          switch (compare_command(argv[4+shift],&show_sub_cmd_l3[0])){
+                                 case 0:
+	                                print_counters(p_port_list);
+                                        exit(0);
+                                 default:
+                                        printf("Unknown sub-command: \"%s\", allowed commands:\n",argv[4+shift]);
+                                        print_allow_command(&show_sub_cmd_l3[0]);
+                                        exit(1);
+	                  }
                           exit(0);
                    default:
                           printf("Unknown sub-command: \"%s\", allowed commands:\n",argv[3+shift]);

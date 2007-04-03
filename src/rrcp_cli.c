@@ -95,7 +95,7 @@ int main(int argc, char *argv[])
     int on = 1;
 
     cli = cli_init();
-    cli_set_banner(cli, "OpenRRCP CLI Version 0.1.93");
+    cli_set_banner(cli, "OpenRRCP CLI Version 0.1.94");
     cli_set_hostname(cli, "rrcpswitch");
 
     cmd_show_register_commands(cli);

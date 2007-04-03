@@ -110,7 +110,7 @@ void print_port_link_status(int port_no, int enabled, unsigned char encoded_stat
     printf("\n");
 }
 
-void print_link_status(void){
+void print_link_status(unsigned short int *arr){
     int i;
     union {
 	uint16_t sh[13];
@@ -134,6 +134,7 @@ void print_link_status(void){
     EnLoopDet=rtl83xx_readreg16(0x0200)&0x4;
     if (EnLoopDet) port_loop_status=rtl83xx_readreg32(0x0101);
     for(i=1;i<=switchtypes[switchtype].num_ports;i++){
+        if (arr) { if (!*(arr+i-1)){ continue;} }
 	print_port_link_status(
 		i,
 		!((u.signlelong>>(map_port_number_from_logical_to_physical(i)))&1),
@@ -150,13 +151,14 @@ void do_softreboot(void){
     rtl83xx_setreg16(0x0000,0x0001);
 }
 
-void print_counters(void){
+void print_counters(unsigned short int *arr){
     int i,port_tr;
     for (i=0;i<=0x0c;i++){
 	rtl83xx_setreg16(0x0700+i,0x0000);//read rx byte, tx byte, drop byte
     }
     printf("port              RX          TX        drop\n");
     for (i=1;i<=switchtypes[switchtype].num_ports;i++){
+        if (arr) { if (!*(arr+i-1)){ continue;} }
 	port_tr=map_port_number_from_logical_to_physical(i);
 	printf("%s/%-2d: %11lu %11lu %11lu\n",
 		ifname,i,
@@ -411,6 +413,17 @@ unsigned int st,sp;
   }
  }
  return(0);
+}
+
+int compare_command(char *argv, char **command_list){
+ int i=0;
+
+ do{
+//  printf("Compare %s %s\n",argv,command_list[i]);
+  if (strlen(argv) > strlen(command_list[i])) continue;
+  if (strstr(command_list[i],argv)==command_list[i]) return(i);
+ }while (strlen(command_list[i++]));
+ return(-1);
 }
 
 void do_restrict_rrcp(unsigned short int *arr){
@@ -678,6 +691,51 @@ void do_alt_config(mode){
   rtl83xx_setreg16(0x0300,swconfig.alt_config.raw);
 }
 
+void print_allow_command(char **command_list){
+ int i=0;
+
+ while (strlen(command_list[i])){
+  printf("%s\n",command_list[i++]);
+ }
+ return;
+}
+
+void print_usage(void){
+	printf("Usage: rtl8316b [[authkey-]xx:xx:xx:xx:xx:xx@]if-name <command> [<argument>]\n");
+	printf("       rtl8326 ----\"\"----\n");
+	printf("       rtl83xx_dlink_des1016d ----\"\"----\n");
+	printf("       rtl83xx_dlink_des1024d ----\"\"----\n");
+	printf("       rtl83xx_compex_ps2216 ----\"\"----\n");
+        printf("       rtl83xx_ovislink_fsh2402gt ----\"\"----\n");
+	printf(" where command may be:\n");
+	printf(" show running-config          - show current switch config\n");
+	printf(" show interface [<list ports>]- print link status for ports\n");
+	printf(" show interface [<list ports>] summary - print port rx/tx counters\n");
+	printf(" scan [verbose]               - scan network for rrcp-enabled switches\n");
+	printf(" reboot [soft|hard]           - initiate switch reboot\n");
+//	printf(" vlan status                  - show low-level vlan confg\n");
+//	printf(" vlan enable_hvlan [<port>]   - configure switch as home-vlan tree with specified uplink port\n");
+//	printf(" vlan enable_8021q [<port>]   - configure switch as IEEE 802.1Q vlan tree with specified uplink port\n");
+//	printf(" vlan disable               - disable all VLAN support\n");
+//	printf(" restrict-rrcp <list ports>   - enable rrcp on specified ports, disable on other\n");
+//	printf(" restrict-rrcp status         - print rrcp status for all ports\n");
+//	printf(" bcast-storm-ctrl enable|disable   - broadcast storm control on/off\n"); 
+//	printf(" loopdetect enable|disable         - network loop detect on/off\n"); 
+//	printf(" port <list ports> enable|disable  - enable/disable specified port(s)\n");
+//	printf(" port <list ports> media <speed>   - set speed/duplex on specified port(s)\n");
+//	printf(" port <list ports> flowctrl <mode> - set flow control mode on specified port(s)\n");
+//	printf(" port <list ports> bandwidth <arg> - set bandwidth on specified port(s)\n");
+//	printf(" port <list ports> mirror <arg>    - mirroring port(s)\n");
+//	printf(" port <list ports> learning <arg>  - enable/disable MAC-learning on port(s)\n");
+//	printf(" mac-aging <arg>              - address lookup table control\n");
+	printf(" ping                         - test if switch is responding\n");
+	printf(" write memory                 - save current config to EEPROM\n");
+	printf(" write defaults               - save to EEPROM chip-default values\n");
+	printf(" mac-address <mac>            - set <mac> as new switch MAC address and reboots\n");
+//      printf(" authkey <hex-value>          - set new authkey\n"); 
+        return;
+}
+
 int main(int argc, char **argv){
     unsigned int x[6];
     unsigned int ak;
@@ -687,42 +745,21 @@ int main(int argc, char **argv){
     int media_speed;
     int direction; 
     int bandw;
-    int shift;
+    int shift=0;
+    int negate=0;
+    int cmd;
+    unsigned short int *p_port_list=NULL;
     unsigned short int port_list[26];
+    char *cmd_level_1[]={"show", "config", "scan", "reload", "reboot", "write", "ping", "mac-address",""}; 
+    char *show_sub_cmd[]={"running-config","startup-config","interface",""};
+    char *scan_sub_cmd[]={"verbose",""};
+    char *show_sub_cmd_l2[]={"full","verbose",""};
+    char *show_sub_cmd_l3[]={"summary",""};
+    char *reset_sub_cmd[]={"soft","hard",""};
+    char *write_sub_cmd[]={"memory","eeprom","defaults",""};
 
     if (argc<3){
-	printf("Usage: rtl8316b [[authkey-]xx:xx:xx:xx:xx:xx@]if-name <command> [<argument>]\n");
-	printf("       rtl8326 ----\"\"----\n");
-	printf("       rtl83xx_dlink_des1016d ----\"\"----\n");
-	printf("       rtl83xx_dlink_des1024d ----\"\"----\n");
-	printf("       rtl83xx_compex_ps2216 ----\"\"----\n");
-        printf("       rtl83xx_ovislink_fsh2402gt ----\"\"----\n");
-	printf(" where command may be:\n");
-	printf(" scan [verbose]               - scan network for rrcp-enabled switches\n");
-	printf(" reboot                       - initiate switch reboot\n");
-	printf(" show config [full|verbose]   - show current switch config\n");
-	printf(" vlan status                  - show low-level vlan confg\n");
-	printf(" vlan enable_hvlan [<port>]   - configure switch as home-vlan tree with specified uplink port\n");
-	printf(" vlan enable_8021q [<port>]   - configure switch as IEEE 802.1Q vlan tree with specified uplink port\n");
-	printf(" vlan disable               - disable all VLAN support\n");
-	printf(" restrict-rrcp <list ports>   - enable rrcp on specified ports, disable on other\n");
-	printf(" restrict-rrcp status         - print rrcp status for all ports\n");
-	printf(" link-status                  - print link status for all ports\n");
-	printf(" counters                     - print port rx/tx counters for all ports\n");
-	printf(" bcast-storm-ctrl enable|disable   - broadcast storm control on/off\n"); 
-	printf(" loopdetect enable|disable         - network loop detect on/off\n"); 
-	printf(" port <list ports> enable|disable  - enable/disable specified port(s)\n");
-	printf(" port <list ports> media <speed>   - set speed/duplex on specified port(s)\n");
-	printf(" port <list ports> flowctrl <mode> - set flow control mode on specified port(s)\n");
-	printf(" port <list ports> bandwidth <arg> - set bandwidth on specified port(s)\n");
-	printf(" port <list ports> mirror <arg>    - mirroring port(s)\n");
-	printf(" port <list ports> learning <arg>  - enable/disable MAC-learning on port(s)\n");
-	printf(" mac-aging <arg>              - address lookup table control\n");
-	printf(" ping                         - test if switch is responding\n");
-	printf(" write memory                 - save current config to EEPROM\n");
-	printf(" eeprom set-mac-address <mac> - set <mac> as new switch MAC address and reboots\n");
-	printf(" eeprom default               - save to EEPROM chip-default values\n");
-        printf(" authkey <hex-value>          - set new authkey\n"); 
+        print_usage();
 	exit(0);
     }
     p=argv[0];
@@ -762,6 +799,7 @@ int main(int argc, char **argv){
     }else{
 	strcpy(ifname,argv[1]);
     }
+
     if (if_nametoindex(ifname)<=0){
 	printf("%s: no such interface: %s\n",argv[0],ifname);
 	exit(0);
@@ -776,289 +814,143 @@ int main(int argc, char **argv){
     engage_timeout(5);
     rtl83xx_prepare();
 
-
-    if(strcmp(argv[2],"scan")==0){
-	if (argc==4 && strcmp(argv[3],"verbose")==0){
-	    rtl83xx_scan(1);
-	}else{
-	    rtl83xx_scan(0);
-	}
-    }else if(strcmp(argv[2],"getreg")==0){
-	int ra=strtol(argv[3], (char **)NULL, 16);
-	printf("reg(0x%04x)=0x%04x\n",ra,(int)rtl83xx_readreg32(ra));
-    }else if(strcmp(argv[2],"setreg")==0){
-	int ra=strtol(argv[3], (char **)NULL, 16);
-	int rd=strtol(argv[4], (char **)NULL, 16);
-	rtl83xx_setreg16(ra,rd);
-	printf("reg(0x%04x) has been set to 0x%04x\n",ra,(int)rtl83xx_readreg32(ra));
-    }else if(strcmp(argv[2],"reboot")==0){
-	do_reboot();
-    }else if(strcmp(argv[2],"soft-reboot")==0){
-	do_softreboot();
-    }else if(strcmp(argv[2],"ping")==0){
-	do_ping();
-    }else if(strcmp(argv[2],"link-status")==0){
-	print_link_status();
-    }else if(strcmp(argv[2],"counters")==0){
-	print_counters();
-    }else if(strcmp(argv[2],"show")==0){
-	if (argc<4){
-	    printf("No sub-command specified! available subcommands are:\n");
-	    printf("show config\n");
-	    return(1);
-	}
-	if(strcmp(argv[3],"config")==0){
-	    if ((argc==5)&&((strcmp(argv[4],"full")==0)||(strcmp(argv[4],"verbose")==0))){
-		do_show_config(1);
-	    }else{
-		do_show_config(0);
-	    }
-	}else{
-	    printf("Unknown sub-command: %s",argv[3]);
-	}
-    }else if(strcmp(argv[2],"vlan")==0){
-	if (argc<4){
-	    printf("No sub-command specified! available subcommands are:\n");
-	    printf("vlan enable_hvlan [<root-port>]\n");
-//	    printf("vlan enable_8021q <root-port>[,VID_base] *(VID_base is 100 by default)\n");
-	    printf("vlan enable_8021q [<root-port>]\n");
-	    printf("vlan disable\n");
-	    printf("vlan status\n");
-	    return(1);
-	}
-	if(strcmp(argv[3],"status")==0){
-	    print_vlan_status();
-	}else if(strcmp(argv[3],"disable")==0){
-	    do_vlan_disable();
-	}else if((strcmp(argv[3],"enable_hvlan")==0)||(strcmp(argv[3],"enable_8021q")==0)){
-	    if (argc<5){
-//		printf("no root-port specified!\n");
-//		return(1);
-                root_port=-1;
-            }else{
-                root_port=atoi(argv[4]);
-            }
-            do_vlan_enable_vlan(strcmp(argv[3],"enable_8021q")==0,root_port,100);
-	}else{
-	    printf("Unknown sub-command: %s",argv[3]);
-	}
-    }else if(strcmp(argv[2],"write")==0){
-        if (argc<4){
-            printf("No sub-command specified! available subcommands are:\n");
-            printf("memory\n");
-        }
-        if(strcmp(argv[3],"memory")==0){
-            do_write_memory();
-        }else{
-            printf("Unknown sub-command: %s\n",argv[3]);
-        }
-    }else if(strcmp(argv[2],"restrict-rrcp")==0){
-	if (argc<4){
-	    printf("No list of allowed-port specified!\n");
-	}else{ 
-	    if(strcmp(argv[3],"status")==0){
-		print_rrcp_status();
-	    } else if (str_portlist_to_array(argv[3],&port_list[0],switchtypes[switchtype].num_ports)==0){
-		do_restrict_rrcp(&port_list[0]);
-	    }else{
-		printf("Invalid list of ports. Valid form:\n");
-		printf("                                  1         - one port\n");
-		printf("                                  1,5, .. x - list port\n");
-		printf("                                  1-5       - range of ports\n");
-		printf("                                  1,5,8-10, .. x - mix list and range of ports\n");
-	    }
-	}
-    }else if(strcmp(argv[2],"eeprom")==0){
-        if (argc<4){
-            printf("No sub-command specified! available subcommands are:\n");
-            printf("set-mac-address\n");
-            printf("default\n");
-        }
-        if(strcmp(argv[3],"set-mac-address")==0){
-	    if ((sscanf(argv[4], "%02x:%02x:%02x:%02x:%02x:%02x",x,x+1,x+2,x+3,x+4,x+5)==6)||
-	        (sscanf(argv[4], "%02x%02x.%02x%02x.%02x%02x",x,x+1,x+2,x+3,x+4,x+5)==6)){
-		for (i=0;i<6;i++){
-		    if (do_write_eeprom_byte(0x12+i,(unsigned char)x[i])){
-			printf ("error writing eeprom!\n");
-			exit(1);
-		    }
-		}
-		do_reboot();
-	    }else{
-		printf("malformed mac address: '%s'!\n",argv[4]);exit(1);
-	    }
-        }else if(strcmp(argv[3],"default")==0){
-            do_write_eeprom_defaults();
-        }else{
-            printf("Unknown sub-command: %s\n",argv[3]);
-        }
-    }else if(strcmp(argv[2],"authkey")==0){
-       if (argc<4){
-            printf("No value specified!\n");
-       }else if (sscanf(argv[3],"%04x",&ak) != 1){
-          printf("Invalid value\n");
-       }else{
-         if (ak > 0xffff) { printf("Invalid value\n");}
-         else{
-           rtl83xx_setreg16(0x209,ak);
-           printf ("Setting of new authkey is no save into EEPROM and may be forged after reboot.\n");
-           printf ("After change authkey switch not answering on broadcast \"Hello\" scan, be close.\n"); 
-         }
-       }  
-    }else if(strcmp(argv[2],"loopdetect")==0){
-        if (argc<4){
-            printf("No sub-command specified! available subcommands are:\n");
-            printf("enable\n");
-            printf("disable\n");
-        }
-        else if(strcmp(argv[3],"enable")==0){
-		  do_loopdetect(1);
-        }
-        else if(strcmp(argv[3],"disable")==0){
-		  do_loopdetect(0);
-        }else{
-            printf("Unknown sub-command: %s\n",argv[3]);
-        }
-    }else if(strcmp(argv[2],"bcast-storm-ctrl")==0){
-        if (argc<4){
-            printf("No sub-command specified! available subcommands are:\n");
-            printf("enable\n");
-            printf("disable\n");
-        }
-        else if(strcmp(argv[3],"enable")==0){
-		  do_broadcast_storm_control(1);
-        }
-        else if(strcmp(argv[3],"disable")==0){
-		  do_broadcast_storm_control(0);
-        }else{
-            printf("Unknown sub-command: %s\n",argv[3]);
-        }
-    }else if(strcmp(argv[2],"port")==0){
-        if (argc<5){
-            printf("No sub-command specified! available subcommands are:\n");
-            printf("<list of ports> enable\n");
-            printf("<list of ports> disable\n");
-            printf("<list of ports> media auto|10h|10f|100h|100f|1000\n");
-	    printf("<list of ports> flowctrl none|asym2remote|symmetric|asym2local\n");
-            printf("<list of ports> bandwidth [tx|rx] 100M|128k|256k|512k|1M|2M|4M|8M\n");
-            printf("<list of ports> mirror [tx|rx|off] <destination port>\n");
-            printf("<list of ports> learning enable|disable\n");
-        } else if (str_portlist_to_array(argv[3],&port_list[0],switchtypes[switchtype].num_ports)!=0){
-		 printf("Invalid list of ports. Valid form:\n");
-		 printf("                                  1         - one port\n");
-		 printf("                                  1,5, .. x - list port\n");
-		 printf("                                  1-5       - range of ports\n");
-		 printf("                                  1,5,8-10, .. x - mix list and range of ports\n");
-	  } else if(strcmp(argv[4],"enable")==0){
-                 do_port_disable(&port_list[0],1);
-          } else if(strcmp(argv[4],"disable")==0){
-                 do_port_disable(&port_list[0],0);
-          } else if(strcmp(argv[4],"media")==0){
-                   if (argc<6){
-                        printf("No speed specified! Available options: auto|10h|10f|100h|100f|1000\n");
-                   }else if ((media_speed=port_mode_encode(0,argv[5])) < 0) {
-                        printf("Invalid speed specified! Valid form: auto|10h|10f|100h|100f|1000\n");
-		   }else{
-                     do_port_config(0,&port_list[0],media_speed);
-                   }
-          } else if(strcmp(argv[4],"flowctrl")==0){
-                   if (argc<6){
-                        printf("No mode specified! Available options: none|asym2remote|symmetric|asym2local\n");
-                   }else if ((media_speed=port_mode_encode(1,argv[5])) < 0) {
-                        printf("Invalid mode specified! Valid form: none|asym2remote|symmetric|asym2local\n");
-		   }else{
-                     do_port_config(1,&port_list[0],media_speed);
-                   }
-          } else if(strcmp(argv[4],"learning")==0){
-                   if (argc<6){
-                        printf("No options specified! Available options: enable|disable\n");
-                   }else if (strcmp(argv[5],"enable")==0){
-                       do_port_learning(1,&port_list[0]);
-                   }else if (strcmp(argv[5],"disable")==0){
-                       do_port_learning(0,&port_list[0]);
-                   }else{
-                        printf("Invalid options specified! Available options: enable|disable\n");
-                   }
-          } else if(strcmp(argv[4],"bandwidth")==0){
-                   direction=-1; bandw=-1;shift=0;
-                   switch (argc){
-                      case 7:
-                             if (strcmp(argv[5],"rx")==0){
-				direction=1; shift++;
-                             }else if (strcmp(argv[5],"tx")==0){
-                                direction=2; shift++;
-                             }
-                      case 6:
-                             if ( (bandw=bandwidth_encode(argv[5+shift])) >= 0 ) {
-                                if (!shift) direction=0;
-                                break;
-                             }
-                      default:
-                             printf("Invalid bandwidth specified! Valid options: tx|rx,100M|128k|256k|512k|1M|2M|4M|8M\n");
-                   }
-                   if ( (direction >= 0) && (bandw >= 0) ) do_port_config_bandwidth(direction,&port_list[0],bandw);
-          } else if(strcmp(argv[4],"mirror")==0){
-                   direction=-1; shift=0;
-		   if (switchtypes[switchtype].chip_id != 1){
-                      printf ("This function can not work on the devices constructed not on rtl8316b\n");
-                   } 
-                   switch (argc){
-                      case 7:
-                             if (strcmp(argv[5],"rx")==0){
-				direction=1; shift++;
-                             }else if (strcmp(argv[5],"tx")==0){
-                                direction=2; shift++;
-                             }else{
-                                printf("Invalid option specified! Available options: [tx|rx|off] <dest. port>\n");
-                                break;
-                             }
-                      case 6:
-                             if (strcmp(argv[5],"off")==0){
-                                direction=3;
-                             }else{
-                               root_port=atoi(argv[5+shift]);
-                               if ( (root_port < 1) || (root_port > switchtypes[switchtype].num_ports) ){
-                                 direction=-1;
-                                 printf ("Incorrect destination port\n");
-                               }else if (port_list[root_port-1]){
-                                 direction=-1;
-                                 printf ("Destination port in list of source port\n");
-                               }else{
-                                if (!shift) direction=0;
-                               }
-                             }
-                             break;
-                      default:
-                        printf("No options specified! Available options: [tx|rx|off] <dest. port>\n");
-                   } 
-                   if (direction >= 0) do_port_config_mirror(direction,&port_list[0],root_port);
-          }else{
-             printf("Unknown sub-command: %s\n",argv[4]);
-          }
-    }else if(strcmp(argv[2],"mac-aging")==0){
-        if (argc<4){
-            printf("No sub-command specified! available subcommands are:\n");
-            printf("normal  - normal aging time (300s)\n");
-            printf("fast    - quickly refresh MAC table (12s)\n");
-            printf("disable - keep MAC table static\n");
-            printf("drop-unknown - drop packet with unknown destination\n");
-            printf("pass-unknown - pass packet with unknown destination\n");
-        }else if(strcmp(argv[3],"disable")==0){
-                do_alt_config(1);
-        }else if(strcmp(argv[3],"normal")==0){
-                do_alt_config(2);
-        }else if(strcmp(argv[3],"fast")==0){
-                do_alt_config(3);
-        }else if(strcmp(argv[3],"drop-unknown")==0){
-                do_alt_config(4);
-        }else if(strcmp(argv[3],"pass-unknown")==0){
-                do_alt_config(5);
-        }else{
-            printf("Invalid sub-command specified! available subcommands are: normal|fast|disable|drop-unknown|pass-unknown\n");
-        }
-    }else{
-	printf("unknown command: %s\n",argv[2]);
+    if(strcmp(argv[2],"no")==0){
+     negate++;
+     shift++;
     }
 
-    return 0;
+    cmd=compare_command(argv[2+shift],&cmd_level_1[0]);
+    //printf("%i\n",cmd);
+    switch (cmd){
+         case 0: //show
+  	        if (argc == (2+shift+1)){
+                   printf("No sub-command specified, allowed commands:\n");
+                   print_allow_command(&show_sub_cmd[0]);
+                   exit(1);
+                }
+                switch(compare_command(argv[3+shift],&show_sub_cmd[0])){
+                   case 0: // running-config
+   	                  if (argc == (3+shift+1)){
+	           	     do_show_config(0);
+                             exit(0);
+                          }
+                          switch (compare_command(argv[4+shift],&show_sub_cmd_l2[0])){
+                                 case 0:
+                                 case 1:
+	                                do_show_config(1);
+                                        exit(0);
+                                 default:
+                                        printf("Unknown sub-command: \"%s\", allowed commands:\n",argv[4+shift]);
+                                        print_allow_command(&show_sub_cmd_l2[0]);
+                                        exit(1);
+	                  }
+                   case 1: // startup-config
+                          printf("Under construction\n");
+                          exit(0);
+                   case 2: // interfaces
+   	                  if (argc == (3+shift+1)){
+                             print_link_status(NULL);
+                             exit(0);
+                          }
+                          if (str_portlist_to_array(argv[4+shift],&port_list[0],switchtypes[switchtype].num_ports)==0){
+                            p_port_list=&port_list[0];
+   	                    if (argc == (4+shift+1)){
+                               print_link_status(p_port_list);
+                               exit(0);
+                            }
+                            shift++;
+                          }
+                          switch (compare_command(argv[4+shift],&show_sub_cmd_l3[0])){
+                                 case 0:
+	                                print_counters(p_port_list);
+                                        exit(0);
+                                 default:
+                                        printf("Unknown sub-command: \"%s\", allowed commands:\n",argv[4+shift]);
+                                        print_allow_command(&show_sub_cmd_l3[0]);
+                                        exit(1);
+	                  }
+                          exit(0);
+                   default:
+                          printf("Unknown sub-command: \"%s\", allowed commands:\n",argv[3+shift]);
+                          print_allow_command(&scan_sub_cmd[0]);
+                          exit(1);
+                }
+         case 1: //config
+                break;
+         case 2: //scan
+  	        if (argc == (2+shift+1)){
+	           rtl83xx_scan(0);
+                   exit(0);
+                }
+                switch (compare_command(argv[3+shift],&scan_sub_cmd[0])){
+                   case 0:
+	                  rtl83xx_scan(1);
+                          exit(0);
+                   default:
+                          printf("Unknown sub-command: \"%s\", allowed commands:\n",argv[3+shift]);
+                          print_allow_command(&scan_sub_cmd[0]);
+                          exit(1);
+	        }
+         case 3: //reload
+         case 4: //reboot
+  	        if (argc == (2+shift+1)){
+                   do_reboot();
+                   exit(0);
+                }
+                switch (compare_command(argv[3+shift],&reset_sub_cmd[0])){
+                   case 0:
+	                  do_softreboot();
+                          exit(0);
+                   case 1:
+	                  do_reboot();
+                          exit(0);
+                   default:
+                          printf("Unknown sub-command: \"%s\", allowed commands:\n",argv[3+shift]);
+                          print_allow_command(&reset_sub_cmd[0]);
+                          exit(1);
+	        }
+         case 5: //write
+  	        if (argc == (2+shift+1)){
+                   printf("No sub-command specified, allowed commands:\n");
+                   print_allow_command(&write_sub_cmd[0]);
+                   exit(1);
+                }
+                switch(compare_command(argv[3+shift],&write_sub_cmd[0])){
+                   case 0:
+                   case 1:
+                          do_write_memory();
+                          exit(0);
+                   case 2:
+                          do_write_eeprom_defaults();
+                          exit(0);
+                   default:
+                          printf("Unknown sub-command: \"%s\", allowed commands:\n",argv[3+shift]);
+                          print_allow_command(&write_sub_cmd[0]);
+                          exit(1);
+                }
+         case 6: //ping
+                do_ping();
+                exit(0);
+         case 7: //mac-address
+  	        if (argc == (2+shift+1)){
+		   printf("not specified mac address\n");
+                   exit(1);
+                }
+   	        if ((sscanf(argv[3+shift], "%02x:%02x:%02x:%02x:%02x:%02x",x,x+1,x+2,x+3,x+4,x+5)!=6)&&
+	            (sscanf(argv[3+shift], "%02x%02x.%02x%02x.%02x%02x",x,x+1,x+2,x+3,x+4,x+5)!=6)){
+   		   printf("malformed mac address: '%s'!\n",argv[3+shift]);
+                   exit(1);
+                }
+		for (i=0;i<6;i++){
+		   if (do_write_eeprom_byte(0x12+i,(unsigned char)x[i])){
+		      printf ("error writing eeprom!\n");
+		      exit(1);
+		   }
+	        }
+		do_reboot();
+                exit(0);
+         default:
+                print_usage();
+    }
+    exit(0);
 }

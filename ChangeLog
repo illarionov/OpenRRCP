@@ -1,4 +1,11 @@
+Wed Mar  7 00:41:19 MSK 2007
+        * rtl83xx: Changeset [37] by amelnik - "show ..." added
+
+Tue Mar  6 01:29:31 MSK 2007
+        * rtl83xx: Changeset [36] by amelnik - work started
+
 ------------------------ OpenRRCP 0.1.93 ---------------------------------------
+Tue Feb 20 23:27:19 MSK 2007
         * rtl83xx: Added explicit support for Ovislink FSH2402GT
         * rtl83xx: Added support for variable RRCP authentification key
         * Reworked EEPROM access routines

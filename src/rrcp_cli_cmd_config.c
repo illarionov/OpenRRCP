@@ -274,6 +274,20 @@ int cmd_config_spanning_tree(struct cli_def *cli, char *command, char *argv[], i
     return CLI_OK;
 }
 
+int cmd_config_end(struct cli_def *cli, char *command, char *argv[], int argc)
+{
+    if (argc>0){
+	if (strcmp(argv[0],"?")==0){
+	    cli_print(cli, "<CR>");
+	}else{
+	    cli_print(cli, "%% Invalid input detected.");
+	}
+    }else{
+	cli_set_configmode(cli, MODE_EXEC, NULL);
+    }
+    return CLI_OK;
+}
+
 void cmd_config_register_commands(struct cli_def *cli)
 {
     struct cli_command *c,*c2,*c3,*no;
@@ -387,4 +401,6 @@ void cmd_config_register_commands(struct cli_def *cli)
 	c=cli_register_command(cli, no_spanning_tree, "bpdufilter", cmd_config_spanning_tree, PRIVILEGE_PRIVILEGED, MODE_CONFIG, "Don't send or receive BPDUs on this interface");
 	cli_register_command(cli, c, "enable", cmd_config_spanning_tree, PRIVILEGE_PRIVILEGED, MODE_CONFIG, "Disable BPDU filtering for this interface");
     }
+    
+    cli_register_command(cli, NULL, "end", cmd_config_end, PRIVILEGE_PRIVILEGED, MODE_CONFIG, "Exit from configure mode");
 }

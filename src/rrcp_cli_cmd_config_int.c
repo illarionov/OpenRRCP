@@ -30,6 +30,7 @@
 #include "rrcp_config.h"
 #include "rrcp_switches.h"
 #include "rrcp_cli_cmd_show.h"
+#include "rrcp_cli_cmd_config.h"
 
 #define MODE_CONFIG_INT		10
 
@@ -376,4 +377,5 @@ void cmd_config_int_register_commands(struct cli_def *cli)
 	cli_register_command(cli, duplex, "full", cmd_config_int_speed_duplex, PRIVILEGE_PRIVILEGED, MODE_CONFIG_INT, "Force full duplex operation");
 	cli_register_command(cli, duplex, "half", cmd_config_int_speed_duplex, PRIVILEGE_PRIVILEGED, MODE_CONFIG_INT, "Force half-duplex operation");
     }
+    cli_register_command(cli, NULL, "end", cmd_config_end, PRIVILEGE_PRIVILEGED, MODE_CONFIG_INT, "Exit from configure mode");
 }

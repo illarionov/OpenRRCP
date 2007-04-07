@@ -25,3 +25,5 @@
 #include "../lib/libcli.h"
 
 void cmd_config_register_commands(struct cli_def *cli);
+
+int cmd_config_end(struct cli_def *cli, char *command, char *argv[], int argc);

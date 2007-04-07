@@ -270,7 +270,7 @@ void rrcp_config_bin2text(char *sc, int l, int show_defaults)
 	}
 	if (swconfig.port_config.config[port_phys].autoneg){
 	    if (show_defaults){
-		sncprintf(sc,l," speed auto\n duplex auto\n");
+		sncprintf(sc,l," speed auto\n");
 	    }
 	}else if (swconfig.port_config.config[port_phys].media_100full){
 	    sncprintf(sc,l," speed 100\n duplex full\n");
@@ -283,6 +283,7 @@ void rrcp_config_bin2text(char *sc, int l, int show_defaults)
 	}
 	sncprintf(sc,l,"!\n");
     }
+    sncprintf(sc,l,"end\n");
 }
 
 void do_show_config(int verbose)

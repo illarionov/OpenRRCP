@@ -22,4 +22,4 @@
     This would be appreciated, however not required.
 */
 
-#define RRCP_CLI_VERSION "0.1.94"
+#define RRCP_CLI_VERSION "0.1.94.beta1"

@@ -132,6 +132,7 @@ int main(int argc, char *argv[])
 
     switchtype=-1;
     switchtype_force=0;
+    tcp_port=0;
     while(1) {
 	char c;
 	c = getopt_long (argc, argv, "t:fp:",

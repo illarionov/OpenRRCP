@@ -73,6 +73,21 @@ int cmd_config_mac_aging(struct cli_def *cli, char *command, char *argv[], int a
     return CLI_OK;
 }
 
+int cmd_config_ip_igmp_snooping(struct cli_def *cli, char *command, char *argv[], int argc)
+{
+    if (argc>0){
+	if (strcmp(argv[0],"?")==0){
+	    cli_print(cli, "<CR>");
+	}else{
+	    cli_print(cli, "%% Invalid input detected.");
+	}
+    }else{
+	if (strcasecmp(command,"ip igmp snooping")==0)    swconfig.alt_igmp_snooping.config.en_igmp_snooping=1;
+	if (strcasecmp(command,"no ip igmp snooping")==0) swconfig.alt_igmp_snooping.config.en_igmp_snooping=0;
+    }
+    return CLI_OK;
+}
+
 int cmd_config_rrcp(struct cli_def *cli, char *command, char *argv[], int argc)
 {
     if (argc>0){
@@ -301,6 +316,17 @@ void cmd_config_register_commands(struct cli_def *cli)
     c=cli_register_command(cli, NULL, "mac-address-table", NULL, PRIVILEGE_PRIVILEGED, MODE_CONFIG, "Configure the MAC address table");
     cli_register_command(cli, c, "aging-time", cmd_config_mac_aging, PRIVILEGE_PRIVILEGED, MODE_CONFIG, "Set MAC address table entry maximum age");
     
+    { // ip config
+	struct cli_command *ip,*ip_igmp,*no_ip,*no_ip_igmp;
+	ip=cli_register_command(cli, NULL, "ip", NULL, PRIVILEGE_PRIVILEGED, MODE_CONFIG, "Global IP configuration subcommands");
+	ip_igmp=cli_register_command(cli, ip, "igmp", NULL, PRIVILEGE_PRIVILEGED, MODE_CONFIG, "IGMP global configuration");
+	cli_register_command(cli, ip_igmp, "snooping", cmd_config_ip_igmp_snooping, PRIVILEGE_PRIVILEGED, MODE_CONFIG, "Global IGMP Snooping enable");
+
+	no_ip=cli_register_command(cli, no, "ip", NULL, PRIVILEGE_PRIVILEGED, MODE_CONFIG, "Global IP configuration subcommands");
+	no_ip_igmp=cli_register_command(cli, no_ip, "igmp", NULL, PRIVILEGE_PRIVILEGED, MODE_CONFIG, "IGMP global configuration");
+	cli_register_command(cli, no_ip_igmp, "snooping", cmd_config_ip_igmp_snooping, PRIVILEGE_PRIVILEGED, MODE_CONFIG, "Global IGMP Snooping disable");
+    }
+
     { // rrcp config
 	c=cli_register_command(cli, NULL, "rrcp", NULL, PRIVILEGE_PRIVILEGED, MODE_CONFIG, "Global RRCP configuration subcommand");
 	cli_register_command(cli, c, "enable", cmd_config_rrcp, PRIVILEGE_PRIVILEGED, MODE_CONFIG, "Enable RRCP");

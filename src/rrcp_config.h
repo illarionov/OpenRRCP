@@ -73,6 +73,18 @@
 	    uint16_t raw[2];    
 	} alt_mask; // 0x0301..0x0302
 	union {
+	    struct  t_alt_igmp_snooping{
+		uint16_t
+	    	    en_igmp_snooping:1,
+	    	    reserved:15;
+	    } config;
+	    uint16_t raw;
+	} alt_igmp_snooping; // 0x0308
+	union {
+	    uint32_t mask;
+	    uint16_t raw[2];    
+	} alt_mrouter_mask; // 0x0309..0x030a
+	union {
 	    struct t_vlan_s{
 		struct  t_vlan_s_config{
 		    uint16_t

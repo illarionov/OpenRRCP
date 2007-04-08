@@ -53,7 +53,8 @@ int cmd_show_version(struct cli_def *cli, char *command, char *argv[], int argc)
     cli_print(cli, "Vendor: %s",switchtypes[switchtype].vendor);
     cli_print(cli, "Model: %s",switchtypes[switchtype].model);
     cli_print(cli, "Chip: %s",chipnames[switchtypes[switchtype].chip_id]);
-    cli_print(cli, "802.1Q support: %s",(switchtypes[switchtype].chip_id==rtl8316b) ? "Yes" : "No/Buggy");
+    cli_print(cli, "802.1Q support: %s",(switchtypes[switchtype].chip_id==rtl8326) ? "No/Buggy" : "Yes");
+    cli_print(cli, "IGMP support: %s",(switchtypes[switchtype].chip_id==rtl8326) ? "v1" : "v1, v2");
     cli_print(cli, "Facing host interface: %s",ifname);
     return CLI_OK;
 }
@@ -139,6 +140,36 @@ int cmd_show_interfaces(struct cli_def *cli, char *command, char *argv[], int ar
     return CLI_OK;
 }
 
+int cmd_show_ip_igmp_snooping(struct cli_def *cli, char *command, char *argv[], int argc)
+{
+    if (argc>0){
+	if (strcmp(argv[0],"?")==0){
+	    cli_print(cli, "<CR>");
+	}else{
+	    cli_print(cli, "%% Invalid input detected.");
+	}
+    }else{
+	if (strcasecmp(command,"show ip igmp snooping")==0){
+	    cli_print(cli, "Global IGMP Snooping configuration:");
+	    cli_print(cli, "-----------------------------------");
+	    cli_print(cli, "IGMP snooping              : %s",swconfig.alt_igmp_snooping.config.en_igmp_snooping ? "Enabled":"Disabled");
+	}
+	if (strcasecmp(command,"show ip igmp snooping mrouter")==0){
+	    int port,port_phys;
+	    char pn[64];
+
+	    cli_print(cli, "Multicast routers found on port(s):");
+	    for(port=1;port<=switchtypes[switchtype].num_ports;port++){
+	        port_phys=map_port_number_from_logical_to_physical(port);
+	        if (swconfig.alt_mrouter_mask.mask & (1<<port_phys)){
+		    cli_print(cli, "%s",rrcp_config_get_portname(pn,sizeof(pn),port,port_phys));
+		}
+	    }
+	}
+    }
+    return CLI_OK;
+}
+
 int cmd_test(struct cli_def *cli, char *command, char *argv[], int argc)
 {
     int i;
@@ -153,12 +184,22 @@ int cmd_test(struct cli_def *cli, char *command, char *argv[], int argc)
 
 void cmd_show_register_commands(struct cli_def *cli)
 {
-    struct cli_command *c,*c2;
+    struct cli_command *c;
     c = cli_register_command(cli, NULL, "show", NULL,  PRIVILEGE_UNPRIVILEGED, MODE_EXEC, "Show running system information");
     cli_register_command(cli, c, "version", cmd_show_version, PRIVILEGE_UNPRIVILEGED, MODE_EXEC, "System hardware and software status");
     cli_register_command(cli, c, "configuration", cmd_test, PRIVILEGE_PRIVILEGED, MODE_EXEC, "Contents of Non-Volatile memory");
-    c2 = cli_register_command(cli, c, "running-config", cmd_show_config, PRIVILEGE_PRIVILEGED, MODE_EXEC, "Current operating configuration");
-    cli_register_command(cli, c2, "full", cmd_show_config, PRIVILEGE_PRIVILEGED, MODE_EXEC, "Current operating configuration including default statements");
+    {//show running-config
+	struct cli_command *show_runningconfig;
+	show_runningconfig = cli_register_command(cli, c, "running-config", cmd_show_config, PRIVILEGE_PRIVILEGED, MODE_EXEC, "Current operating configuration");
+	cli_register_command(cli, show_runningconfig, "full", cmd_show_config, PRIVILEGE_PRIVILEGED, MODE_EXEC, "Current operating configuration including default statements");
+    }
     cli_register_command(cli, c, "startup-config", cmd_test, PRIVILEGE_PRIVILEGED, MODE_EXEC, "Contents of startup configuration");
     cli_register_command(cli, c, "interfaces", cmd_show_interfaces, PRIVILEGE_UNPRIVILEGED, MODE_EXEC, "Interface status and configuration");
+    {//show ip igmp snooping
+	struct cli_command *show_ip,*show_ip_igmp,*show_ip_igmp_snooping;
+	show_ip = cli_register_command(cli, c, "ip", NULL, PRIVILEGE_PRIVILEGED, MODE_EXEC, "IP information");
+	show_ip_igmp = cli_register_command(cli, show_ip, "igmp", NULL, PRIVILEGE_PRIVILEGED, MODE_EXEC, "IGMP information");
+	show_ip_igmp_snooping = cli_register_command(cli, show_ip_igmp, "snooping", cmd_show_ip_igmp_snooping, PRIVILEGE_PRIVILEGED, MODE_EXEC, "Snooping info on this switch");
+	cli_register_command(cli, show_ip_igmp_snooping, "mrouter", cmd_show_ip_igmp_snooping, PRIVILEGE_PRIVILEGED, MODE_EXEC, "Show multicast routers on this switch");
+    }
 }

@@ -43,6 +43,9 @@ void rrcp_config_read_from_switch(void)
     swconfig.rrcp_config.raw=rtl83xx_readreg16(0x0200);
     for(i=0;i<2;i++)
 	swconfig.rrcp_byport_disable.raw[i]=rtl83xx_readreg16(0x0201+i);
+    swconfig.alt_igmp_snooping.raw=rtl83xx_readreg16(0x0308);
+    for(i=0;i<2;i++)
+	swconfig.alt_mrouter_mask.raw[i]=rtl83xx_readreg16(0x0309+i);
     for(i=0;i<14;i++){
 	swconfig.vlan.raw[i]=rtl83xx_readreg16(0x030b+i);
     }
@@ -126,6 +129,9 @@ void rrcp_config_bin2text(char *sc, int l, int show_defaults)
 	}
         sncprintf(sc,l,"mac-address-table aging-time %d\n",mac_aging_time);
 	sncprintf(sc,l,"!\n");
+    }
+    {
+	sncprintf(sc,l,"%sip igmp snooping\n", swconfig.alt_igmp_snooping.config.en_igmp_snooping ? "":"no ");
     }
     {
 	sncprintf(sc,l,"%srrcp enable\n", swconfig.rrcp_config.config.rrcp_disable ? "no ":"");

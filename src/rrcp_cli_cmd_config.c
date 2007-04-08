@@ -194,6 +194,7 @@ int cmd_config_qos(struct cli_def *cli, char *command, char *argv[], int argc)
 	if (strcasecmp(command,"mls qos trust cos")==0) swconfig.qos_config.config.cos_enable=1;
 	if (strcasecmp(command,"no mls qos trust cos")==0) swconfig.qos_config.config.cos_enable=0;
 	if (strcasecmp(command,"no wrr-queue ratio")==0) swconfig.qos_config.config.wrr_ratio=3;
+	rtl83xx_setreg16(0x0400,swconfig.qos_config.raw);
     }
     return CLI_OK;
 }
@@ -215,7 +216,9 @@ int cmd_config_qos_wrr_queue_ratio(struct cli_def *cli, char *command, char *arg
 		    hit=1;
 		}
 	    }
-	    if (!hit){
+	    if (hit){
+		rtl83xx_setreg16(0x0400,swconfig.qos_config.raw);
+	    }else{
 		cli_print(cli, "%% Invalid input detected.");
 	    }
 	}
@@ -240,6 +243,8 @@ int cmd_config_flowcontrol(struct cli_def *cli, char *command, char *argv[], int
 	if (strcasecmp(command,"no flowcontrol backpressure")==0) swconfig.port_config_global.config.flow_backpressure_disable=1;
 	if (strcasecmp(command,"flowcontrol ondemand-disable")==0) swconfig.qos_config.config.flow_ondemand_disable=1;
 	if (strcasecmp(command,"no flowcontrol ondemand-disable")==0) swconfig.qos_config.config.flow_ondemand_disable=0;
+	rtl83xx_setreg16(0x0607,swconfig.port_config_global.raw);
+	rtl83xx_setreg16(0x0400,swconfig.qos_config.raw);
     }
     return CLI_OK;
 }
@@ -271,6 +276,7 @@ int cmd_config_stormcontrol(struct cli_def *cli, char *command, char *argv[], in
 	if (strcasecmp(command,"storm-control multicast")==0) {
 	    swconfig.port_config_global.config.storm_control_multicast_strict=1;
 	}
+	rtl83xx_setreg16(0x0607,swconfig.port_config_global.raw);
     }
     return CLI_OK;
 }

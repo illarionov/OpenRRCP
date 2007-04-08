@@ -210,6 +210,8 @@ int cmd_config_int_mls(struct cli_def *cli, char *command, char *argv[], int arg
 	    cli_print(cli, "%% Invalid input detected.");
 	    return CLI_ERROR;
 	}
+	rtl83xx_setreg16(0x0401,swconfig.qos_port_priority.raw[0]);
+	rtl83xx_setreg16(0x0402,swconfig.qos_port_priority.raw[1]);
     }else{
 	cli_print(cli, "%% Specify new CoS value (0 or 7)");
     }

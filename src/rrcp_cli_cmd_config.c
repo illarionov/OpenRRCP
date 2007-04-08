@@ -25,6 +25,7 @@
 #include <string.h>
 #include "../lib/libcli.h"
 #include "rrcp_config.h"
+#include "rrcp_io.h"
 #include "rrcp_switches.h"
 #include "rrcp_cli_cmd_show.h"
 

@@ -84,6 +84,7 @@ int cmd_config_ip_igmp_snooping(struct cli_def *cli, char *command, char *argv[]
     }else{
 	if (strcasecmp(command,"ip igmp snooping")==0)    swconfig.alt_igmp_snooping.config.en_igmp_snooping=1;
 	if (strcasecmp(command,"no ip igmp snooping")==0) swconfig.alt_igmp_snooping.config.en_igmp_snooping=0;
+	rtl83xx_setreg16reg16(0x0308,swconfig.alt_igmp_snooping.raw);
     }
     return CLI_OK;
 }

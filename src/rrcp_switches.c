@@ -35,7 +35,7 @@ char* chipnames [3] = {
 
 uint32_t switchtype;
 
-const uint32_t switchtype_n = 6;
+const uint32_t switchtype_n = 7;
 
 struct switchtype_t switchtypes[7] = {
     {

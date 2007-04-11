@@ -707,6 +707,7 @@ void print_usage(void){
 	printf("       rtl83xx_dlink_des1024d ----\"\"----\n");
 	printf("       rtl83xx_compex_ps2216 ----\"\"----\n");
         printf("       rtl83xx_ovislink_fsh2402gt ----\"\"----\n");
+	printf("       rtl83xx_zyxel_es116p ----\"\"----\n");
 	printf(" where command may be:\n");
 	printf(" show running-config          - show current switch config\n");
 	printf(" show interface [<list ports>]- print link status for ports\n");
@@ -778,6 +779,8 @@ int main(int argc, char **argv){
 	switchtype=4;
     }else if (strstr(p,"rtl83xx_ovislink_fsh2402gt")==argv[0]+strlen(argv[0])-26){
 	switchtype=5;
+    }else if (strstr(p,"rtl83xx_zyxel_es116p")==argv[0]+strlen(argv[0])-20){
+	switchtype=6;
     }else {
 	printf("%s: unknown switch/chip type\n",argv[0]);
 	exit(0);

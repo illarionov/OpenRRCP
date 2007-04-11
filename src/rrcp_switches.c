@@ -37,7 +37,7 @@ uint32_t switchtype;
 
 const uint32_t switchtype_n = 6;
 
-struct switchtype_t switchtypes[6] = {
+struct switchtype_t switchtypes[7] = {
     {
 	"generic",
 	"rtl8316b",
@@ -91,6 +91,15 @@ struct switchtype_t switchtypes[6] = {
 	rtl8326,
 	26,
 	{2,4,6,8,10,12,14,16,18,20,22,24,1,3,5,7,9,11,13,15,17,19,21,23,25,26,0}
+    },
+    {
+	"zyxel",
+	"es116p",
+	"unknown",
+	"rtl8316b",
+	rtl8316b,
+	16,
+	{2,4,6,8,10,12,14,16,1,3,5,7,9,11,13,15,0,0,0,0,0,0,0,0,0,0,0}
     }
 };
 

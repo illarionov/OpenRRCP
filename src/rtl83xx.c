@@ -182,7 +182,7 @@ void do_ping(void){
     _exit(!r);
 }
 
-void print_vlan_status(void){
+void print_vlan_status(int show_vid){
     int i,port,port_phys;
 
     unsigned short vlan_status;
@@ -228,6 +228,7 @@ void print_vlan_status(void){
     for (port=1;port<=switchtypes[switchtype].num_ports;port++){
 	port_phys=map_port_number_from_logical_to_physical(port);
 	//insert_vid option is available only in rtl8316b
+        if ( (show_vid >= 0) && (show_vid != vlan_vid[vlan_port_vlan.index[port_phys]]) ) continue; 
 	printf("%s/%-2d: VLAN_IDX=%02d, VID=%d, Insert_VID=%s, Out_tag_strip=%s\n",
 		ifname,
 		port,
@@ -240,6 +241,8 @@ void print_vlan_status(void){
     printf("IDX VID Member ports\n");
     for (i=0;i<32;i++){
 	if (vlan_entry.bitmap[i]){
+        if ( (show_vid > 0) && (show_vid != vlan_vid[i]) ) continue; 
+
 	    char s[16],portlist[128];
 	    int port;
 	    portlist[0]=0;
@@ -748,15 +751,19 @@ int main(int argc, char **argv){
     int shift=0;
     int negate=0;
     int cmd;
+    int vid=-1;
     unsigned short int *p_port_list=NULL;
     unsigned short int port_list[26];
     char *cmd_level_1[]={"show", "config", "scan", "reload", "reboot", "write", "ping", "mac-address",""}; 
-    char *show_sub_cmd[]={"running-config","startup-config","interface",""};
+    char *show_sub_cmd[]={"running-config","startup-config","interface","vlan",""};
     char *scan_sub_cmd[]={"verbose",""};
     char *show_sub_cmd_l2[]={"full","verbose",""};
     char *show_sub_cmd_l3[]={"summary",""};
+    char *show_sub_cmd_l4[]={"id",""};
     char *reset_sub_cmd[]={"soft","hard",""};
     char *write_sub_cmd[]={"memory","eeprom","defaults",""};
+    char *config_sub_cmd_l1[]={"interface","rrcp",""};
+    char *config_intf_sub_cmd_l1[]={"shutdown","speed","rate-limit","mac-address","rrcp","mls",""};
 
     if (argc<3){
         print_usage();
@@ -814,10 +821,6 @@ int main(int argc, char **argv){
     engage_timeout(5);
     rtl83xx_prepare();
 
-    if(strcmp(argv[2],"no")==0){
-     negate++;
-     shift++;
-    }
 
     cmd=compare_command(argv[2+shift],&cmd_level_1[0]);
     //printf("%i\n",cmd);
@@ -870,12 +873,76 @@ int main(int argc, char **argv){
                                         exit(1);
 	                  }
                           exit(0);
+                   case 3: // vlan
+   	                  if (argc == (3+shift+1)){
+                             print_vlan_status(-1);
+                             exit(0);
+                          }
+                          switch (compare_command(argv[4+shift],&show_sub_cmd_l4[0])){
+                                 case 0:
+                                        if (argc > (4+shift+1)){
+                                         if (sscanf(argv[5+shift], "%i",&vid) == 1) { 
+                                           print_vlan_status(vid);
+                                           exit(0); 
+                                         }
+                                        }
+	                                printf("Vlan-id not specified\n");
+                                        exit(1);
+                                 default:
+                                        printf("Unknown sub-command: \"%s\", allowed commands:\n",argv[4+shift]);
+                                        print_allow_command(&show_sub_cmd_l4[0]);
+                                        exit(1);
+	                  }
                    default:
                           printf("Unknown sub-command: \"%s\", allowed commands:\n",argv[3+shift]);
                           print_allow_command(&scan_sub_cmd[0]);
                           exit(1);
                 }
          case 1: //config
+  	        if (argc == (2+shift+1)){
+                   printf("No sub-command, allowed commands:\n");
+                   print_allow_command(&config_sub_cmd_l1[0]);
+                   exit(1);
+                }
+                if (strcmp(argv[3+shift],"no")==0){
+                   negate++;
+                   shift++;
+  	           if (argc == (3+shift+1)){
+                      printf("No sub-command, allowed commands:\n");
+                      print_allow_command(&config_sub_cmd_l1[0]);
+                      exit(1);
+                   }
+                }
+                switch (compare_command(argv[3+shift],&config_sub_cmd_l1[0])){
+                   case 0: // interface
+       	                  if (argc == (3+shift+1)){
+                             printf("No list of ports\n");
+                             exit(1);
+                          }
+                          if (str_portlist_to_array(argv[4+shift],&port_list[0],switchtypes[switchtype].num_ports)!=0){
+                             printf("Incorrect list of ports: \"%s\"\n",argv[4+shift]);
+                             exit(1);
+                          }
+       	                  if (argc == (4+shift+1)){
+                             printf("No sub-command, allowed commands:\n");
+                             print_allow_command(&config_intf_sub_cmd_l1[0]);
+                             exit(1);
+                          }
+                          switch (compare_command(argv[5+shift],&config_intf_sub_cmd_l1[0])){
+                                 case 0: // shutdown
+                                        do_port_disable(&port_list[0],negate);
+                                        exit(0);
+                                 default:
+                                         printf("Unknown sub-command: \"%s\", allowed commands:\n",argv[5+shift]);
+                                         print_allow_command(&config_intf_sub_cmd_l1[0]);
+                                         exit(1);
+                          }
+                          
+                   default:
+                          printf("Unknown sub-command: \"%s\", allowed commands:\n",argv[3+shift]);
+                          print_allow_command(&config_sub_cmd_l1[0]);
+                          exit(1);
+                }
                 break;
          case 2: //scan
   	        if (argc == (2+shift+1)){

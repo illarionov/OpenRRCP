@@ -144,7 +144,8 @@ int cmd_show_ip_igmp_snooping(struct cli_def *cli, char *command, char *argv[], 
 {
     if (argc>0){
 	if (strcmp(argv[0],"?")==0){
-	    cli_print(cli, "<CR>");
+	    cli_print(cli, "  |  Output modifiers");
+	    cli_print(cli, "  <cr>");
 	}else{
 	    cli_print(cli, "%% Invalid input detected.");
 	}

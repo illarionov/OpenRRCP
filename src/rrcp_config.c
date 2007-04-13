@@ -133,7 +133,7 @@ char *rrcp_config_get_portname(char *buffer, int buffer_size, int port_number, i
 
 void rrcp_config_bin2text(char *sc, int l, int show_defaults)
 {
-    int i,port,port_phys,port2,port2_phys;
+    int port,port_phys,port2,port2_phys;
     char pn[64];
 
     sprintf(sc,"!\n");
@@ -245,21 +245,42 @@ void rrcp_config_bin2text(char *sc, int l, int show_defaults)
 	if (swconfig.vlan.s.config.enable){
 	    //print vlan-related lines only if vlans are enabled globally by this config
 	    if (is_trunk){
-		char vlanlist[256],s[16];
+		char vlanlist[256],s[32];
+		int i,j,r_start=-1,r_last=-1;
 		vlanlist[0]=0;
-		for(i=0;i<32;i++){
-		    if(swconfig.vlan_entry.bitmap[i]&(1<<port_phys)){
-			sprintf(s,"%d",swconfig.vlan_vid[i]);
-			if (vlanlist[0]!=0){
-			    strcat(vlanlist,",");
+
+		for(i=1;i<4097;i++){
+		    int found=0;
+		    for (j=0;j<32;j++){
+			if (swconfig.vlan_vid[j]==i){
+			    found=1;
+			    if (r_start<=0){
+				r_start=i;
+			    }
+			    r_last=i;
 			}
-			strcat(vlanlist,s);
+		    }
+		    if (!found){
+			if (r_start>0){
+			    if (r_start==r_last){
+				sprintf(s,"%d",r_start);
+			    }else{
+				sprintf(s,"%d-%d",r_start,r_last);
+			    }
+			    if (vlanlist[0]!=0){
+				strcat(vlanlist,",");
+			    }
+			    strcat(vlanlist,s);
+			    r_start=-1;
+			    r_last=-1;
+			}
 		    }
 		}
 		if (vlanlist[0]==0){
 		    strcpy(vlanlist,"none");
 		}
 		sncprintf(sc,l," switchport trunk allowed vlan %s\n",vlanlist);
+		sncprintf(sc,l," switchport trunk native vlan %d\n",swconfig.vlan_vid[swconfig.vlan.s.port_vlan_index[port_phys]]);
 	    }else{
 		sncprintf(sc,l," switchport access vlan %d\n",swconfig.vlan_vid[swconfig.vlan.s.port_vlan_index[port_phys]]);
 	    }
@@ -349,5 +370,22 @@ int find_or_create_vlan_index_by_vid(int vid)
 	    return i;
 	}
     }
+    //try to free unused vlan
+    for(i=0;i<32;i++){
+	if (swconfig.vlan_entry.bitmap[i]==0){
+	    int port,port_phys,vid_used_as_pvid=0;
+	    for(port=1;port<=switchtypes[switchtype].num_ports;port++){
+	        port_phys=map_port_number_from_logical_to_physical(port);
+		if (swconfig.vlan.s.port_vlan_index[port_phys]==i){
+		    vid_used_as_pvid=1;
+		}
+	    }
+	    if (vid_used_as_pvid==0){
+	        swconfig.vlan_vid[i]=vid;
+		return i;
+	    }
+	}
+    }
+
     return -1;
 }

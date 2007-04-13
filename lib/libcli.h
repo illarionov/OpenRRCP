@@ -4,6 +4,7 @@
 #define CLI_OK			0
 #define CLI_ERROR		-1
 #define CLI_QUIT		-2
+#define CLI_RETRY		-33
 #define MAX_HISTORY		256
 
 #define PRIVILEGE_UNPRIVILEGED	0

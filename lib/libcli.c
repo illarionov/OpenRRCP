@@ -551,7 +551,7 @@ int cli_find_command(struct cli_def *cli, struct cli_command *commands, int num_
 				cli_error(cli, "  %-20s %s", c->command, c->help ? : "");
 		}
 
-		return CLI_OK;
+		return CLI_RETRY;
 	}
 
 	{
@@ -610,7 +610,24 @@ int cli_find_command(struct cli_def *cli, struct cli_command *commands, int num_
 				}
 				else
 				{
-				    return cli_find_command(cli, c->children, num_words, words, start_word + 1, filters);
+					int retval;
+					retval=cli_find_command(cli, c->children, num_words, words, start_word + 1, filters);
+					if (retval!=CLI_RETRY)
+					{
+						return retval;
+					}
+					else
+					{
+						if (!c->callback)
+						{
+							if (words[start_word+1][strlen(words[start_word+1])-1] == '?')
+							{
+								return CLI_OK;
+							}
+							cli_error(cli, "%% Invalid input detected: \"%s\"", words[start_word+1]);
+							return CLI_ERROR;
+						}
+					}
 				}
 			}
 
@@ -719,12 +736,15 @@ int cli_find_command(struct cli_def *cli, struct cli_command *commands, int num_
 
 			return rc;
 		}
+	}else if (start_word > 0){
+	    //try to execute previous command, maybe we have just looked at it's argument
+	    return CLI_RETRY;
 	}
 
 	if (words[start_word][0]=='!'){
 		return CLI_OK;
 	}else{
-		cli_error(cli, "Invalid %s \"%s\"", commands->parent ? "argument" : "command", words[start_word]);
+		cli_error(cli, "%% Invalid %s \"%s\"", commands->parent ? "argument" : "command", words[start_word]);
 		return CLI_ERROR;
 	}
 }
@@ -890,8 +910,6 @@ int cli_loop(struct cli_def *cli, int sockfd)
 	if (cli->banner)
 		cli_error(cli, "%s", cli->banner);
 
-	// Start off in unprivileged mode
-	cli_set_privilege(cli, PRIVILEGE_UNPRIVILEGED);
 	cli_set_configmode(cli, MODE_EXEC, NULL);
 
 	// No auth required?

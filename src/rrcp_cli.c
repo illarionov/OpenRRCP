@@ -230,6 +230,7 @@ int main(int argc, char *argv[])
 	ttyarg.c_iflag = 0 ;                     /* clear iflag of all input */
 	ttyarg.c_lflag = ISIG ;                  /* clear lflag of all processing, except for signals */
 	n = tcsetattr( x , TCSANOW , &ttyarg ) ; /* set changed tty arguments */
+	cli_set_privilege(cli, PRIVILEGE_PRIVILEGED);
 	cli_loop(cli, x);
 	system("reset"); //reset terminal on exit. FIXME: need to find more straight-forward solution to do this.
     }else{

@@ -37,6 +37,7 @@
 #include <signal.h>
 #include <unistd.h>
 #include "rrcp_packet.h"
+#include "rrcp_lib.h"
 #include "rrcp_io.h"
 #include "rrcp_switches.h"
 #include "rrcp_config.h"
@@ -383,41 +384,6 @@ void do_write_eeprom_defaults(){
  if (switchtypes[switchtype].num_ports==26) {if (do_write_eeprom(0x53,0xbfbf)) {printf("write eeprom\n");exit(1);}}
 }
 
-int str_portlist_to_array(char *list,unsigned short int *arr,unsigned int arrlen){
-short int i,k;
-char *s,*c,*n;
-char *d[16];
-unsigned int st,sp; 
-
- s=list;
- for (i=0;i<arrlen;i++) { *(arr+i)=0; }
- for (i=0;i<strlen(s);i++){  //check allowed symbols
-  if ( ((s[i] >= '0') && (s[i] <= '9')) || (s[i] == ',') || (s[i] == '-') ) continue; 
-  return(1);
- }
- while(*s){
-  bzero(d,sizeof(d));
-  // parsing
-  if ( (c=strchr(s,',')) != NULL ) { k=c-s; n=c+1; }
-  else { k=strlen(s); n=s+k; }
-  if (k >= sizeof(d)) return(1);
-  memcpy(d,s,k);s=n;
-  // range of ports or one port?
-  if (strchr((char *)d,'-')!=NULL){ 
-   // range
-   if (sscanf((char *)d,"%u-%u",&st,&sp) != 2) return(2);
-   if ( !st || !sp || (st > sp) || (st > arrlen) || (sp > arrlen) ) return(3);
-   for (i=st;i<=sp;i++) { *(arr+i-1)=1; }
-  }else{
-   // one port
-   st=(unsigned int)strtoul((char *)d, (char **)NULL, 10);
-   if ( !st || (st > arrlen) ) return(3);
-   *(arr+st-1)=1;
-  }
- }
- return(0);
-}
-
 int compare_command(char *argv, char **command_list){
  int i=0;
 
@@ -745,10 +711,10 @@ int main(int argc, char **argv){
     unsigned int ak;
     int i;
     char *p;
-    int root_port=-1;
-    int media_speed;
-    int direction; 
-    int bandw;
+//    int root_port=-1;
+//    int media_speed;
+//    int direction; 
+//    int bandw;
     int shift=0;
     int negate=0;
     int cmd;

@@ -22,9 +22,11 @@
     This would be appreciated, however not required.
 */
 
+#include <stdlib.h>
 #include <string.h>
 #include "../lib/libcli.h"
 #include "rrcp_config.h"
+#include "rrcp_lib.h"
 #include "rrcp_io.h"
 #include "rrcp_switches.h"
 #include "rrcp_cli_cmd_show.h"
@@ -78,7 +80,7 @@ int cmd_config_ip_igmp_snooping(struct cli_def *cli, char *command, char *argv[]
 {
     if (argc>0){
 	if (strcmp(argv[0],"?")==0){
-	    cli_print(cli, "<CR>");
+	    cli_print(cli, "  <cr>");
 	}else{
 	    cli_print(cli, "%% Invalid input detected.");
 	}
@@ -94,7 +96,7 @@ int cmd_config_rrcp(struct cli_def *cli, char *command, char *argv[], int argc)
 {
     if (argc>0){
 	if (strcmp(argv[0],"?")==0){
-	    cli_print(cli, "<CR>");
+	    cli_print(cli, "  <cr>");
 	}else{
 	    cli_print(cli, "%% Invalid input detected.");
 	}
@@ -112,10 +114,39 @@ int cmd_config_rrcp(struct cli_def *cli, char *command, char *argv[], int argc)
 int cmd_config_vlan(struct cli_def *cli, char *command, char *argv[], int argc)
 {
     if (argc>0){
+	if (strcasecmp(command,"no vlan")==0) {
+	    if (argv[0][strlen(argv[0])-1]=='?'){
+		cli_print(cli, "  <1-4095>             Remove exiting vlan from switch");
+		cli_print(cli, "  <cr>");
+	        return CLI_ERROR;
+	    }else{
+		int vidlist[33];
+		int i,vi;
+
+		if (str_portlist_to_array_by_value(argv[0],vidlist,32)==0){
+		    for (i=0;(i<32)&&(vidlist[i]>0)&&(vidlist[i]<4095);i++){
+			vi=find_vlan_index_by_vid(vidlist[i]);
+			if (vi>=0){
+			    swconfig.vlan_entry.bitmap[vi]=0;
+			    if (vidlist[i]>1){
+				swconfig.vlan_vid[vi]=0;
+			    }
+			}
+		    }
+		    rrcp_config_commit_vlan_to_switch();
+		}else{
+		    cli_print(cli, "%% ERROR: Invalid vlan list: '%s'",argv[0]);
+		    return CLI_ERROR;
+		}
+		return CLI_OK;
+	    }
+	}
 	if (strcmp(argv[0],"?")==0){
-	    cli_print(cli, "<CR>");
+	    cli_print(cli, "  <cr>");
+	    return CLI_ERROR;
 	}else{
 	    cli_print(cli, "%% Invalid input detected.");
+	    return CLI_ERROR;
 	}
     }else{
 	if (strcasecmp(command,"no vlan")==0) {
@@ -172,7 +203,7 @@ int cmd_config_vlan_leaky(struct cli_def *cli, char *command, char *argv[], int 
 {
     if (argc>0){
 	if (strcmp(argv[0],"?")==0){
-	    cli_print(cli, "<CR>");
+	    cli_print(cli, "  <cr>");
 	}else{
 	    cli_print(cli, "%% Invalid input detected.");
 	}
@@ -190,7 +221,7 @@ int cmd_config_vlan_drop(struct cli_def *cli, char *command, char *argv[], int a
 {
     if (argc>0){
 	if (strcmp(argv[0],"?")==0){
-	    cli_print(cli, "<CR>");
+	    cli_print(cli, "  <cr>");
 	}else{
 	    cli_print(cli, "%% Invalid input detected.");
 	}
@@ -207,7 +238,7 @@ int cmd_config_qos(struct cli_def *cli, char *command, char *argv[], int argc)
 {
     if (argc>0){
 	if (strcmp(argv[0],"?")==0){
-	    cli_print(cli, "<CR>");
+	    cli_print(cli, "  <cr>");
 	}else{
 	    cli_print(cli, "%% Invalid input detected.");
 	}
@@ -255,7 +286,7 @@ int cmd_config_flowcontrol(struct cli_def *cli, char *command, char *argv[], int
 {
     if (argc>0){
 	if (strcmp(argv[0],"?")==0){
-	    cli_print(cli, "<CR>");
+	    cli_print(cli, "  <cr>");
 	}else{
 	    cli_print(cli, "%% Invalid input detected.");
 	}
@@ -276,7 +307,7 @@ int cmd_config_stormcontrol(struct cli_def *cli, char *command, char *argv[], in
 {
     if (argc>0){
 	if (strcmp(argv[0],"?")==0){
-	    cli_print(cli, "<CR>");
+	    cli_print(cli, "  <cr>");
 	}else{
 	    cli_print(cli, "%% Invalid input detected.");
 	}
@@ -308,7 +339,7 @@ int cmd_config_spanning_tree(struct cli_def *cli, char *command, char *argv[], i
 {
     if (argc>0){
 	if (strcmp(argv[0],"?")==0){
-	    cli_print(cli, "<CR>");
+	    cli_print(cli, "  <cr>");
 	}else{
 	    cli_print(cli, "%% Invalid input detected.");
 	}
@@ -324,7 +355,7 @@ int cmd_config_end(struct cli_def *cli, char *command, char *argv[], int argc)
 {
     if (argc>0){
 	if (strcmp(argv[0],"?")==0){
-	    cli_print(cli, "<CR>");
+	    cli_print(cli, "  <cr>");
 	}else{
 	    cli_print(cli, "%% Invalid input detected.");
 	}
@@ -379,7 +410,7 @@ void cmd_config_register_commands(struct cli_def *cli)
 	struct cli_command *vlan,*no_vlan,*vlan_leaky,*no_vlan_leaky,*vlan_drop,*no_vlan_drop;
 
 	vlan=cli_register_command(cli, NULL, "vlan", NULL, PRIVILEGE_PRIVILEGED, MODE_CONFIG, "Global VLAN mode");
-	no_vlan=cli_register_command(cli, no, "vlan", cmd_config_vlan, PRIVILEGE_PRIVILEGED, MODE_CONFIG, "Disable VLAN support globally");
+	no_vlan=cli_register_command(cli, no, "vlan", cmd_config_vlan, PRIVILEGE_PRIVILEGED, MODE_CONFIG, "Vlan commands");
 	cli_register_command(cli, vlan, "portbased", cmd_config_vlan, PRIVILEGE_PRIVILEGED, MODE_CONFIG, "Enable port-based VLANs only");
 	c2=cli_register_command(cli, vlan, "dot1q", cmd_config_vlan, PRIVILEGE_PRIVILEGED, MODE_CONFIG, "Enable full IEEE 802.1Q tagged VLANs");
 	cli_register_command(cli, c2, "force", cmd_config_vlan, PRIVILEGE_PRIVILEGED, MODE_CONFIG, "Enable IEEE 802.1Q VLANs even on buggy hardware");

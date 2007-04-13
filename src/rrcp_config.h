@@ -166,8 +166,15 @@ extern const char *wrr_ratio_text[4];
 extern struct t_swconfig swconfig;
 
 void rrcp_config_read_from_switch(void);
+
+void rrcp_config_commit_vlan_to_switch(void);
+
 void rrcp_config_bin2text(char *text_buffer, int buffer_length, int show_defaults);
 
 char *rrcp_config_get_portname(char *buffer, int buffer_size, int port_number, int port_number_phys);
 
 void do_show_config(int verbose);
+
+int find_vlan_index_by_vid(int vid);
+
+int find_or_create_vlan_index_by_vid(int vid);

@@ -85,6 +85,29 @@ void rrcp_config_read_from_switch(void)
     }
 }
 
+void rrcp_config_commit_vlan_to_switch(void)
+{
+    int i;
+
+    for(i=0;i<14;i++){
+	rtl83xx_setreg16(0x030b+i,swconfig.vlan.raw[i]);
+    }
+    for(i=0;i<4;i++){
+	rtl83xx_setreg16(0x0319+i,swconfig.vlan_port_output_tag.raw[i]);
+    }
+    for(i=0;i<32;i++){
+	//mask out ports absent on this switch
+	swconfig.vlan_entry.bitmap[i] &= 0xffffffff>>(32-switchtypes[switchtype].num_ports);
+	rtl83xx_setreg16(0x031d+i*3,  swconfig.vlan_entry.raw[i*2]);
+	rtl83xx_setreg16(0x031d+i*3+1,swconfig.vlan_entry.raw[i*2+1]);
+	rtl83xx_setreg16(0x031d+i*3+2,swconfig.vlan_vid[i]);
+    }
+    //mask out ports absent on this switch
+    swconfig.vlan_port_insert_vid.bitmap &= 0xffffffff>>(32-switchtypes[switchtype].num_ports);
+    rtl83xx_setreg16(0x037d,swconfig.vlan_port_insert_vid.raw[0]);
+    rtl83xx_setreg16(0x037e,swconfig.vlan_port_insert_vid.raw[1]);
+}
+
 void sncprintf(char *str, size_t size, const char *format, ...) {
     char line[1024];
     va_list ap;
@@ -301,4 +324,30 @@ void do_show_config(int verbose)
     rrcp_config_bin2text(text,65535,verbose);
     printf("%s",text);
     free(text);
+}
+
+int find_vlan_index_by_vid(int vid)
+{
+    int i;
+    for(i=0;i<32;i++){
+	if (swconfig.vlan_vid[i]==vid){
+	    return i;
+	}
+    }
+    return -1;
+}
+
+int find_or_create_vlan_index_by_vid(int vid)
+{
+    int i;
+    for(i=0;i<32;i++){
+	if (swconfig.vlan_vid[i]==vid){
+	    return i;
+	}
+	if (swconfig.vlan_vid[i]==0){
+	    swconfig.vlan_vid[i]=vid;
+	    return i;
+	}
+    }
+    return -1;
 }

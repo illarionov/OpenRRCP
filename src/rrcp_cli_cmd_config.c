@@ -123,23 +123,46 @@ int cmd_config_vlan(struct cli_def *cli, char *command, char *argv[], int argc)
 	    swconfig.vlan.s.config.enable=0;
 	    swconfig.vlan.s.config.drop_untagged_frames=0;
 	    swconfig.vlan.s.config.ingress_filtering=0;
+	    rrcp_config_commit_vlan_to_switch();
 	}
-	if (strcasecmp(command,"vlan portbased")==0) {swconfig.vlan.s.config.dot1q=0; swconfig.vlan.s.config.enable=1;}
-	if (strcasecmp(command,"vlan dot1q")==0){
+	if (strcasecmp(command,"vlan portbased")==0) {
+	    int i,port,port_phys;
+	    cli_print(cli, "%% WARNING: Portbased VLANs are not fully supported in this software yet.");
+	    for(i=1;i<32;i++){
+	        swconfig.vlan_vid[i]=i+1;
+	    }
+	    for(port=1;port<=switchtypes[switchtype].num_ports;port++){
+	        port_phys=map_port_number_from_logical_to_physical(port);
+		swconfig.vlan.s.port_vlan_index[port_phys]=0;
+	    }
+	    swconfig.vlan_port_insert_vid.bitmap=0;
+	    swconfig.vlan.s.config.dot1q=0;
+	    swconfig.vlan.s.config.enable=1;
+	    rrcp_config_commit_vlan_to_switch();
+	}
+	if ((strcasecmp(command,"vlan dot1q")==0)||(strcasecmp(command,"vlan dot1q force")==0)){
 	    if (switchtypes[switchtype].chip_id!=rtl8316b){
-		cli_print(cli, "%% IEEE 802.1Q VLANs not supported properly on this hardware. Use 'force' to persevere");
-		return CLI_ERROR;
+		if (strcasecmp(command,"vlan dot1q force")==0){
+		    cli_print(cli, "%% WARNING: Enabled IEEE 802.1Q VLANs on hardware, that do not supported them properly.");
+		}else{
+		    cli_print(cli, "%% IEEE 802.1Q VLANs not supported properly on this hardware. Use 'force' to persevere.");
+		    return CLI_ERROR;
+		}
 	    }else{
+		int i,port,port_phys;
+		swconfig.vlan_vid[0]=1;
+		for(i=1;i<32;i++){
+		    swconfig.vlan_vid[i]=0;
+		}
+		for(port=1;port<=switchtypes[switchtype].num_ports;port++){
+		    port_phys=map_port_number_from_logical_to_physical(port);
+		    swconfig.vlan.s.port_vlan_index[port_phys]=0;
+		}
+		swconfig.vlan_port_insert_vid.bitmap=0;
 	        swconfig.vlan.s.config.dot1q=1;
 		swconfig.vlan.s.config.enable=1;
+		rrcp_config_commit_vlan_to_switch();
 	    }
-	}
-	if (strcasecmp(command,"vlan dot1q force")==0){
-	    if (switchtypes[switchtype].chip_id!=rtl8316b){
-		cli_print(cli, "%% WARNING: Enabled IEEE 802.1Q VLANs on hardware, that do not supported them properly");
-	    }
-	    swconfig.vlan.s.config.dot1q=1;
-	    swconfig.vlan.s.config.enable=1;
 	}
     }
     return CLI_OK;

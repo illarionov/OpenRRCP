@@ -703,6 +703,17 @@ void print_allow_command(char **command_list){
  return;
 }
 
+int speed_encode(char *arg){
+  if ( (strcmp(arg,"a")==0) ||
+       (strcmp(arg,"au")==0) ||
+       (strcmp(arg,"aut")==0) ||
+       (strcmp(arg,"auto")==0) ) return(0);
+  if (strcmp(arg,"1000")==0) return(0x10);
+  if (strcmp(arg,"100")==0) return(0x4);
+  if (strcmp(arg,"10")==0)  return(0x1);
+  return(-1);
+}
+
 void print_usage(void){
 	printf("Usage: rtl8316b [[authkey-]xx:xx:xx:xx:xx:xx@]if-name <command> [<argument>]\n");
 	printf("       rtl8326 ----\"\"----\n");
@@ -745,13 +756,14 @@ int main(int argc, char **argv){
     int i;
     char *p;
     int root_port=-1;
-    int media_speed;
+    int media_speed=0;
     int direction; 
     int bandw;
     int shift=0;
     int negate=0;
     int cmd;
     int vid=-1;
+    int duplex=0;
     unsigned short int *p_port_list=NULL;
     unsigned short int port_list[26];
     char *cmd_level_1[]={"show", "config", "scan", "reload", "reboot", "write", "ping", "mac-address",""}; 
@@ -763,7 +775,8 @@ int main(int argc, char **argv){
     char *reset_sub_cmd[]={"soft","hard",""};
     char *write_sub_cmd[]={"memory","eeprom","defaults",""};
     char *config_sub_cmd_l1[]={"interface","rrcp",""};
-    char *config_intf_sub_cmd_l1[]={"shutdown","speed","rate-limit","mac-address","rrcp","mls",""};
+    char *config_intf_sub_cmd_l1[]={"no","shutdown","speed","duplex","rate-limit","mac-address","rrcp","mls",""};
+    char *config_duplex[]={"half","full",""};
 
     if (argc<3){
         print_usage();
@@ -904,15 +917,7 @@ int main(int argc, char **argv){
                    print_allow_command(&config_sub_cmd_l1[0]);
                    exit(1);
                 }
-                if (strcmp(argv[3+shift],"no")==0){
-                   negate++;
-                   shift++;
-  	           if (argc == (3+shift+1)){
-                      printf("No sub-command, allowed commands:\n");
-                      print_allow_command(&config_sub_cmd_l1[0]);
-                      exit(1);
-                   }
-                }
+
                 switch (compare_command(argv[3+shift],&config_sub_cmd_l1[0])){
                    case 0: // interface
        	                  if (argc == (3+shift+1)){
@@ -929,8 +934,51 @@ int main(int argc, char **argv){
                              exit(1);
                           }
                           switch (compare_command(argv[5+shift],&config_intf_sub_cmd_l1[0])){
-                                 case 0: // shutdown
-                                        do_port_disable(&port_list[0],negate);
+                                 case 0: // no
+                                        if (argc > 5+shift+1) { // no shutdown
+                                          if (compare_command(argv[6+shift],&config_intf_sub_cmd_l1[0])==1){
+                                           do_port_disable(&port_list[0],1);
+                                           exit(0);
+                                          }
+                                          printf("Incorrect sub-commands, allowed: shutdown\n");
+                                          exit(1);
+                                        }
+                                        printf("No sub-command, allowed commands:\n");
+                                        print_allow_command(&config_intf_sub_cmd_l1[1]);
+                                        exit(1);
+                                 case 1: // shutdown
+                                        do_port_disable(&port_list[0],0);
+                                        exit(0);
+                                 case 2: // speed
+          	                        if (argc == (5+shift+1)){
+                                          printf("No sub-command, allowed commands:");
+                                          printf(" 10|100|1000|auto [duplex half|full]\n");
+                                          exit(1);
+                                         }
+                                        if ((media_speed=speed_encode(argv[6+shift])) == -1){
+                                          printf("Incorect speed, valid are: 10|100|1000|auto\n");
+                                          exit(1);
+                                        }
+                                        if ( (argc > 6+shift+1) && (media_speed!=0) && (media_speed!=0x8) ){ //duplex
+                                          if (compare_command(argv[7+shift],&config_intf_sub_cmd_l1[0])==3){
+           	                            if (argc == (7+shift+1)){
+                                              printf("No sub-command, allowed commands:\n");
+                                              print_allow_command(&config_duplex[0]);
+                                              exit(1);
+                                            }
+                                            if ((duplex=compare_command(argv[8+shift],&config_duplex[0])) < 0){
+                                              printf("Incorect duplex, valid are: full|half\n");
+                                              exit(1);
+                                            }
+                                            media_speed=media_speed<<duplex;
+                                            do_port_config(0,&port_list[0],media_speed);
+                                            exit(0);
+                                          }
+                                          printf("Incorrect sub-command, allowed commands:\n");
+                                          printf("duplex half|full\n");
+                                          exit(1);
+                                        }
+                                        do_port_config(0,&port_list[0],media_speed);
                                         exit(0);
                                  default:
                                          printf("Unknown sub-command: \"%s\", allowed commands:\n",argv[5+shift]);

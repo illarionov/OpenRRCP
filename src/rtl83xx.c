@@ -523,13 +523,6 @@ int port_mode_encode(int mode,char *arg){
  return(-1); 
 }
 
-int bandwidth_encode(char *arg){
- int i;
- for(i=0;i<strlen(arg);i++) arg[i]=toupper(arg[i]);
- for(i=0;i<8;i++) if (strcmp(arg,bandwidth_text[i])==0) return(i);
- return(-1);
-}
-
 void do_port_config(int mode,unsigned short int *arr, int val){
   int i;
   int phys_port;
@@ -757,15 +750,17 @@ int main(int argc, char **argv){
     char *p;
     int root_port=-1;
     int media_speed=0;
-    int direction; 
-    int bandw;
+    int direction=0; 
+    int bandw=0;
     int shift=0;
     int negate=0;
+    int mac_learning=0;
     int cmd;
     int vid=-1;
     int duplex=0;
     unsigned short int *p_port_list=NULL;
     unsigned short int port_list[26];
+    char *ena_disa[]={"enable","disable",""};
     char *cmd_level_1[]={"show", "config", "scan", "reload", "reboot", "write", "ping", "mac-address",""}; 
     char *show_sub_cmd[]={"running-config","startup-config","interface","vlan",""};
     char *scan_sub_cmd[]={"verbose",""};
@@ -777,6 +772,8 @@ int main(int argc, char **argv){
     char *config_sub_cmd_l1[]={"interface","rrcp",""};
     char *config_intf_sub_cmd_l1[]={"no","shutdown","speed","duplex","rate-limit","mac-address","rrcp","mls",""};
     char *config_duplex[]={"half","full",""};
+    char *config_rate[]={"100m","128k","256k","512k","1m","2m","4m","8m","input","output",""};
+    char *config_mac_learn[]={"learning","disable","enable",""};
 
     if (argc<3){
         print_usage();
@@ -980,6 +977,47 @@ int main(int argc, char **argv){
                                         }
                                         do_port_config(0,&port_list[0],media_speed);
                                         exit(0);
+                                 case 4:  //rate-limit
+                                        for(;;){
+           	                           if (argc == (5+shift+1)){
+                                             printf("No sub-command, allowed commands:");
+                                             printf(" [input|output] 128K|256K|512K|1M|2M|4M|8M|100M\n");
+                                             exit(1);
+                                           }
+                                           for(i=0;i<strlen(argv[6+shift]);i++) argv[6+shift][i]=tolower(argv[6+shift][i]);
+					   if ((bandw=compare_command(argv[6+shift],&config_rate[0])) == -1){
+                                             printf("Incorrect sub-command, valid commands:");
+                                             printf(" [input|output] 128K|256K|512K|1M|2M|4M|8M|100M\n");
+                                             exit(1);
+                                           }
+                                           if (bandw > 7){
+                                             direction=bandw-7;
+                                             shift++;
+                                             continue;
+                                           }
+                                           do_port_config_bandwidth(direction,&port_list[0],bandw);
+                                           exit(0);
+                                        };
+                                 case 5:  //mac-address
+                                        for(;;){
+           	                           if (argc == (5+shift+1)){
+                                             printf("No sub-command, allowed commands:");
+                                             printf(" learning enable|disable\n");
+                                             exit(1);
+                                           }
+					   if ((mac_learning=compare_command(argv[6+shift],&config_mac_learn[0])) == -1){
+                                             printf("Incorrect sub-command, valid commands:");
+                                             printf(" learning enable|disable\n");
+                                             exit(1);
+                                           }
+                                           if (!mac_learning){
+                                             shift++;
+                                             continue;
+                                           }
+                                           do_port_learning(mac_learning-1,&port_list[0]);
+                                           exit(0);
+                                        }
+                                       
                                  default:
                                          printf("Unknown sub-command: \"%s\", allowed commands:\n",argv[5+shift]);
                                          print_allow_command(&config_intf_sub_cmd_l1[0]);

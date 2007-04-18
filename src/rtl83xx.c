@@ -420,88 +420,61 @@ unsigned int st,sp;
 
 int compare_command(char *argv, char **command_list){
  int i=0;
+ int res=-1;
+ int count=0;
 
  do{
-//  printf("Compare %s %s\n",argv,command_list[i]);
   if (strlen(argv) > strlen(command_list[i])) continue;
-  if (strstr(command_list[i],argv)==command_list[i]) return(i);
+  if (strstr(command_list[i],argv)==command_list[i]) {res=i; count++;}
  }while (strlen(command_list[i++]));
- return(-1);
+ if (count > 1){
+   printf("Ambiguous command: \"%s\"\n",argv);
+   exit(1);
+ }
+ return(res);
+}
+
+void do_32bit_reg_action(unsigned short int *arr, unsigned short int val, unsigned int base_reg){
+    int i;
+    uint32_t portmask;
+    union {
+        struct {
+            uint16_t low;
+            uint16_t high;
+        } doubleshort;
+        uint32_t singlelong;
+    } u;
+
+    portmask=u.singlelong=0;
+    for(i=0;i<switchtypes[switchtype].num_ports;i++){
+      portmask|=(((*(arr+map_port_number_from_physical_to_logical(i)-1))&0x1)<<i);
+    }
+    u.doubleshort.low=rtl83xx_readreg16(base_reg);
+    if (switchtypes[switchtype].num_ports > 16) u.doubleshort.high=rtl83xx_readreg16(base_reg+1);
+
+    if (val) u.singlelong&=~portmask; 
+    else u.singlelong|=portmask;
+
+    rtl83xx_setreg16(base_reg,u.doubleshort.low);
+    if (switchtypes[switchtype].num_ports > 16) rtl83xx_setreg16(base_reg+1,u.doubleshort.high);
+    return;
 }
 
 void do_restrict_rrcp(unsigned short int *arr, unsigned short int val){
-    int i;
-    uint32_t portmask;
-
-    portmask=swconfig.rrcp_byport_disable.bitmap=0;
-    for(i=0;i<switchtypes[switchtype].num_ports;i++){
-      portmask|=(((*(arr+map_port_number_from_physical_to_logical(i)-1))&0x1)<<i);
-    }
-    swconfig.rrcp_byport_disable.raw[0]=rtl83xx_readreg16(0x0201);
-    if (switchtypes[switchtype].num_ports > 16) swconfig.rrcp_byport_disable.raw[1]=rtl83xx_readreg16(0x0202);
-
-    if (val) swconfig.rrcp_byport_disable.bitmap&=~portmask; 
-    else swconfig.rrcp_byport_disable.bitmap|=portmask;
-
-    rtl83xx_setreg16(0x0201,swconfig.rrcp_byport_disable.raw[0]);
-    if (switchtypes[switchtype].num_ports > 16) rtl83xx_setreg16(0x0202,swconfig.rrcp_byport_disable.raw[1]);
+    do_32bit_reg_action(arr,val,0x201);
 }
 
 void do_port_qos(unsigned short int *arr,unsigned short int val){
-    int i;
-    uint32_t portmask;
-
-    portmask=swconfig.qos_port_priority.bitmap=0;
-    for(i=0;i<switchtypes[switchtype].num_ports;i++){
-      portmask|=(((*(arr+map_port_number_from_physical_to_logical(i)-1))&0x1)<<i);
-    }
-    swconfig.qos_port_priority.raw[0]=rtl83xx_readreg16(0x0401);
-    if (switchtypes[switchtype].num_ports > 16) swconfig.qos_port_priority.raw[1]=rtl83xx_readreg16(0x0402);
-
-    if (val) swconfig.qos_port_priority.bitmap&=~portmask; 
-    else swconfig.qos_port_priority.bitmap|=portmask;
-
-    rtl83xx_setreg16(0x0401,swconfig.qos_port_priority.raw[0]);
-    if (switchtypes[switchtype].num_ports > 16) rtl83xx_setreg16(0x0402,swconfig.qos_port_priority.raw[1]);
+    do_32bit_reg_action(arr,val,0x401);
 }
 
 void do_port_disable(unsigned short int *arr,unsigned short int val){
-    int i;
-    uint32_t portmask;
-
-    portmask=swconfig.port_disable.bitmap=0;
-    for(i=0;i<switchtypes[switchtype].num_ports;i++){
-      portmask|=(((*(arr+map_port_number_from_physical_to_logical(i)-1))&0x1)<<i);
-    }
-    swconfig.port_disable.raw[0]=rtl83xx_readreg16(0x0608);
-    if (switchtypes[switchtype].num_ports > 16) swconfig.port_disable.raw[1]=rtl83xx_readreg16(0x0609);
-
-    if (val) swconfig.port_disable.bitmap&=~portmask; 
-    else swconfig.port_disable.bitmap|=portmask;
-
-    rtl83xx_setreg16(0x0608,swconfig.port_disable.raw[0]);
-    if (switchtypes[switchtype].num_ports > 16) rtl83xx_setreg16(0x0609,swconfig.port_disable.raw[1]);
-    
+    do_32bit_reg_action(arr,val,0x608);
     if (!val) printf ("Warning! This setting(s) can be saved and be forged after reboot\n");
 }
 
 void do_port_learning(int mode,unsigned short int *arr){
-    int i;
-    uint32_t portmask;
-
-    portmask=swconfig.alt_mask.mask=0;
-    for(i=0;i<switchtypes[switchtype].num_ports;i++){
-      portmask|=(((*(arr+map_port_number_from_physical_to_logical(i)-1))&0x1)<<i);
-    }
-    swconfig.alt_mask.raw[0]=rtl83xx_readreg16(0x0301);
-    if (switchtypes[switchtype].num_ports > 16) swconfig.alt_mask.raw[1]=rtl83xx_readreg16(0x0302);
-
-    if (mode) swconfig.alt_mask.mask&=~portmask; 
-    else swconfig.alt_mask.mask|=portmask;
-
-    rtl83xx_setreg16(0x0301,swconfig.alt_mask.raw[0]);
-    if (switchtypes[switchtype].num_ports > 16) rtl83xx_setreg16(0x0301,swconfig.alt_mask.raw[1]);
-    
+    do_32bit_reg_action(arr,mode,0x301);
     if (!mode) printf ("Warning! This setting(s) can be saved and be forged after reboot\n");
 }
 

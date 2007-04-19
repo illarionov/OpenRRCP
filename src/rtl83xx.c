@@ -478,6 +478,18 @@ void do_port_learning(int mode,unsigned short int *arr){
     if (!mode) printf ("Warning! This setting(s) can be saved and be forged after reboot\n");
 }
 
+void do_rrcp_ctrl(int state){
+    swconfig.rrcp_config.raw=rtl83xx_readreg16(0x0200);
+    swconfig.rrcp_config.config.rrcp_disable=state&0x1;
+    rtl83xx_setreg16(0x0200,swconfig.rrcp_config.raw);
+}
+
+void do_rrcp_echo(int state){
+    swconfig.rrcp_config.raw=rtl83xx_readreg16(0x0200);
+    swconfig.rrcp_config.config.echo_disable=state&0x1;
+    rtl83xx_setreg16(0x0200,swconfig.rrcp_config.raw);
+}
+
 void do_loopdetect(int state){
     swconfig.rrcp_config.raw=rtl83xx_readreg16(0x0200);
     swconfig.rrcp_config.config.loop_enable=state&0x1;
@@ -695,18 +707,20 @@ void print_usage(void){
 	printf(" --\"\"-- mac-address learning enable|disable - enable/disable MAC-learning on port(s)\n");
 	printf(" --\"\"-- rrcp enable|disable - enable/disable rrcp on specified ports\n");
 	printf(" --\"\"-- mls qos cos 0|7 - set port priority\n");
+	printf(" --\"\"-- rrcp enable|disable - global rrcp enable|disable\n");
+	printf(" --\"\"-- rrcp echo enable|disable - rrcp echo (REP) enable|disable\n");
+	printf(" --\"\"-- rrcp loop-detect enable|disable - network loop detect enable|disable\n"); 
+        printf(" --\"\"-- rrcp authkey <hex-value> - set new authkey\n"); 
 //	printf(" vlan status                  - show low-level vlan confg\n");
 //	printf(" vlan enable_hvlan [<port>]   - configure switch as home-vlan tree with specified uplink port\n");
 //	printf(" vlan enable_8021q [<port>]   - configure switch as IEEE 802.1Q vlan tree with specified uplink port\n");
 //	printf(" vlan disable               - disable all VLAN support\n");
 //	printf(" bcast-storm-ctrl enable|disable   - broadcast storm control on/off\n"); 
-//	printf(" loopdetect enable|disable         - network loop detect on/off\n"); 
 //	printf(" mac-aging <arg>              - address lookup table control\n");
 	printf(" ping                         - test if switch is responding\n");
 	printf(" write memory                 - save current config to EEPROM\n");
 	printf(" write defaults               - save to EEPROM chip-default values\n");
 	printf(" mac-address <mac>            - set <mac> as new switch MAC address and reboots\n");
-//      printf(" authkey <hex-value>          - set new authkey\n"); 
         return;
 }
 
@@ -743,6 +757,7 @@ int main(int argc, char **argv){
     char *config_mac_learn[]={"learning","disable","enable",""};
     char *config_port_qos[]={"7","0","qos","cos",""};
     char *config_port_flow[]={"none","asym2remote","symmetric","asym2local",""};
+    char *config_rrcp[]={"disable","enable","echo","loop-detect","authkey",""};
 
     if (argc<3){
         print_usage();
@@ -1037,7 +1052,66 @@ int main(int argc, char **argv){
                                          print_allow_command(&config_intf_sub_cmd_l1[0]);
                                          exit(1);
                           }
-                          
+                   case 1:
+       	                  if (argc == (3+shift+1)){
+                             printf("No sub-command, allowed commands:\n");
+                             print_allow_command(&config_rrcp[0]);
+                             exit(1);
+                          }
+                          switch (compare_command(argv[4+shift],&config_rrcp[0])){
+                                 case 0: // rrcp disable
+                                        do_rrcp_ctrl(1);
+                                        exit(1);
+                                 case 1: // rrcp enable
+                                        do_rrcp_ctrl(0);
+                                        exit(1);
+                                 case 2: // rrcp echo
+           	                        if (argc == (4+shift+1)){
+                                          printf("No sub-command, allowed commands:");
+                                          printf(" enable|disable\n");
+                                          exit(1);
+                                         }
+					if ((subcmd=compare_command(argv[5+shift],&ena_disa[0])) == -1){
+                                          printf("Incorrect sub-command, valid commands:");
+                                          printf(" enable|disable\n");
+                                          exit(1);
+                                        }
+                                        do_rrcp_echo(!subcmd);
+                                        exit(0);
+                                 case 3: // rrcp loopdetect
+           	                        if (argc == (4+shift+1)){
+                                          printf("No sub-command, allowed commands:");
+                                          printf(" enable|disable\n");
+                                          exit(1);
+                                         }
+					if ((subcmd=compare_command(argv[5+shift],&ena_disa[0])) == -1){
+                                          printf("Incorrect sub-command, valid commands:");
+                                          printf(" enable|disable\n");
+                                          exit(1);
+                                        }
+                                        do_loopdetect(subcmd);
+                                        exit(0);
+                                 case 4: // rrcp authkey
+           	                        if (argc == (4+shift+1)){
+                                          printf("Authkey needed\n");
+                                          exit(1);
+                                         }
+                                         if (sscanf(argv[5+shift],"%04x",&ak) == 1){
+                                           if (ak <= 0xffff) {
+                                             rtl83xx_setreg16(0x209,ak);
+                                             printf ("Setting of new authkey is no save into EEPROM and may be forged after reboot.\n");
+                                             printf ("After change authkey switch not answering on broadcast \"Hello\" scan, be close.\n");
+                                             exit(0);
+                                           }
+                                         }
+                                         printf("Invalid Authkey\n");
+                                         exit(1);
+                                 default:
+                                         printf("Unknown sub-command: \"%s\", allowed commands:\n",argv[4+shift]);
+                                         print_allow_command(&config_rrcp[0]);
+                                         exit(1);
+
+                          }
                    default:
                           printf("Unknown sub-command: \"%s\", allowed commands:\n",argv[3+shift]);
                           print_allow_command(&config_sub_cmd_l1[0]);

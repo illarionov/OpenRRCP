@@ -96,6 +96,7 @@ int main(int argc, char *argv[])
     struct sockaddr_in servaddr;
     int on = 1;
     int switchtype_force,tcp_port;
+    int authkey_tmp=-1;
 
     cli = cli_init();
     {
@@ -135,12 +136,15 @@ int main(int argc, char *argv[])
     tcp_port=0;
     while(1) {
 	char c;
-	c = getopt_long (argc, argv, "t:fp:",
+	c = getopt_long (argc, argv, "k:t:fp:",
                         NULL, NULL);
 	if (c == -1)
     	    break;
 
         switch (c) {
+    	    case 'k':
+		sscanf(optarg,"%04x",&authkey_tmp);
+    		break;
     	    case 't':
 		switchtype=atoi(optarg);
     		break;
@@ -166,6 +170,7 @@ int main(int argc, char *argv[])
 	optind++;
     }else{
 	printf("\nUsage: rrcp_cli [options] <xx:xx:xx:xx:xx:xx@if-name>\n");
+	printf(" -k <key>     RRCP Authentication Key (hex, 0000-ffff)\n");
 	printf(" -p <port>    go to background and listen on specified TCP port\n");
 	printf(" -t <number>  specify switch type\n");
 	printf(" -f           force switch_type (be careful!)\n");
@@ -186,6 +191,9 @@ int main(int argc, char *argv[])
 
 
     engage_timeout(10);
+    if (authkey_tmp>=0){
+	authkey=authkey_tmp;
+    }
     rtl83xx_prepare();
 
     if (switchtype==-1){
@@ -194,7 +202,7 @@ int main(int argc, char *argv[])
 	    switchtypes[switchtype].vendor,
 	    switchtypes[switchtype].model);
     }else{
-	if(switchtypes[switchtype].chip_id!=rrcp_switch_autodetect_chip()){
+	if(switchtypes[switchtype].chip_id!=rrcp_switch_autodetect_chip() && !switchtype_force){
 	    printf("%s: ERROR - Chip mismatch\n"
 		    "Specified switch: %s %s\n"
 		    "Specified chip: %s\n"

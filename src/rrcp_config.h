@@ -24,7 +24,20 @@
 
 #include <stdint.h>
 
+    typedef enum {
+	EEPROM_NONE = 0,
+	EEPROM_WRITEPOTECTED = 1,
+	EEPROM_2401 = 2,
+	EEPROM_2402 = 3,
+	EEPROM_2404 = 4,
+	EEPROM_2408 = 5,
+	EEPROM_2416 = 6
+    } t_eeprom_type;
+
     struct t_swconfig {
+	unsigned int switch_type;
+	unsigned int chip_type;
+	t_eeprom_type eeprom_type;
 	union {//0x0200
 	    struct  t_rrcp_config{
 		uint16_t
@@ -163,6 +176,7 @@
 
 extern const char *bandwidth_text[8];
 extern const char *wrr_ratio_text[4];
+extern const char *eeprom_type_text[7];
 extern struct t_swconfig swconfig;
 
 void rrcp_config_read_from_switch(void);

@@ -111,6 +111,29 @@ int cmd_config_rrcp(struct cli_def *cli, char *command, char *argv[], int argc)
     return CLI_OK;
 }
 
+int cmd_config_rrcp_authkey(struct cli_def *cli, char *command, char *argv[], int argc)
+{
+    if (argc==1){
+	if (argv[0][strlen(argv[0])-1]=='?'){
+	    cli_print(cli, "0000-ffff           New RRCP Authentication key (hex)");
+	}else{
+	    int new_authkey;
+	    
+	    if (sscanf(argv[0],"%04x",&new_authkey)){
+		rtl83xx_setreg16(0x209,new_authkey);
+		authkey=new_authkey;
+	    }else{
+		cli_print(cli, "%% ERROR: Invalid authkey specification: '%s'",argv[0]);
+		return CLI_ERROR;
+	    }
+	}
+    }else{
+	cli_print(cli, "%% Invalid input detected.");
+	return CLI_ERROR;
+    }
+    return CLI_OK;
+}
+
 int cmd_config_vlan(struct cli_def *cli, char *command, char *argv[], int argc)
 {
     if (argc>0){
@@ -404,6 +427,8 @@ void cmd_config_register_commands(struct cli_def *cli)
 	cli_register_command(cli, c3, "enable", cmd_config_rrcp, PRIVILEGE_PRIVILEGED, MODE_CONFIG, "Enable RRCP-based loop detection");
 	c3=cli_register_command(cli, c2, "loop-detect", NULL, PRIVILEGE_PRIVILEGED, MODE_CONFIG, "Global RRCP-based loop detection configuration subcommand");
 	cli_register_command(cli, c3, "enable", cmd_config_rrcp, PRIVILEGE_PRIVILEGED, MODE_CONFIG, "Enable RRCP-based loop detection");
+
+	cli_register_command(cli, c, "authkey", cmd_config_rrcp_authkey, PRIVILEGE_PRIVILEGED, MODE_CONFIG, "Set new RRCP Authentication key");
     }
 
     { // vlan config

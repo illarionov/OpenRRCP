@@ -53,6 +53,7 @@ int cmd_show_version(struct cli_def *cli, char *command, char *argv[], int argc)
     cli_print(cli, "Vendor: %s",switchtypes[switchtype].vendor);
     cli_print(cli, "Model: %s",switchtypes[switchtype].model);
     cli_print(cli, "Chip: %s",chipnames[switchtypes[switchtype].chip_id]);
+    cli_print(cli, "EEPROM: %s",eeprom_type_text[swconfig.eeprom_type]);
     cli_print(cli, "802.1Q support: %s",(switchtypes[switchtype].chip_id==rtl8326) ? "No/Buggy" : "Yes");
     cli_print(cli, "IGMP support: %s",(switchtypes[switchtype].chip_id==rtl8326) ? "v1" : "v1, v2");
     cli_print(cli, "Facing host interface: %s",ifname);

@@ -70,14 +70,6 @@ union t_vlan_port_insert_vid {
         uint16_t raw[2];
 };
 
-union t_rrcp_status {
-        struct {
-            uint16_t  low;
-            uint16_t  high;
-        } doubleshort;
-        uint32_t signlelong;
-} ;
-
 extern const uint32_t chipname_n;
 extern char* chipnames [3];
 

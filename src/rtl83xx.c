@@ -340,6 +340,28 @@ void do_vlan_disable(){
   rtl83xx_setreg16(0x030b,swconfig.vlan.raw[0]);
 }
 
+int do_write_eeprom(uint16_t addr,uint16_t data){
+
+ rtl83xx_setreg16(0x218,data>>8);
+ rtl83xx_setreg16(0x217,addr);
+ if ((wait_eeprom()&0x2000)!=0) return 1;
+ rtl83xx_setreg16(0x218,data&0x00ff);
+ rtl83xx_setreg16(0x217,addr-1);
+ if ((wait_eeprom()&0x2000)!=0) return 1;
+ return 0;
+}
+
+int do_read_eeprom(uint16_t addr,uint16_t *data){
+
+ rtl83xx_setreg16(0x217,addr|0x800);
+ if ((wait_eeprom()&0x2000)!=0) return 1;
+ *data=rtl83xx_readreg16(0x218);
+ rtl83xx_setreg16(0x217,(addr-1)|0x800);
+ if ((wait_eeprom()&0x2000)!=0) return 1;
+ *data|=rtl83xx_readreg16(0x218)>>8;
+ return 0;
+}
+
 void do_write_memory(){
  int i,numreg;
 
@@ -384,79 +406,100 @@ void do_write_eeprom_defaults(){
  if (switchtypes[switchtype].num_ports==26) {if (do_write_eeprom(0x53,0xbfbf)) {printf("write eeprom\n");exit(1);}}
 }
 
+/*
+int str_portlist_to_array(char *list,unsigned short int *arr,unsigned int arrlen){
+short int i,k;
+char *s,*c,*n;
+char *d[16];
+unsigned int st,sp; 
+
+ s=list;
+ for (i=0;i<arrlen;i++) { *(arr+i)=0; }
+ for (i=0;i<strlen(s);i++){  //check allowed symbols
+  if ( ((s[i] >= '0') && (s[i] <= '9')) || (s[i] == ',') || (s[i] == '-') ) continue; 
+  return(1);
+ }
+ while(*s){
+  bzero(d,sizeof(d));
+  // parsing
+  if ( (c=strchr(s,',')) != NULL ) { k=c-s; n=c+1; }
+  else { k=strlen(s); n=s+k; }
+  if (k >= sizeof(d)) return(1);
+  memcpy(d,s,k);s=n;
+  // range of ports or one port?
+  if (strchr((char *)d,'-')!=NULL){ 
+   // range
+   if (sscanf((char *)d,"%u-%u",&st,&sp) != 2) return(2);
+   if ( !st || !sp || (st > sp) || (st > arrlen) || (sp > arrlen) ) return(3);
+   for (i=st;i<=sp;i++) { *(arr+i-1)=1; }
+  }else{
+   // one port
+   st=(unsigned int)strtoul((char *)d, (char **)NULL, 10);
+   if ( !st || (st > arrlen) ) return(3);
+   *(arr+st-1)=1;
+  }
+ }
+ return(0);
+}
+*/
+
 int compare_command(char *argv, char **command_list){
  int i=0;
+ int res=-1;
+ int count=0;
 
  do{
-//  printf("Compare %s %s\n",argv,command_list[i]);
   if (strlen(argv) > strlen(command_list[i])) continue;
-  if (strstr(command_list[i],argv)==command_list[i]) return(i);
+  if (strstr(command_list[i],argv)==command_list[i]) {res=i; count++;}
  }while (strlen(command_list[i++]));
- return(-1);
+ if (count > 1){
+   printf("Ambiguous command: \"%s\"\n",argv);
+   exit(1);
+ }
+ return(res);
 }
 
-void do_restrict_rrcp(unsigned short int *arr){
-    int i;
-    union t_rrcp_status u;
-
-    u.signlelong=0;
-    for(i=0;i<switchtypes[switchtype].num_ports;i++){
-      u.signlelong|=(((~*(arr+map_port_number_from_physical_to_logical(i)-1))&0x1)<<i);
-    }
-    rtl83xx_setreg16(0x0201,u.doubleshort.low);
-    rtl83xx_setreg16(0x0202,u.doubleshort.high);
-}
-
-void print_rrcp_status(void){
-    int i;
-    union t_rrcp_status u;
-
-    u.doubleshort.low=rtl83xx_readreg16(0x0201);
-    u.doubleshort.high=rtl83xx_readreg16(0x0202);
-    for(i=1;i<=switchtypes[switchtype].num_ports;i++){
-      printf("%s/%-2d: ",ifname,i);
-      if ( ((u.signlelong>>(map_port_number_from_logical_to_physical(i)))&0x1) == 0) printf("ENABLED\n");
-      else printf("disable\n");
-    }
-}
-
-void do_port_disable(unsigned short int *arr,unsigned short int val){
+void do_32bit_reg_action(unsigned short int *arr, unsigned short int val, unsigned int base_reg){
     int i;
     uint32_t portmask;
+    union {
+        struct {
+            uint16_t low;
+            uint16_t high;
+        } doubleshort;
+        uint32_t singlelong;
+    } u;
 
-    portmask=swconfig.port_disable.bitmap=0;
+    portmask=u.singlelong=0;
     for(i=0;i<switchtypes[switchtype].num_ports;i++){
       portmask|=(((*(arr+map_port_number_from_physical_to_logical(i)-1))&0x1)<<i);
     }
-    swconfig.port_disable.raw[0]=rtl83xx_readreg16(0x0608);
-    if (switchtypes[switchtype].num_ports > 16) swconfig.port_disable.raw[1]=rtl83xx_readreg16(0x0609);
+    u.doubleshort.low=rtl83xx_readreg16(base_reg);
+    if (switchtypes[switchtype].num_ports > 16) u.doubleshort.high=rtl83xx_readreg16(base_reg+1);
 
-    if (val) swconfig.port_disable.bitmap&=~portmask; 
-    else swconfig.port_disable.bitmap|=portmask;
+    if (val) u.singlelong&=~portmask; 
+    else u.singlelong|=portmask;
 
-    rtl83xx_setreg16(0x0608,swconfig.port_disable.raw[0]);
-    if (switchtypes[switchtype].num_ports > 16) rtl83xx_setreg16(0x0609,swconfig.port_disable.raw[1]);
-    
+    rtl83xx_setreg16(base_reg,u.doubleshort.low);
+    if (switchtypes[switchtype].num_ports > 16) rtl83xx_setreg16(base_reg+1,u.doubleshort.high);
+    return;
+}
+
+void do_restrict_rrcp(unsigned short int *arr, unsigned short int val){
+    do_32bit_reg_action(arr,val,0x201);
+}
+
+void do_port_qos(unsigned short int *arr,unsigned short int val){
+    do_32bit_reg_action(arr,val,0x401);
+}
+
+void do_port_disable(unsigned short int *arr,unsigned short int val){
+    do_32bit_reg_action(arr,val,0x608);
     if (!val) printf ("Warning! This setting(s) can be saved and be forged after reboot\n");
 }
 
 void do_port_learning(int mode,unsigned short int *arr){
-    int i;
-    uint32_t portmask;
-
-    portmask=swconfig.alt_mask.mask=0;
-    for(i=0;i<switchtypes[switchtype].num_ports;i++){
-      portmask|=(((*(arr+map_port_number_from_physical_to_logical(i)-1))&0x1)<<i);
-    }
-    swconfig.alt_mask.raw[0]=rtl83xx_readreg16(0x0301);
-    if (switchtypes[switchtype].num_ports > 16) swconfig.alt_mask.raw[1]=rtl83xx_readreg16(0x0302);
-
-    if (mode) swconfig.alt_mask.mask&=~portmask; 
-    else swconfig.alt_mask.mask|=portmask;
-
-    rtl83xx_setreg16(0x0301,swconfig.alt_mask.raw[0]);
-    if (switchtypes[switchtype].num_ports > 16) rtl83xx_setreg16(0x0301,swconfig.alt_mask.raw[1]);
-    
+    do_32bit_reg_action(arr,mode,0x301);
     if (!mode) printf ("Warning! This setting(s) can be saved and be forged after reboot\n");
 }
 
@@ -470,30 +513,6 @@ void do_broadcast_storm_control(int state){
     swconfig.port_config_global.raw=rtl83xx_readreg16(0x0607);
     swconfig.port_config_global.config.storm_control_broadcast_disable=~(state&0x1);
     rtl83xx_setreg16(0x0607,swconfig.port_config_global.raw);
-}
-
-int port_mode_encode(int mode,char *arg){
- if (mode){ //flow control
-   if (strcmp(arg,"none")==0) return(0);
-   if (strcmp(arg,"asym2remote")==0)  return(0x20);
-   if (strcmp(arg,"symmetric")==0)  return(0x40);
-   if (strcmp(arg,"asym2local")==0) return(0x60);
- }else{ //speed
-   if (strcmp(arg,"auto")==0) return(0);
-   if (strcmp(arg,"10h")==0)  return(0x1);
-   if (strcmp(arg,"10f")==0)  return(0x2);
-   if (strcmp(arg,"100h")==0) return(0x4);
-   if (strcmp(arg,"100f")==0) return(0x8);
-   if (strcmp(arg,"1000")==0) return(0x10);
-}
- return(-1); 
-}
-
-int bandwidth_encode(char *arg){
- int i;
- for(i=0;i<strlen(arg);i++) arg[i]=toupper(arg[i]);
- for(i=0;i<8;i++) if (strcmp(arg,bandwidth_text[i])==0) return(i);
- return(-1);
 }
 
 void do_port_config(int mode,unsigned short int *arr, int val){
@@ -669,6 +688,17 @@ void print_allow_command(char **command_list){
  return;
 }
 
+int speed_encode(char *arg){
+  if ( (strcmp(arg,"a")==0) ||
+       (strcmp(arg,"au")==0) ||
+       (strcmp(arg,"aut")==0) ||
+       (strcmp(arg,"auto")==0) ) return(0);
+  if (strcmp(arg,"1000")==0) return(0x10);
+  if (strcmp(arg,"100")==0) return(0x4);
+  if (strcmp(arg,"10")==0)  return(0x1);
+  return(-1);
+}
+
 void print_usage(void){
 	printf("Usage: rtl8316b [[authkey-]xx:xx:xx:xx:xx:xx@]if-name <command> [<argument>]\n");
 	printf("       rtl8326 ----\"\"----\n");
@@ -676,27 +706,26 @@ void print_usage(void){
 	printf("       rtl83xx_dlink_des1024d ----\"\"----\n");
 	printf("       rtl83xx_compex_ps2216 ----\"\"----\n");
         printf("       rtl83xx_ovislink_fsh2402gt ----\"\"----\n");
-	printf("       rtl83xx_zyxel_es116p ----\"\"----\n");
 	printf(" where command may be:\n");
 	printf(" show running-config          - show current switch config\n");
 	printf(" show interface [<list ports>]- print link status for ports\n");
 	printf(" show interface [<list ports>] summary - print port rx/tx counters\n");
 	printf(" scan [verbose]               - scan network for rrcp-enabled switches\n");
 	printf(" reboot [soft|hard]           - initiate switch reboot\n");
+	printf(" config interface [<list ports>] ... - port(s) configuration\n");
+	printf(" --\"\"-- [no] shutdown - enable/disable specified port(s)\n");
+	printf(" --\"\"-- speed <arg> [duplex <arg>] - set speed/duplex on specified port(s)\n");
+	printf(" --\"\"-- flow-control <arg>  - set flow-control on specified port(s)\n");
+	printf(" --\"\"-- rate-limit [input|output] <arg>  - set bandwidth on specified port(s)\n");
+	printf(" --\"\"-- mac-address learning enable|disable - enable/disable MAC-learning on port(s)\n");
+	printf(" --\"\"-- rrcp enable|disable - enable/disable rrcp on specified ports\n");
+	printf(" --\"\"-- mls qos cos 0|7 - set port priority\n");
 //	printf(" vlan status                  - show low-level vlan confg\n");
 //	printf(" vlan enable_hvlan [<port>]   - configure switch as home-vlan tree with specified uplink port\n");
 //	printf(" vlan enable_8021q [<port>]   - configure switch as IEEE 802.1Q vlan tree with specified uplink port\n");
 //	printf(" vlan disable               - disable all VLAN support\n");
-//	printf(" restrict-rrcp <list ports>   - enable rrcp on specified ports, disable on other\n");
-//	printf(" restrict-rrcp status         - print rrcp status for all ports\n");
 //	printf(" bcast-storm-ctrl enable|disable   - broadcast storm control on/off\n"); 
 //	printf(" loopdetect enable|disable         - network loop detect on/off\n"); 
-//	printf(" port <list ports> enable|disable  - enable/disable specified port(s)\n");
-//	printf(" port <list ports> media <speed>   - set speed/duplex on specified port(s)\n");
-//	printf(" port <list ports> flowctrl <mode> - set flow control mode on specified port(s)\n");
-//	printf(" port <list ports> bandwidth <arg> - set bandwidth on specified port(s)\n");
-//	printf(" port <list ports> mirror <arg>    - mirroring port(s)\n");
-//	printf(" port <list ports> learning <arg>  - enable/disable MAC-learning on port(s)\n");
 //	printf(" mac-aging <arg>              - address lookup table control\n");
 	printf(" ping                         - test if switch is responding\n");
 	printf(" write memory                 - save current config to EEPROM\n");
@@ -712,15 +741,18 @@ int main(int argc, char **argv){
     int i;
     char *p;
 //    int root_port=-1;
-//    int media_speed;
-//    int direction; 
-//    int bandw;
+    int media_speed=0;
+    int direction=0; 
+    int bandw=0;
     int shift=0;
-    int negate=0;
+//    int negate=0;
+    int subcmd=0;
     int cmd;
     int vid=-1;
+    int duplex=0;
     unsigned short int *p_port_list=NULL;
     unsigned short int port_list[26];
+    char *ena_disa[]={"disable","enable",""};
     char *cmd_level_1[]={"show", "config", "scan", "reload", "reboot", "write", "ping", "mac-address",""}; 
     char *show_sub_cmd[]={"running-config","startup-config","interface","vlan",""};
     char *scan_sub_cmd[]={"verbose",""};
@@ -730,7 +762,12 @@ int main(int argc, char **argv){
     char *reset_sub_cmd[]={"soft","hard",""};
     char *write_sub_cmd[]={"memory","eeprom","defaults",""};
     char *config_sub_cmd_l1[]={"interface","rrcp",""};
-    char *config_intf_sub_cmd_l1[]={"shutdown","speed","rate-limit","mac-address","rrcp","mls",""};
+    char *config_intf_sub_cmd_l1[]={"no","shutdown","speed","duplex","rate-limit","mac-address","rrcp","mls","flow-control",""};
+    char *config_duplex[]={"half","full",""};
+    char *config_rate[]={"100m","128k","256k","512k","1m","2m","4m","8m","input","output",""};
+    char *config_mac_learn[]={"learning","disable","enable",""};
+    char *config_port_qos[]={"7","0","qos","cos",""};
+    char *config_port_flow[]={"none","asym2remote","symmetric","asym2local",""};
 
     if (argc<3){
         print_usage();
@@ -752,8 +789,6 @@ int main(int argc, char **argv){
 	switchtype=4;
     }else if (strstr(p,"rtl83xx_ovislink_fsh2402gt")==argv[0]+strlen(argv[0])-26){
 	switchtype=5;
-    }else if (strstr(p,"rtl83xx_zyxel_es116p")==argv[0]+strlen(argv[0])-20){
-	switchtype=6;
     }else {
 	printf("%s: unknown switch/chip type\n",argv[0]);
 	exit(0);
@@ -873,15 +908,7 @@ int main(int argc, char **argv){
                    print_allow_command(&config_sub_cmd_l1[0]);
                    exit(1);
                 }
-                if (strcmp(argv[3+shift],"no")==0){
-                   negate++;
-                   shift++;
-  	           if (argc == (3+shift+1)){
-                      printf("No sub-command, allowed commands:\n");
-                      print_allow_command(&config_sub_cmd_l1[0]);
-                      exit(1);
-                   }
-                }
+
                 switch (compare_command(argv[3+shift],&config_sub_cmd_l1[0])){
                    case 0: // interface
        	                  if (argc == (3+shift+1)){
@@ -898,8 +925,137 @@ int main(int argc, char **argv){
                              exit(1);
                           }
                           switch (compare_command(argv[5+shift],&config_intf_sub_cmd_l1[0])){
-                                 case 0: // shutdown
-                                        do_port_disable(&port_list[0],negate);
+                                 case 0: // no
+                                        if (argc > 5+shift+1) { // no shutdown
+                                          if (compare_command(argv[6+shift],&config_intf_sub_cmd_l1[0])==1){
+                                           do_port_disable(&port_list[0],1);
+                                           exit(0);
+                                          }
+                                          printf("Incorrect sub-commands, allowed: shutdown\n");
+                                          exit(1);
+                                        }
+                                        printf("No sub-command, allowed commands:\n");
+                                        print_allow_command(&config_intf_sub_cmd_l1[1]);
+                                        exit(1);
+                                 case 1: // shutdown
+                                        do_port_disable(&port_list[0],0);
+                                        exit(0);
+                                 case 2: // speed
+          	                        if (argc == (5+shift+1)){
+                                          printf("No sub-command, allowed commands:");
+                                          printf(" 10|100|1000|auto [duplex half|full]\n");
+                                          exit(1);
+                                         }
+                                        if ((media_speed=speed_encode(argv[6+shift])) == -1){
+                                          printf("Incorect speed, valid are: 10|100|1000|auto\n");
+                                          exit(1);
+                                        }
+                                        if ( (argc > 6+shift+1) && (media_speed!=0) && (media_speed!=0x8) ){ //duplex
+                                          if (compare_command(argv[7+shift],&config_intf_sub_cmd_l1[0])==3){
+           	                            if (argc == (7+shift+1)){
+                                              printf("No sub-command, allowed commands:\n");
+                                              print_allow_command(&config_duplex[0]);
+                                              exit(1);
+                                            }
+                                            if ((duplex=compare_command(argv[8+shift],&config_duplex[0])) < 0){
+                                              printf("Incorect duplex, valid are: full|half\n");
+                                              exit(1);
+                                            }
+                                            media_speed=media_speed<<duplex;
+                                            do_port_config(0,&port_list[0],media_speed);
+                                            exit(0);
+                                          }
+                                          printf("Incorrect sub-command, allowed commands:\n");
+                                          printf("duplex half|full\n");
+                                          exit(1);
+                                        }
+                                        do_port_config(0,&port_list[0],media_speed);
+                                        exit(0);
+                                 case 4:  //rate-limit
+                                        for(;;){
+           	                           if (argc == (5+shift+1)){
+                                             printf("No sub-command, allowed commands:");
+                                             printf(" [input|output] 128K|256K|512K|1M|2M|4M|8M|100M\n");
+                                             exit(1);
+                                           }
+                                           for(i=0;i<strlen(argv[6+shift]);i++) argv[6+shift][i]=tolower(argv[6+shift][i]);
+					   if ((bandw=compare_command(argv[6+shift],&config_rate[0])) == -1){
+                                             printf("Incorrect sub-command, valid commands:");
+                                             printf(" [input|output] 128K|256K|512K|1M|2M|4M|8M|100M\n");
+                                             exit(1);
+                                           }
+                                           if (bandw > 7){
+                                             direction=bandw-7;
+                                             shift++;
+                                             continue;
+                                           }
+                                           do_port_config_bandwidth(direction,&port_list[0],bandw);
+                                           exit(0);
+                                        };
+                                 case 5:  //mac-address
+                                        for(;;){
+           	                           if (argc == (5+shift+1)){
+                                             printf("No sub-command, allowed commands:");
+                                             printf(" learning enable|disable\n");
+                                             exit(1);
+                                           }
+					   if ((subcmd=compare_command(argv[6+shift],&config_mac_learn[0])) == -1){
+                                             printf("Incorrect sub-command, valid commands:");
+                                             printf(" learning enable|disable\n");
+                                             exit(1);
+                                           }
+                                           if (!subcmd){
+                                             shift++;
+                                             continue;
+                                           }
+                                           do_port_learning(subcmd-1,&port_list[0]);
+                                           exit(0);
+                                        }
+                                 case 6:  // rrcp
+           	                        if (argc == (5+shift+1)){
+                                          printf("No sub-command, allowed commands:");
+                                          printf(" enable|disable\n");
+                                          exit(1);
+                                         }
+					if ((subcmd=compare_command(argv[6+shift],&ena_disa[0])) == -1){
+                                          printf("Incorrect sub-command, valid commands:");
+                                          printf(" enable|disable\n");
+                                          exit(1);
+                                        }
+                                        do_restrict_rrcp(&port_list[0],subcmd);
+                                        exit(0);
+                                 case 7: // mls qos
+                                        for(;;){
+           	                           if (argc == (5+shift+1)){
+                                             printf("No sub-command, allowed commands:");
+                                             printf(" qos cos 0|7\n");
+                                             exit(1);
+                                           }
+					   if ((subcmd=compare_command(argv[6+shift],&config_port_qos[0])) == -1){
+                                             printf("Incorrect sub-command, valid commands:");
+                                             printf(" qos cos 0|7\n");
+                                             exit(1);
+                                           }
+                                           if (subcmd > 1){
+                                             shift++;
+                                             continue;
+                                           }
+                                           do_port_qos(&port_list[0],subcmd);
+                                           exit(0);
+                                        }
+                                 case 8:  // flow control
+           	                        if (argc == (5+shift+1)){
+                                          printf("No sub-command, allowed commands:\n");
+                                          print_allow_command(&config_port_flow[0]);
+                                          exit(1);
+                                         }
+					if ((subcmd=compare_command(argv[6+shift],&config_port_flow[0])) == -1){
+                                          printf("Incorrect sub-command, valid commands:\n");
+                                          print_allow_command(&config_port_flow[0]);
+                                          exit(1);
+                                        }
+                                        if (subcmd) subcmd=subcmd<<5;
+                                        do_port_config(1,&port_list[0],subcmd);
                                         exit(0);
                                  default:
                                          printf("Unknown sub-command: \"%s\", allowed commands:\n",argv[5+shift]);
@@ -978,7 +1134,7 @@ int main(int argc, char **argv){
                    exit(1);
                 }
 		for (i=0;i<6;i++){
-		   if (do_write_eeprom_byte(0x12+i,(unsigned char)x[i])){
+		   if (eeprom_write(0x12+i,(unsigned char)x[i])){
 		      printf ("error writing eeprom!\n");
 		      exit(1);
 		   }

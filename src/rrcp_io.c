@@ -562,6 +562,28 @@ int eeprom_read(uint16_t addr,uint8_t *data){
     return 0;
 }
 
+//old two-byte tweaked version - will be eventualy phased out
+int do_write_eeprom(uint16_t addr,uint16_t data){
+    rtl83xx_setreg16(0x218,data>>8);
+    rtl83xx_setreg16(0x217,addr);
+    if ((wait_eeprom()&0x2000)!=0) return 1;
+    rtl83xx_setreg16(0x218,data&0x00ff);
+    rtl83xx_setreg16(0x217,addr-1);
+    if ((wait_eeprom()&0x2000)!=0) return 1;
+    return 0;
+}
+
+//old two-byte tweaked version - will be eventualy phased out
+int do_read_eeprom(uint16_t addr,uint16_t *data){
+    rtl83xx_setreg16(0x217,addr|0x800);
+    if ((wait_eeprom()&0x2000)!=0) return 1;
+    *data=rtl83xx_readreg16(0x218);
+    rtl83xx_setreg16(0x217,(addr-1)|0x800);
+    if ((wait_eeprom()&0x2000)!=0) return 1;
+    *data|=rtl83xx_readreg16(0x218)>>8;
+    return 0;
+}
+
 //returns 1 if got response
 uint32_t rtl83xx_ping(void){
     int i,len = 0;

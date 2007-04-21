@@ -25,6 +25,8 @@
 //#include <sys/types.h>
 #include <stdint.h>
 
+#define do_write_eeprom_byte eeprom_write
+
 extern char ifname[128];
 extern uint16_t authkey;
 extern unsigned char my_mac[6];
@@ -62,6 +64,12 @@ int wait_eeprom();
 int eeprom_write(uint16_t addr,uint8_t data);
 
 int eeprom_read(uint16_t addr,uint8_t *data);
+
+//old two-byte tweaked version - will be eventualy phased out
+int do_write_eeprom(uint16_t addr,uint16_t data);
+
+//old two-byte tweaked version - will be eventualy phased out
+int do_read_eeprom(uint16_t addr,uint16_t *data);
 
 uint32_t rtl83xx_ping(void);
 

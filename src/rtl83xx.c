@@ -37,7 +37,6 @@
 #include <signal.h>
 #include <unistd.h>
 #include "rrcp_packet.h"
-#include "rrcp_lib.h"
 #include "rrcp_io.h"
 #include "rrcp_switches.h"
 #include "rrcp_config.h"
@@ -340,28 +339,6 @@ void do_vlan_disable(){
   rtl83xx_setreg16(0x030b,swconfig.vlan.raw[0]);
 }
 
-int do_write_eeprom(uint16_t addr,uint16_t data){
-
- rtl83xx_setreg16(0x218,data>>8);
- rtl83xx_setreg16(0x217,addr);
- if ((wait_eeprom()&0x2000)!=0) return 1;
- rtl83xx_setreg16(0x218,data&0x00ff);
- rtl83xx_setreg16(0x217,addr-1);
- if ((wait_eeprom()&0x2000)!=0) return 1;
- return 0;
-}
-
-int do_read_eeprom(uint16_t addr,uint16_t *data){
-
- rtl83xx_setreg16(0x217,addr|0x800);
- if ((wait_eeprom()&0x2000)!=0) return 1;
- *data=rtl83xx_readreg16(0x218);
- rtl83xx_setreg16(0x217,(addr-1)|0x800);
- if ((wait_eeprom()&0x2000)!=0) return 1;
- *data|=rtl83xx_readreg16(0x218)>>8;
- return 0;
-}
-
 void do_write_memory(){
  int i,numreg;
 
@@ -406,7 +383,6 @@ void do_write_eeprom_defaults(){
  if (switchtypes[switchtype].num_ports==26) {if (do_write_eeprom(0x53,0xbfbf)) {printf("write eeprom\n");exit(1);}}
 }
 
-/*
 int str_portlist_to_array(char *list,unsigned short int *arr,unsigned int arrlen){
 short int i,k;
 char *s,*c,*n;
@@ -441,9 +417,13 @@ unsigned int st,sp;
  }
  return(0);
 }
-*/
 
 int compare_command(char *argv, char **command_list){
+/*
+   found word from argv in command_list and return his number,
+   else return -1. If found more then 1 concurrences - print
+   error and close program
+*/
  int i=0;
  int res=-1;
  int count=0;
@@ -501,6 +481,18 @@ void do_port_disable(unsigned short int *arr,unsigned short int val){
 void do_port_learning(int mode,unsigned short int *arr){
     do_32bit_reg_action(arr,mode,0x301);
     if (!mode) printf ("Warning! This setting(s) can be saved and be forged after reboot\n");
+}
+
+void do_rrcp_ctrl(int state){
+    swconfig.rrcp_config.raw=rtl83xx_readreg16(0x0200);
+    swconfig.rrcp_config.config.rrcp_disable=state&0x1;
+    rtl83xx_setreg16(0x0200,swconfig.rrcp_config.raw);
+}
+
+void do_rrcp_echo(int state){
+    swconfig.rrcp_config.raw=rtl83xx_readreg16(0x0200);
+    swconfig.rrcp_config.config.echo_disable=state&0x1;
+    rtl83xx_setreg16(0x0200,swconfig.rrcp_config.raw);
 }
 
 void do_loopdetect(int state){
@@ -661,11 +653,11 @@ void do_alt_config(mode){
            break;
     case 2: 
            swconfig.alt_config.s.config.mac_aging_disable=0;
-           swconfig.alt_config.s.config.mac_aging_fast=0;
+           swconfig.alt_config.s.config.mac_aging_fast=1;
            break;
     case 3: 
            swconfig.alt_config.s.config.mac_aging_disable=0;
-           swconfig.alt_config.s.config.mac_aging_fast=1;
+           swconfig.alt_config.s.config.mac_aging_fast=0;
            break;
     case 4: 
            swconfig.alt_config.s.config.mac_drop_unknown=1;
@@ -699,6 +691,49 @@ int speed_encode(char *arg){
   return(-1);
 }
 
+void check_argc(int argc, int cur_argc, char *msg, char **command_list){
+/*
+   check number of argc and if it is last number - print error and close program
+   if ptr to msg not NULL, print given error message, else - default message
+*/
+  if (argc == (cur_argc+1)){
+   if (msg) printf("%s",msg);
+   else printf("No sub-command specified, allowed commands:\n");
+   if (command_list) print_allow_command(command_list);
+   exit(1);
+  }
+}
+
+int get_cmd_num(char *argv, int needed, char *msg, char **command_list){
+/*
+   search word from argv in command_list and return his number, if not found - 
+   print error and close programm. 
+   if ptr to msg not NULL, print given error message, else - default message.
+   if `needed' not equal -1 and return number not equal value of `needed' -
+   print error and close program 
+*/
+int subcmd=-1;
+  if ((subcmd=compare_command(argv,command_list)) != -1){
+   if (needed >= 0) {
+    if (needed == subcmd) { return subcmd; }
+   }else{ 
+    return subcmd;
+   }
+  }
+  if (msg) { printf("%s",msg); }
+  else { 
+   printf("Incorrect sub-command, valid commands:\n");
+   print_allow_command(command_list);
+  }
+  exit(1);
+}
+
+void print_unknown(char *argv, char **command_list){
+  printf("Unknown sub-command: \"%s\", allowed commands:\n",argv);
+  print_allow_command(command_list);
+  exit(1);
+}
+
 void print_usage(void){
 	printf("Usage: rtl8316b [[authkey-]xx:xx:xx:xx:xx:xx@]if-name <command> [<argument>]\n");
 	printf("       rtl8326 ----\"\"----\n");
@@ -706,6 +741,7 @@ void print_usage(void){
 	printf("       rtl83xx_dlink_des1024d ----\"\"----\n");
 	printf("       rtl83xx_compex_ps2216 ----\"\"----\n");
         printf("       rtl83xx_ovislink_fsh2402gt ----\"\"----\n");
+	printf("       rtl83xx_zyxel_es116p ----\"\"----\n");
 	printf(" where command may be:\n");
 	printf(" show running-config          - show current switch config\n");
 	printf(" show interface [<list ports>]- print link status for ports\n");
@@ -720,18 +756,20 @@ void print_usage(void){
 	printf(" --\"\"-- mac-address learning enable|disable - enable/disable MAC-learning on port(s)\n");
 	printf(" --\"\"-- rrcp enable|disable - enable/disable rrcp on specified ports\n");
 	printf(" --\"\"-- mls qos cos 0|7 - set port priority\n");
+	printf(" --\"\"-- rrcp enable|disable - global rrcp enable|disable\n");
+	printf(" --\"\"-- rrcp echo enable|disable - rrcp echo (REP) enable|disable\n");
+	printf(" --\"\"-- rrcp loop-detect enable|disable - network loop detect enable|disable\n"); 
+        printf(" --\"\"-- rrcp authkey <hex-value> - set new authkey\n"); 
+	printf(" --\"\"-- mac-address-table aging-time|drop-unknown <arg>  - address lookup table control\n");
 //	printf(" vlan status                  - show low-level vlan confg\n");
 //	printf(" vlan enable_hvlan [<port>]   - configure switch as home-vlan tree with specified uplink port\n");
 //	printf(" vlan enable_8021q [<port>]   - configure switch as IEEE 802.1Q vlan tree with specified uplink port\n");
 //	printf(" vlan disable               - disable all VLAN support\n");
 //	printf(" bcast-storm-ctrl enable|disable   - broadcast storm control on/off\n"); 
-//	printf(" loopdetect enable|disable         - network loop detect on/off\n"); 
-//	printf(" mac-aging <arg>              - address lookup table control\n");
 	printf(" ping                         - test if switch is responding\n");
 	printf(" write memory                 - save current config to EEPROM\n");
 	printf(" write defaults               - save to EEPROM chip-default values\n");
 	printf(" mac-address <mac>            - set <mac> as new switch MAC address and reboots\n");
-//      printf(" authkey <hex-value>          - set new authkey\n"); 
         return;
 }
 
@@ -761,13 +799,17 @@ int main(int argc, char **argv){
     char *show_sub_cmd_l4[]={"id",""};
     char *reset_sub_cmd[]={"soft","hard",""};
     char *write_sub_cmd[]={"memory","eeprom","defaults",""};
-    char *config_sub_cmd_l1[]={"interface","rrcp",""};
+    char *config_sub_cmd_l1[]={"interface","rrcp","mac-address-table",""};
     char *config_intf_sub_cmd_l1[]={"no","shutdown","speed","duplex","rate-limit","mac-address","rrcp","mls","flow-control",""};
     char *config_duplex[]={"half","full",""};
     char *config_rate[]={"100m","128k","256k","512k","1m","2m","4m","8m","input","output",""};
     char *config_mac_learn[]={"learning","disable","enable",""};
     char *config_port_qos[]={"7","0","qos","cos",""};
     char *config_port_flow[]={"none","asym2remote","symmetric","asym2local",""};
+    char *config_rrcp[]={"disable","enable","echo","loop-detect","authkey",""};
+    char *config_alt[]={"aging-time","unknown-destination",""};
+    char *config_alt_time[]={"0","12","300",""};
+    char *config_alt_dest[]={"drop","pass",""};
 
     if (argc<3){
         print_usage();
@@ -789,6 +831,8 @@ int main(int argc, char **argv){
 	switchtype=4;
     }else if (strstr(p,"rtl83xx_ovislink_fsh2402gt")==argv[0]+strlen(argv[0])-26){
 	switchtype=5;
+    }else if (strstr(p,"rtl83xx_zyxel_es116p")==argv[0]+strlen(argv[0])-20){ 
+        switchtype=6; 
     }else {
 	printf("%s: unknown switch/chip type\n",argv[0]);
 	exit(0);
@@ -825,32 +869,19 @@ int main(int argc, char **argv){
     engage_timeout(5);
     rtl83xx_prepare();
 
-
     cmd=compare_command(argv[2+shift],&cmd_level_1[0]);
-    //printf("%i\n",cmd);
     switch (cmd){
          case 0: //show
-  	        if (argc == (2+shift+1)){
-                   printf("No sub-command specified, allowed commands:\n");
-                   print_allow_command(&show_sub_cmd[0]);
-                   exit(1);
-                }
+                check_argc(argc,2+shift,NULL,&show_sub_cmd[0]);
                 switch(compare_command(argv[3+shift],&show_sub_cmd[0])){
                    case 0: // running-config
    	                  if (argc == (3+shift+1)){
 	           	     do_show_config(0);
                              exit(0);
                           }
-                          switch (compare_command(argv[4+shift],&show_sub_cmd_l2[0])){
-                                 case 0:
-                                 case 1:
-	                                do_show_config(1);
-                                        exit(0);
-                                 default:
-                                        printf("Unknown sub-command: \"%s\", allowed commands:\n",argv[4+shift]);
-                                        print_allow_command(&show_sub_cmd_l2[0]);
-                                        exit(1);
-	                  }
+                          (void) get_cmd_num(argv[4+shift],-1,NULL,&show_sub_cmd_l2[0]);
+	                  do_show_config(1);
+                          exit(0);
                    case 1: // startup-config
                           printf("Under construction\n");
                           exit(0);
@@ -867,123 +898,64 @@ int main(int argc, char **argv){
                             }
                             shift++;
                           }
-                          switch (compare_command(argv[4+shift],&show_sub_cmd_l3[0])){
-                                 case 0:
-	                                print_counters(p_port_list);
-                                        exit(0);
-                                 default:
-                                        printf("Unknown sub-command: \"%s\", allowed commands:\n",argv[4+shift]);
-                                        print_allow_command(&show_sub_cmd_l3[0]);
-                                        exit(1);
-	                  }
+                          (void) get_cmd_num(argv[4+shift],0,NULL,&show_sub_cmd_l3[0]);
+	                  print_counters(p_port_list);
                           exit(0);
                    case 3: // vlan
    	                  if (argc == (3+shift+1)){
                              print_vlan_status(-1);
                              exit(0);
                           }
-                          switch (compare_command(argv[4+shift],&show_sub_cmd_l4[0])){
-                                 case 0:
-                                        if (argc > (4+shift+1)){
-                                         if (sscanf(argv[5+shift], "%i",&vid) == 1) { 
-                                           print_vlan_status(vid);
-                                           exit(0); 
-                                         }
-                                        }
-	                                printf("Vlan-id not specified\n");
-                                        exit(1);
-                                 default:
-                                        printf("Unknown sub-command: \"%s\", allowed commands:\n",argv[4+shift]);
-                                        print_allow_command(&show_sub_cmd_l4[0]);
-                                        exit(1);
-	                  }
-                   default:
-                          printf("Unknown sub-command: \"%s\", allowed commands:\n",argv[3+shift]);
-                          print_allow_command(&scan_sub_cmd[0]);
+                          (void) get_cmd_num(argv[4+shift],0,NULL,&show_sub_cmd_l4[0]);
+                          if (argc > (4+shift+1)){
+                            if (sscanf(argv[5+shift], "%i",&vid) == 1) { 
+                              print_vlan_status(vid);
+                              exit(0); 
+                            }
+                          }
+	                  printf("Vlan-id not specified\n");
                           exit(1);
+                   default: 
+                          print_unknown(argv[3+shift],&show_sub_cmd[0]);
                 }
          case 1: //config
-  	        if (argc == (2+shift+1)){
-                   printf("No sub-command, allowed commands:\n");
-                   print_allow_command(&config_sub_cmd_l1[0]);
-                   exit(1);
-                }
-
+                check_argc(argc,2+shift,NULL,&config_sub_cmd_l1[0]);
                 switch (compare_command(argv[3+shift],&config_sub_cmd_l1[0])){
                    case 0: // interface
-       	                  if (argc == (3+shift+1)){
-                             printf("No list of ports\n");
-                             exit(1);
-                          }
+                          check_argc(argc,3+shift,"No list of ports\n",NULL);
                           if (str_portlist_to_array(argv[4+shift],&port_list[0],switchtypes[switchtype].num_ports)!=0){
                              printf("Incorrect list of ports: \"%s\"\n",argv[4+shift]);
                              exit(1);
                           }
-       	                  if (argc == (4+shift+1)){
-                             printf("No sub-command, allowed commands:\n");
-                             print_allow_command(&config_intf_sub_cmd_l1[0]);
-                             exit(1);
-                          }
+                          check_argc(argc,4+shift,NULL,&config_intf_sub_cmd_l1[0]);
                           switch (compare_command(argv[5+shift],&config_intf_sub_cmd_l1[0])){
                                  case 0: // no
-                                        if (argc > 5+shift+1) { // no shutdown
-                                          if (compare_command(argv[6+shift],&config_intf_sub_cmd_l1[0])==1){
-                                           do_port_disable(&port_list[0],1);
-                                           exit(0);
-                                          }
-                                          printf("Incorrect sub-commands, allowed: shutdown\n");
-                                          exit(1);
-                                        }
-                                        printf("No sub-command, allowed commands:\n");
-                                        print_allow_command(&config_intf_sub_cmd_l1[1]);
-                                        exit(1);
+                                        check_argc(argc,5+shift,"No sub-command, allowed commands: shutdown\n",NULL);
+                                        (void) get_cmd_num(argv[6+shift],1,"Incorrect sub-commands, allowed: shutdown\n",&config_intf_sub_cmd_l1[0]);
+                                        do_port_disable(&port_list[0],1);
+                                        exit(0);
                                  case 1: // shutdown
                                         do_port_disable(&port_list[0],0);
                                         exit(0);
                                  case 2: // speed
-          	                        if (argc == (5+shift+1)){
-                                          printf("No sub-command, allowed commands:");
-                                          printf(" 10|100|1000|auto [duplex half|full]\n");
-                                          exit(1);
-                                         }
+                                        check_argc(argc,5+shift,"No sub-command, allowed commands: 10|100|1000|auto [duplex half|full]\n",NULL);
                                         if ((media_speed=speed_encode(argv[6+shift])) == -1){
                                           printf("Incorect speed, valid are: 10|100|1000|auto\n");
                                           exit(1);
                                         }
                                         if ( (argc > 6+shift+1) && (media_speed!=0) && (media_speed!=0x8) ){ //duplex
-                                          if (compare_command(argv[7+shift],&config_intf_sub_cmd_l1[0])==3){
-           	                            if (argc == (7+shift+1)){
-                                              printf("No sub-command, allowed commands:\n");
-                                              print_allow_command(&config_duplex[0]);
-                                              exit(1);
-                                            }
-                                            if ((duplex=compare_command(argv[8+shift],&config_duplex[0])) < 0){
-                                              printf("Incorect duplex, valid are: full|half\n");
-                                              exit(1);
-                                            }
-                                            media_speed=media_speed<<duplex;
-                                            do_port_config(0,&port_list[0],media_speed);
-                                            exit(0);
-                                          }
-                                          printf("Incorrect sub-command, allowed commands:\n");
-                                          printf("duplex half|full\n");
-                                          exit(1);
+                                          (void)get_cmd_num(argv[7+shift],3,"Incorrect sub-command, allowed commands: duplex half|full\n",&config_intf_sub_cmd_l1[0]);
+                                          check_argc(argc,7+shift,NULL,&config_duplex[0]);
+                                          duplex=get_cmd_num(argv[8+shift],-1,NULL,&config_duplex[0]);
+                                          media_speed=media_speed<<duplex;
                                         }
                                         do_port_config(0,&port_list[0],media_speed);
                                         exit(0);
                                  case 4:  //rate-limit
                                         for(;;){
-           	                           if (argc == (5+shift+1)){
-                                             printf("No sub-command, allowed commands:");
-                                             printf(" [input|output] 128K|256K|512K|1M|2M|4M|8M|100M\n");
-                                             exit(1);
-                                           }
+                                           check_argc(argc,5+shift,"No sub-command, allowed commands: [input|output] 128K|256K|512K|1M|2M|4M|8M|100M\n",NULL);
                                            for(i=0;i<strlen(argv[6+shift]);i++) argv[6+shift][i]=tolower(argv[6+shift][i]);
-					   if ((bandw=compare_command(argv[6+shift],&config_rate[0])) == -1){
-                                             printf("Incorrect sub-command, valid commands:");
-                                             printf(" [input|output] 128K|256K|512K|1M|2M|4M|8M|100M\n");
-                                             exit(1);
-                                           }
+                                           bandw=get_cmd_num(argv[6+shift],-1,"Incorrect sub-commands, allowed: [input|output] 128K|256K|512K|1M|2M|4M|8M|100M\n",&config_rate[0]);
                                            if (bandw > 7){
                                              direction=bandw-7;
                                              shift++;
@@ -994,16 +966,8 @@ int main(int argc, char **argv){
                                         };
                                  case 5:  //mac-address
                                         for(;;){
-           	                           if (argc == (5+shift+1)){
-                                             printf("No sub-command, allowed commands:");
-                                             printf(" learning enable|disable\n");
-                                             exit(1);
-                                           }
-					   if ((subcmd=compare_command(argv[6+shift],&config_mac_learn[0])) == -1){
-                                             printf("Incorrect sub-command, valid commands:");
-                                             printf(" learning enable|disable\n");
-                                             exit(1);
-                                           }
+                                           check_argc(argc,5+shift,"No sub-command, allowed commands: learning enable|disable\n",NULL);
+                                           subcmd=get_cmd_num(argv[6+shift],-1,"Incorrect sub-commands, allowed: learning enable|disable\n",&config_mac_learn[0]);
                                            if (!subcmd){
                                              shift++;
                                              continue;
@@ -1012,30 +976,14 @@ int main(int argc, char **argv){
                                            exit(0);
                                         }
                                  case 6:  // rrcp
-           	                        if (argc == (5+shift+1)){
-                                          printf("No sub-command, allowed commands:");
-                                          printf(" enable|disable\n");
-                                          exit(1);
-                                         }
-					if ((subcmd=compare_command(argv[6+shift],&ena_disa[0])) == -1){
-                                          printf("Incorrect sub-command, valid commands:");
-                                          printf(" enable|disable\n");
-                                          exit(1);
-                                        }
+                                        check_argc(argc,5+shift,"No sub-command, allowed commands: enable|disable\n",NULL);
+                                        subcmd=get_cmd_num(argv[6+shift],-1,"Incorrect sub-commands, allowed: enable|disable\n",&ena_disa[0]);
                                         do_restrict_rrcp(&port_list[0],subcmd);
                                         exit(0);
                                  case 7: // mls qos
                                         for(;;){
-           	                           if (argc == (5+shift+1)){
-                                             printf("No sub-command, allowed commands:");
-                                             printf(" qos cos 0|7\n");
-                                             exit(1);
-                                           }
-					   if ((subcmd=compare_command(argv[6+shift],&config_port_qos[0])) == -1){
-                                             printf("Incorrect sub-command, valid commands:");
-                                             printf(" qos cos 0|7\n");
-                                             exit(1);
-                                           }
+                                           check_argc(argc,5+shift,"No sub-command, allowed commands: qos cos 0|7\n",NULL);
+                                           subcmd=get_cmd_num(argv[6+shift],-1,"Incorrect sub-commands, allowed: qos cos 0|7\n",&config_port_qos[0]);
                                            if (subcmd > 1){
                                              shift++;
                                              continue;
@@ -1044,29 +992,67 @@ int main(int argc, char **argv){
                                            exit(0);
                                         }
                                  case 8:  // flow control
-           	                        if (argc == (5+shift+1)){
-                                          printf("No sub-command, allowed commands:\n");
-                                          print_allow_command(&config_port_flow[0]);
-                                          exit(1);
-                                         }
-					if ((subcmd=compare_command(argv[6+shift],&config_port_flow[0])) == -1){
-                                          printf("Incorrect sub-command, valid commands:\n");
-                                          print_allow_command(&config_port_flow[0]);
-                                          exit(1);
-                                        }
+                                        check_argc(argc,5+shift,NULL,&config_port_flow[0]);
+                                        subcmd=get_cmd_num(argv[6+shift],-1,NULL,&config_port_flow[0]);
                                         if (subcmd) subcmd=subcmd<<5;
                                         do_port_config(1,&port_list[0],subcmd);
                                         exit(0);
                                  default:
-                                         printf("Unknown sub-command: \"%s\", allowed commands:\n",argv[5+shift]);
-                                         print_allow_command(&config_intf_sub_cmd_l1[0]);
-                                         exit(1);
+                                         print_unknown(argv[5+shift],&config_intf_sub_cmd_l1[0]);
                           }
-                          
+                   case 1: // rrcp
+                          check_argc(argc,3+shift,NULL,&config_rrcp[0]);
+                          switch (compare_command(argv[4+shift],&config_rrcp[0])){
+                                 case 0: // rrcp disable
+                                        do_rrcp_ctrl(1);
+                                        exit(1);
+                                 case 1: // rrcp enable
+                                        do_rrcp_ctrl(0);
+                                        exit(1);
+                                 case 2: // rrcp echo
+                                        check_argc(argc,4+shift,"No sub-command, allowed commands: enable|disable\n",NULL);
+                                        subcmd=get_cmd_num(argv[5+shift],-1,NULL,&ena_disa[0]);
+                                        do_rrcp_echo(!subcmd);
+                                        exit(0);
+                                 case 3: // rrcp loopdetect
+                                        check_argc(argc,4+shift,"No sub-command, allowed commands: enable|disable\n",NULL);
+                                        subcmd=get_cmd_num(argv[5+shift],-1,NULL,&ena_disa[0]);
+                                        do_loopdetect(subcmd);
+                                        exit(0);
+                                 case 4: // rrcp authkey
+                                        check_argc(argc,4+shift,"Authkey needed\n",NULL);
+                                        if (sscanf(argv[5+shift],"%04x",&ak) == 1){
+                                          if (ak <= 0xffff) {
+                                            rtl83xx_setreg16(0x209,ak);
+                                            printf ("Setting of new authkey is no save into EEPROM and may be forged after reboot.\n");
+                                            printf ("After change authkey switch not answering on broadcast \"Hello\" scan, be close.\n");
+                                            exit(0);
+                                          }
+                                         }
+                                         printf("Invalid Authkey\n");
+                                         exit(1);
+                                 default:
+                                         print_unknown(argv[4+shift],&config_rrcp[0]);
+                          }
+                   case 2: // mac-address-table
+                          check_argc(argc,3+shift,NULL,&config_alt[0]);
+                          switch (compare_command(argv[4+shift],&config_alt[0])){
+                                 case 0: // aging-time
+                                        check_argc(argc,4+shift,NULL,&config_alt_time[0]);
+                                        subcmd=get_cmd_num(argv[5+shift],-1,NULL,&config_alt_time[0]);
+                                        do_alt_config(subcmd+1);
+                                        exit(0);
+                                 case 1: // unknown-destination
+                                        check_argc(argc,4+shift,NULL,&config_alt_dest[0]);
+                                        subcmd=get_cmd_num(argv[5+shift],-1,NULL,&config_alt_dest[0]);
+                                        do_alt_config(subcmd+4);
+                                        exit(0);
+                                 default: 
+                                         print_unknown(argv[4+shift],&config_alt[0]);
+                          }
+
                    default:
-                          printf("Unknown sub-command: \"%s\", allowed commands:\n",argv[3+shift]);
-                          print_allow_command(&config_sub_cmd_l1[0]);
-                          exit(1);
+                          print_unknown(argv[3+shift],&config_sub_cmd_l1[0]);
                 }
                 break;
          case 2: //scan
@@ -1074,39 +1060,23 @@ int main(int argc, char **argv){
 	           rtl83xx_scan(0);
                    exit(0);
                 }
-                switch (compare_command(argv[3+shift],&scan_sub_cmd[0])){
-                   case 0:
-	                  rtl83xx_scan(1);
-                          exit(0);
-                   default:
-                          printf("Unknown sub-command: \"%s\", allowed commands:\n",argv[3+shift]);
-                          print_allow_command(&scan_sub_cmd[0]);
-                          exit(1);
-	        }
+                (void)get_cmd_num(argv[3+shift],0,NULL,&scan_sub_cmd[0]);
+	        rtl83xx_scan(1);
+                exit(0);
          case 3: //reload
          case 4: //reboot
   	        if (argc == (2+shift+1)){
                    do_reboot();
                    exit(0);
                 }
-                switch (compare_command(argv[3+shift],&reset_sub_cmd[0])){
-                   case 0:
-	                  do_softreboot();
-                          exit(0);
-                   case 1:
-	                  do_reboot();
-                          exit(0);
-                   default:
-                          printf("Unknown sub-command: \"%s\", allowed commands:\n",argv[3+shift]);
-                          print_allow_command(&reset_sub_cmd[0]);
-                          exit(1);
-	        }
-         case 5: //write
-  	        if (argc == (2+shift+1)){
-                   printf("No sub-command specified, allowed commands:\n");
-                   print_allow_command(&write_sub_cmd[0]);
-                   exit(1);
+                if (!get_cmd_num(argv[3+shift],-1,NULL,&reset_sub_cmd[0])){
+	          do_softreboot();
+                }else{
+	          do_reboot();
                 }
+                exit(0);
+         case 5: //write
+                check_argc(argc,2+shift,NULL,&write_sub_cmd[0]);
                 switch(compare_command(argv[3+shift],&write_sub_cmd[0])){
                    case 0:
                    case 1:
@@ -1116,25 +1086,20 @@ int main(int argc, char **argv){
                           do_write_eeprom_defaults();
                           exit(0);
                    default:
-                          printf("Unknown sub-command: \"%s\", allowed commands:\n",argv[3+shift]);
-                          print_allow_command(&write_sub_cmd[0]);
-                          exit(1);
+                          print_unknown(argv[3+shift],&write_sub_cmd[0]);
                 }
          case 6: //ping
                 do_ping();
                 exit(0);
          case 7: //mac-address
-  	        if (argc == (2+shift+1)){
-		   printf("not specified mac address\n");
-                   exit(1);
-                }
+                check_argc(argc,2+shift,"MAC address needed\n",NULL);
    	        if ((sscanf(argv[3+shift], "%02x:%02x:%02x:%02x:%02x:%02x",x,x+1,x+2,x+3,x+4,x+5)!=6)&&
 	            (sscanf(argv[3+shift], "%02x%02x.%02x%02x.%02x%02x",x,x+1,x+2,x+3,x+4,x+5)!=6)){
    		   printf("malformed mac address: '%s'!\n",argv[3+shift]);
                    exit(1);
                 }
 		for (i=0;i<6;i++){
-		   if (eeprom_write(0x12+i,(unsigned char)x[i])){
+		   if (do_write_eeprom_byte(0x12+i,(unsigned char)x[i])){
 		      printf ("error writing eeprom!\n");
 		      exit(1);
 		   }

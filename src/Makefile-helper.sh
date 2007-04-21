@@ -13,12 +13,12 @@ if test "$sys" = "NetBSD"; then
 fi;
 
 if test "$sys" = "FreeBSD"; then
-    echo -n "-s -Wall -O2 -ldnet -lpcap =-I/usr/local/include -L/usr/local/lib"
+    echo -n "-s -Wall -O2 -ldnet -lpcap -I/usr/local/include -L/usr/local/lib"
     exit;
 fi;
 
 if test "$sys" = "OpenBSD"; then
-    echo -n "-s -Wall -O2 -ldnet -lpcap =-I/usr/local/include -L/usr/local/lib"
+    echo -n "-s -Wall -O2 -ldnet -lpcap -I/usr/local/include -L/usr/local/lib"
     exit;
 fi;
 

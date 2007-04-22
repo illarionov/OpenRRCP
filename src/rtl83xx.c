@@ -339,6 +339,29 @@ void do_vlan_disable(){
   rtl83xx_setreg16(0x030b,swconfig.vlan.raw[0]);
 }
 
+void do_vlan(int mode){
+  swconfig.vlan.raw[0]=rtl83xx_readreg16(0x030b);
+  switch (mode){
+    case 1: // portbased
+      swconfig.vlan.s.config.enable=1;
+      swconfig.vlan.s.config.dot1q=0;
+      break;
+    case 2: // .1q
+      swconfig.vlan.s.config.enable=1;
+      swconfig.vlan.s.config.dot1q=1;
+      break;
+    default: // disable
+      swconfig.vlan.s.config.enable=0;
+      swconfig.vlan.s.config.dot1q=0;
+  }
+  rtl83xx_setreg16(0x030b,swconfig.vlan.raw[0]);
+}
+
+void do_vlan_tmpl(int mode){
+ if (mode) do_vlan(mode);
+ else printf("Under construction\n");
+}
+
 void do_write_memory(){
  int i,numreg;
 
@@ -430,7 +453,10 @@ int compare_command(char *argv, char **command_list){
 
  do{
   if (strlen(argv) > strlen(command_list[i])) continue;
-  if (strstr(command_list[i],argv)==command_list[i]) {res=i; count++;}
+  if (strstr(command_list[i],argv)==command_list[i]) {
+   if (strcmp(argv,command_list[i])==0) {return(i);}
+   res=i; count++;
+  }
  }while (strlen(command_list[i++]));
  if (count > 1){
    printf("Ambiguous command: \"%s\"\n",argv);
@@ -745,6 +771,7 @@ void print_usage(void){
 	printf(" show running-config          - show current switch config\n");
 	printf(" show interface [<list ports>]- print link status for ports\n");
 	printf(" show interface [<list ports>] summary - print port rx/tx counters\n");
+	printf(" show vlan [vid <id>]         - show low-level vlan confg\n");
 	printf(" scan [verbose]               - scan network for rrcp-enabled switches\n");
 	printf(" reboot [soft|hard]           - initiate switch reboot\n");
 	printf(" config interface [<list ports>] ... - port(s) configuration\n");
@@ -755,20 +782,20 @@ void print_usage(void){
 	printf(" --\"\"-- mac-address learning enable|disable - enable/disable MAC-learning on port(s)\n");
 	printf(" --\"\"-- rrcp enable|disable - enable/disable rrcp on specified ports\n");
 	printf(" --\"\"-- mls qos cos 0|7 - set port priority\n");
-	printf(" --\"\"-- rrcp enable|disable - global rrcp enable|disable\n");
-	printf(" --\"\"-- rrcp echo enable|disable - rrcp echo (REP) enable|disable\n");
-	printf(" --\"\"-- rrcp loop-detect enable|disable - network loop detect enable|disable\n"); 
-        printf(" --\"\"-- rrcp authkey <hex-value> - set new authkey\n"); 
-	printf(" --\"\"-- mac-address-table aging-time|drop-unknown <arg>  - address lookup table control\n");
-//	printf(" vlan status                  - show low-level vlan confg\n");
+	printf(" config rrcp enable|disable - global rrcp enable|disable\n");
+	printf(" config rrcp echo enable|disable - rrcp echo (REP) enable|disable\n");
+	printf(" config rrcp loop-detect enable|disable - network loop detect enable|disable\n"); 
+        printf(" config rrcp authkey <hex-value> - set new authkey\n"); 
+	printf(" config vlan disable - disable all VLAN support\n");
+	printf(" config vlan mode portbased|dot1q - enable specified VLAN support\n");
+	printf(" config mac-address <mac> - set <mac> as new switch MAC address and reboots\n");
+	printf(" config mac-address-table aging-time|drop-unknown <arg>  - address lookup table control\n");
 //	printf(" vlan enable_hvlan [<port>]   - configure switch as home-vlan tree with specified uplink port\n");
 //	printf(" vlan enable_8021q [<port>]   - configure switch as IEEE 802.1Q vlan tree with specified uplink port\n");
-//	printf(" vlan disable               - disable all VLAN support\n");
 //	printf(" bcast-storm-ctrl enable|disable   - broadcast storm control on/off\n"); 
 	printf(" ping                         - test if switch is responding\n");
 	printf(" write memory                 - save current config to EEPROM\n");
 	printf(" write defaults               - save to EEPROM chip-default values\n");
-	printf(" mac-address <mac>            - set <mac> as new switch MAC address and reboots\n");
         return;
 }
 
@@ -790,7 +817,7 @@ int main(int argc, char **argv){
     unsigned short int *p_port_list=NULL;
     unsigned short int port_list[26];
     char *ena_disa[]={"disable","enable",""};
-    char *cmd_level_1[]={"show", "config", "scan", "reload", "reboot", "write", "ping", "mac-address",""}; 
+    char *cmd_level_1[]={"show","config","scan","reload","reboot","write","ping",""}; 
     char *show_sub_cmd[]={"running-config","startup-config","interface","vlan",""};
     char *scan_sub_cmd[]={"verbose",""};
     char *show_sub_cmd_l2[]={"full","verbose",""};
@@ -798,7 +825,7 @@ int main(int argc, char **argv){
     char *show_sub_cmd_l4[]={"id",""};
     char *reset_sub_cmd[]={"soft","hard",""};
     char *write_sub_cmd[]={"memory","eeprom","defaults",""};
-    char *config_sub_cmd_l1[]={"interface","rrcp","mac-address-table",""};
+    char *config_sub_cmd_l1[]={"interface","rrcp","vlan","mac-address","mac-address-table",""};
     char *config_intf_sub_cmd_l1[]={"no","shutdown","speed","duplex","rate-limit","mac-address","rrcp","mls","flow-control",""};
     char *config_duplex[]={"half","full",""};
     char *config_rate[]={"100m","128k","256k","512k","1m","2m","4m","8m","input","output",""};
@@ -809,6 +836,9 @@ int main(int argc, char **argv){
     char *config_alt[]={"aging-time","unknown-destination",""};
     char *config_alt_time[]={"0","12","300",""};
     char *config_alt_dest[]={"drop","pass",""};
+    char *config_vlan[]={"disable","transparent","clear","mode","template-load",""};
+    char *config_vlan_mode[]={"portbased","dot1q",""};
+    char *config_vlan_tmpl[]={"portbased","dot1qtree",""};
 
     if (argc<3){
         print_usage();
@@ -1031,7 +1061,44 @@ int main(int argc, char **argv){
                                  default:
                                          print_unknown(argv[4+shift],&config_rrcp[0]);
                           }
-                   case 2: // mac-address-table
+                   case 2: // vlan
+                          check_argc(argc,3+shift,NULL,&config_vlan[0]);
+                          switch (compare_command(argv[4+shift],&config_vlan[0])){
+                                 case 0: // disable
+                                 case 1: // transparent
+                                        do_vlan(0);
+                                        exit(0);
+                                 case 2: //clear
+                                        do_vlan_tmpl(0);
+                                 case 3: // mode
+                                        check_argc(argc,4+shift,NULL,&config_vlan_mode[0]);
+                                        subcmd=get_cmd_num(argv[5+shift],-1,NULL,&config_vlan_mode[0]);
+                                        do_vlan(subcmd+1);
+                                        exit(0);
+                                 case 4: // template-load
+                                        check_argc(argc,4+shift,NULL,&config_vlan_tmpl[0]);
+                                        subcmd=get_cmd_num(argv[5+shift],-1,NULL,&config_vlan_tmpl[0]);
+                                        do_vlan_tmpl(subcmd+1);
+                                        exit(0);
+                                 default: 
+                                         print_unknown(argv[4+shift],&config_vlan[0]);
+                          }
+                   case 3: // mac-address
+                          check_argc(argc,3+shift,"MAC address needed\n",NULL);
+   	                  if ((sscanf(argv[4+shift], "%02x:%02x:%02x:%02x:%02x:%02x",x,x+1,x+2,x+3,x+4,x+5)!=6)&&
+	                      (sscanf(argv[4+shift], "%02x%02x.%02x%02x.%02x%02x",x,x+1,x+2,x+3,x+4,x+5)!=6)){
+   		              printf("malformed mac address: '%s'!\n",argv[4+shift]);
+                              exit(1);
+                          }
+		          for (i=0;i<6;i++){
+		            if (do_write_eeprom_byte(0x12+i,(unsigned char)x[i])){
+		             printf ("error writing eeprom!\n");
+		             exit(1);
+		            }
+	                  }
+		          do_reboot();
+                          exit(0);
+                   case 4: // mac-address-table
                           check_argc(argc,3+shift,NULL,&config_alt[0]);
                           switch (compare_command(argv[4+shift],&config_alt[0])){
                                  case 0: // aging-time
@@ -1087,21 +1154,6 @@ int main(int argc, char **argv){
                 }
          case 6: //ping
                 do_ping();
-                exit(0);
-         case 7: //mac-address
-                check_argc(argc,2+shift,"MAC address needed\n",NULL);
-   	        if ((sscanf(argv[3+shift], "%02x:%02x:%02x:%02x:%02x:%02x",x,x+1,x+2,x+3,x+4,x+5)!=6)&&
-	            (sscanf(argv[3+shift], "%02x%02x.%02x%02x.%02x%02x",x,x+1,x+2,x+3,x+4,x+5)!=6)){
-   		   printf("malformed mac address: '%s'!\n",argv[3+shift]);
-                   exit(1);
-                }
-		for (i=0;i<6;i++){
-		   if (do_write_eeprom_byte(0x12+i,(unsigned char)x[i])){
-		      printf ("error writing eeprom!\n");
-		      exit(1);
-		   }
-	        }
-		do_reboot();
                 exit(0);
          default:
                 print_usage();

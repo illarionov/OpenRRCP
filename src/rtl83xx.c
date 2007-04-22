@@ -264,58 +264,39 @@ void print_vlan_status(int show_vid){
     }
 }
 
-void do_vlan_enable_vlan(int is_8021q, int root_port, int vid_base){
-    int i,port,vlan,port_phys,root_port_phys;
-    unsigned short vlan_status;
+void do_vlan_enable_vlan(int is_8021q){
+    int i,port,vlan;
     union t_vlan_port_vlan vlan_port_vlan;
     union t_vlan_port_output_tag vlan_port_output_tag;
     union t_vlan_entry vlan_entry;
     unsigned short vlan_vid[32];
     union t_vlan_port_insert_vid vlan_port_insert_vid;
 
-    //fill-up local data structures
-    if (is_8021q){
-	vlan_status=(rtl83xx_readreg32(0x030b)|1)|(1<<4);
-    }else{
-	vlan_status=(rtl83xx_readreg32(0x030b)|1)&~(1<<4);
-    }
-
-    if (root_port < 0){
-      rtl83xx_setreg16reg16(0x030b,vlan_status);
-      return;
-    }
-
     vlan_port_output_tag.bitmap=0;
     vlan_port_insert_vid.bitmap=0;
-    for(port=1;port<=switchtypes[switchtype].num_ports;port++){
-    	port_phys=map_port_number_from_logical_to_physical(port);
-	if (port==root_port){
-	    vlan_port_vlan.index[port_phys]=0;
-	    vlan_port_output_tag.bitmap|=3<<port_phys*2;
-	    vlan_port_insert_vid.bitmap|=1<<port_phys;
-	}else{
-	    vlan_port_vlan.index[port_phys]=(unsigned char)port;
-	}
+
+    for(port=0;port<switchtypes[switchtype].num_ports;port++){
+	vlan_port_vlan.index[port]=(uint16_t)port;
+	vlan_port_output_tag.bitmap|=3<<port*2;
+//	vlan_port_insert_vid.bitmap|=(is_8021q)?1<<port:0;
+	vlan_port_insert_vid.bitmap|=0;
     }
 
-    root_port_phys=map_port_number_from_logical_to_physical(root_port);
     memset(&vlan_entry,0,sizeof(vlan_entry));
     memset(&vlan_vid,0,sizeof(vlan_vid));
-    if (is_8021q){
-	vlan_entry.bitmap[0]=0;
-    }else{
-	vlan_entry.bitmap[0]=0xffffffff>>(32-switchtypes[switchtype].num_ports);
-    }
-    for(vlan=1;vlan<=switchtypes[switchtype].num_ports;vlan++){
-	if (vlan!=root_port){
-	    port_phys=map_port_number_from_logical_to_physical(vlan);
-	    vlan_entry.bitmap[vlan]=(1<<port_phys)|(1<<root_port_phys);
-	    vlan_vid[vlan]=vid_base+vlan;
-	}
+    for(vlan=0;vlan<switchtypes[switchtype].num_ports;vlan++){
+	if ( (vlan!=(switchtypes[switchtype].num_ports-2)) &&
+             (vlan!=(switchtypes[switchtype].num_ports-1)) ) {
+	    vlan_entry.bitmap[vlan]=(1<<vlan)|(1<<(switchtypes[switchtype].num_ports-2))|(1<<(switchtypes[switchtype].num_ports-1));
+//	    vlan_vid[vlan]=(is_8021q)?vid_base+vlan:0;
+	    vlan_vid[vlan]=0;
+	}else{
+//	    vlan_entry.bitmap[vlan]=(is_8021q)?0:0xffffffff>>(32-switchtypes[switchtype].num_ports);
+	    vlan_entry.bitmap[vlan]=0xffffffff>>(32-switchtypes[switchtype].num_ports);
+        }
     }
 
     //write all relevant config to switch from our data structures    
-    rtl83xx_setreg16reg16(0x030b,vlan_status);
     for(i=0;i<13;i++){
 	rtl83xx_setreg16reg16(0x030c+i,vlan_port_vlan.raw[i]);
     }
@@ -358,7 +339,10 @@ void do_vlan(int mode){
 }
 
 void do_vlan_tmpl(int mode){
- if (mode) do_vlan(mode);
+ if (mode) {
+   do_vlan(mode);
+   do_vlan_enable_vlan(mode-1);
+ }
  else printf("Under construction\n");
 }
 
@@ -805,12 +789,10 @@ int main(int argc, char **argv){
     unsigned int ak;
     int i;
     char *p;
-    int root_port=-1;
     int media_speed=0;
     int direction=0; 
     int bandw=0;
     int shift=0;
-    int negate=0;
     int subcmd=0;
     int cmd;
     int vid=-1;

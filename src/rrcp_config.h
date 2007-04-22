@@ -24,7 +24,20 @@
 
 #include <stdint.h>
 
+    typedef enum {
+	EEPROM_NONE = 0,
+	EEPROM_WRITEPOTECTED = 1,
+	EEPROM_2401 = 2,
+	EEPROM_2402 = 3,
+	EEPROM_2404 = 4,
+	EEPROM_2408 = 5,
+	EEPROM_2416 = 6
+    } t_eeprom_type;
+
     struct t_swconfig {
+	unsigned int switch_type;
+	unsigned int chip_type;
+	t_eeprom_type eeprom_type;
 	union {//0x0200
 	    struct  t_rrcp_config{
 		uint16_t
@@ -72,6 +85,18 @@
 	    uint32_t mask;
 	    uint16_t raw[2];    
 	} alt_mask; // 0x0301..0x0302
+	union {
+	    struct  t_alt_igmp_snooping{
+		uint16_t
+	    	    en_igmp_snooping:1,
+	    	    reserved:15;
+	    } config;
+	    uint16_t raw;
+	} alt_igmp_snooping; // 0x0308
+	union {
+	    uint32_t mask;
+	    uint16_t raw[2];    
+	} alt_mrouter_mask; // 0x0309..0x030a
 	union {
 	    struct t_vlan_s{
 		struct  t_vlan_s_config{
@@ -151,11 +176,19 @@
 
 extern const char *bandwidth_text[8];
 extern const char *wrr_ratio_text[4];
+extern const char *eeprom_type_text[7];
 extern struct t_swconfig swconfig;
 
 void rrcp_config_read_from_switch(void);
+
+void rrcp_config_commit_vlan_to_switch(void);
+
 void rrcp_config_bin2text(char *text_buffer, int buffer_length, int show_defaults);
 
 char *rrcp_config_get_portname(char *buffer, int buffer_size, int port_number, int port_number_phys);
 
 void do_show_config(int verbose);
+
+int find_vlan_index_by_vid(int vid);
+
+int find_or_create_vlan_index_by_vid(int vid);

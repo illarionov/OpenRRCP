@@ -22,4 +22,6 @@
     This would be appreciated, however not required.
 */
 
-#define RRCP_CLI_VERSION "0.1.94.beta1"
+#include "../lib/libcli.h"
+
+void cmd_other_register_commands(struct cli_def *cli);

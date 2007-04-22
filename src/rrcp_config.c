@@ -32,17 +32,102 @@
 
 const char *bandwidth_text[8]={"100M","128K","256K","512K","1M","2M","4M","8M"};
 const char *wrr_ratio_text[4]={"4:1","8:1","16:1","1:0"};
+const char *eeprom_type_text[7]={"N/A","Write Protected","2401","2402","2404","2408","2416"};
 
 struct t_swconfig swconfig;
+
+int rrcp_config_autodetect_chip_try_to_write_eeprom (uint16_t addr1, uint16_t addr2)
+{
+    uint8_t tmp11=0, tmp12=0, tmp21=0, tmp22=0;
+
+    eeprom_read(addr1,&tmp11);
+    eeprom_read(addr2,&tmp12);
+    eeprom_write(addr1,tmp11+0x055);
+    eeprom_write(addr2,tmp11+0x0aa);
+    tmp21=tmp11;
+    tmp22=tmp11;
+    eeprom_read(addr1,&tmp21);
+    eeprom_read(addr2,&tmp22);
+    eeprom_write(addr1,tmp11);
+    eeprom_write(addr2,tmp12);
+    return ((tmp21==tmp11+0x055)&&(tmp22==tmp11+0x0aa));
+}
+
+uint16_t rrcp_config_autodetect_switch_chip_eeprom(unsigned int *switch_type, unsigned int *chip_type, t_eeprom_type *eeprom_type){
+    uint16_t saved_reg;
+    uint16_t detected_switchtype=-1;
+    uint16_t detected_chiptype=unknown;
+    t_eeprom_type detected_eeprom=EEPROM_NONE;
+    int i,errcnt=0;
+    uint8_t test1[6];
+    uint8_t test2[4]={0x0,0x55,0xaa,0xff};
+
+    // step 1: detect EEPROM presence and size
+    for(i=0;i<6;i++){
+	if ((errcnt=eeprom_read(0x12+i,&test1[i]))!=0){break;}
+    }
+    if (errcnt==0){
+	if (rrcp_config_autodetect_chip_try_to_write_eeprom(0x07e,0x07f)){
+	    detected_eeprom=EEPROM_2401;
+	    if (rrcp_config_autodetect_chip_try_to_write_eeprom(0x07f,0x0ff)){
+		detected_eeprom=EEPROM_2402;
+		if (rrcp_config_autodetect_chip_try_to_write_eeprom(0x0ff,0x01ff)){
+		    detected_eeprom=EEPROM_2404;
+		    if (rrcp_config_autodetect_chip_try_to_write_eeprom(0x01ff,0x03ff)){
+			detected_eeprom=EEPROM_2408;
+			if (rrcp_config_autodetect_chip_try_to_write_eeprom(0x03ff,0x07ff)){
+			    detected_eeprom=EEPROM_2416;
+			}
+		    }
+		}
+	    }
+	}else{
+	    detected_eeprom=EEPROM_WRITEPOTECTED;
+	}
+    }
+
+    // step 2: if step 1 fail, detect rtl8316b without EEPROM
+    saved_reg=rtl83xx_readreg16(0x0218);
+    for(i=0;i<4;i++){
+	rtl83xx_setreg16(0x0218,test2[i]);
+	if (rtl83xx_readreg16(0x0218) != test2[i]) {
+	    errcnt++; 
+	    break;
+	}
+    }
+    rtl83xx_setreg16(0x0218,saved_reg);
+
+    if (errcnt) {
+        detected_chiptype=rtl8326;
+    }else{
+	detected_chiptype=rtl8316b;
+    }
+
+    if(detected_chiptype==rtl8316b){
+	detected_switchtype=0; // generic rtl8316b
+    }else{
+	detected_switchtype=1; // generic rtl8326
+    }
+
+    *switch_type=detected_switchtype;
+    *chip_type=detected_chiptype;
+    *eeprom_type=detected_eeprom;
+    return 0;
+}
 
 ////////////// read all relevant config from switch into our data structures    
 void rrcp_config_read_from_switch(void)
 {
     int i;
+
+    rrcp_config_autodetect_switch_chip_eeprom(&swconfig.switch_type, &swconfig.chip_type, &swconfig.eeprom_type);
     
     swconfig.rrcp_config.raw=rtl83xx_readreg16(0x0200);
     for(i=0;i<2;i++)
 	swconfig.rrcp_byport_disable.raw[i]=rtl83xx_readreg16(0x0201+i);
+    swconfig.alt_igmp_snooping.raw=rtl83xx_readreg16(0x0308);
+    for(i=0;i<2;i++)
+	swconfig.alt_mrouter_mask.raw[i]=rtl83xx_readreg16(0x0309+i);
     for(i=0;i<14;i++){
 	swconfig.vlan.raw[i]=rtl83xx_readreg16(0x030b+i);
     }
@@ -82,6 +167,29 @@ void rrcp_config_read_from_switch(void)
     }
 }
 
+void rrcp_config_commit_vlan_to_switch(void)
+{
+    int i;
+
+    for(i=0;i<14;i++){
+	rtl83xx_setreg16(0x030b+i,swconfig.vlan.raw[i]);
+    }
+    for(i=0;i<4;i++){
+	rtl83xx_setreg16(0x0319+i,swconfig.vlan_port_output_tag.raw[i]);
+    }
+    for(i=0;i<32;i++){
+	//mask out ports absent on this switch
+	swconfig.vlan_entry.bitmap[i] &= 0xffffffff>>(32-switchtypes[switchtype].num_ports);
+	rtl83xx_setreg16(0x031d+i*3,  swconfig.vlan_entry.raw[i*2]);
+	rtl83xx_setreg16(0x031d+i*3+1,swconfig.vlan_entry.raw[i*2+1]);
+	rtl83xx_setreg16(0x031d+i*3+2,swconfig.vlan_vid[i]);
+    }
+    //mask out ports absent on this switch
+    swconfig.vlan_port_insert_vid.bitmap &= 0xffffffff>>(32-switchtypes[switchtype].num_ports);
+    rtl83xx_setreg16(0x037d,swconfig.vlan_port_insert_vid.raw[0]);
+    rtl83xx_setreg16(0x037e,swconfig.vlan_port_insert_vid.raw[1]);
+}
+
 void sncprintf(char *str, size_t size, const char *format, ...) {
     char line[1024];
     va_list ap;
@@ -107,7 +215,7 @@ char *rrcp_config_get_portname(char *buffer, int buffer_size, int port_number, i
 
 void rrcp_config_bin2text(char *sc, int l, int show_defaults)
 {
-    int i,port,port_phys,port2,port2_phys;
+    int port,port_phys,port2,port2_phys;
     char pn[64];
 
     sprintf(sc,"!\n");
@@ -126,6 +234,9 @@ void rrcp_config_bin2text(char *sc, int l, int show_defaults)
 	}
         sncprintf(sc,l,"mac-address-table aging-time %d\n",mac_aging_time);
 	sncprintf(sc,l,"!\n");
+    }
+    {
+	sncprintf(sc,l,"%sip igmp snooping\n", swconfig.alt_igmp_snooping.config.en_igmp_snooping ? "":"no ");
     }
     {
 	sncprintf(sc,l,"%srrcp enable\n", swconfig.rrcp_config.config.rrcp_disable ? "no ":"");
@@ -216,21 +327,42 @@ void rrcp_config_bin2text(char *sc, int l, int show_defaults)
 	if (swconfig.vlan.s.config.enable){
 	    //print vlan-related lines only if vlans are enabled globally by this config
 	    if (is_trunk){
-		char vlanlist[256],s[16];
+		char vlanlist[256],s[32];
+		int i,j,r_start=-1,r_last=-1;
 		vlanlist[0]=0;
-		for(i=0;i<32;i++){
-		    if(swconfig.vlan_entry.bitmap[i]&(1<<port_phys)){
-			sprintf(s,"%d",swconfig.vlan_vid[i]);
-			if (vlanlist[0]!=0){
-			    strcat(vlanlist,",");
+
+		for(i=1;i<4097;i++){
+		    int found=0;
+		    for (j=0;j<32;j++){
+			if (swconfig.vlan_vid[j]==i){
+			    found=1;
+			    if (r_start<=0){
+				r_start=i;
+			    }
+			    r_last=i;
 			}
-			strcat(vlanlist,s);
+		    }
+		    if (!found){
+			if (r_start>0){
+			    if (r_start==r_last){
+				sprintf(s,"%d",r_start);
+			    }else{
+				sprintf(s,"%d-%d",r_start,r_last);
+			    }
+			    if (vlanlist[0]!=0){
+				strcat(vlanlist,",");
+			    }
+			    strcat(vlanlist,s);
+			    r_start=-1;
+			    r_last=-1;
+			}
 		    }
 		}
 		if (vlanlist[0]==0){
 		    strcpy(vlanlist,"none");
 		}
 		sncprintf(sc,l," switchport trunk allowed vlan %s\n",vlanlist);
+		sncprintf(sc,l," switchport trunk native vlan %d\n",swconfig.vlan_vid[swconfig.vlan.s.port_vlan_index[port_phys]]);
 	    }else{
 		sncprintf(sc,l," switchport access vlan %d\n",swconfig.vlan_vid[swconfig.vlan.s.port_vlan_index[port_phys]]);
 	    }
@@ -270,7 +402,7 @@ void rrcp_config_bin2text(char *sc, int l, int show_defaults)
 	}
 	if (swconfig.port_config.config[port_phys].autoneg){
 	    if (show_defaults){
-		sncprintf(sc,l," speed auto\n duplex auto\n");
+		sncprintf(sc,l," speed auto\n");
 	    }
 	}else if (swconfig.port_config.config[port_phys].media_100full){
 	    sncprintf(sc,l," speed 100\n duplex full\n");
@@ -283,6 +415,7 @@ void rrcp_config_bin2text(char *sc, int l, int show_defaults)
 	}
 	sncprintf(sc,l,"!\n");
     }
+    sncprintf(sc,l,"end\n");
 }
 
 void do_show_config(int verbose)
@@ -294,4 +427,68 @@ void do_show_config(int verbose)
     rrcp_config_bin2text(text,65535,verbose);
     printf("%s",text);
     free(text);
+}
+
+int find_vlan_index_by_vid(int vid)
+{
+    int i;
+    for(i=0;i<32;i++){
+	if (swconfig.vlan_vid[i]==vid){
+	    return i;
+	}
+    }
+    return -1;
+}
+
+int find_or_create_vlan_index_by_vid(int vid)
+{
+    int i;
+    for(i=0;i<32;i++){
+	if (swconfig.vlan_vid[i]==vid){
+	    return i;
+	}
+	if (swconfig.vlan_vid[i]==0){
+	    swconfig.vlan_vid[i]=vid;
+	    return i;
+	}
+    }
+    //try to free unused vlan
+    for(i=0;i<32;i++){
+	if (swconfig.vlan_entry.bitmap[i]==0){
+	    int port,port_phys,vid_used_as_pvid=0;
+	    for(port=1;port<=switchtypes[switchtype].num_ports;port++){
+	        port_phys=map_port_number_from_logical_to_physical(port);
+		if (swconfig.vlan.s.port_vlan_index[port_phys]==i){
+		    vid_used_as_pvid=1;
+		}
+	    }
+	    if (vid_used_as_pvid==0){
+	        swconfig.vlan_vid[i]=vid;
+		return i;
+	    }
+	}
+    }
+
+    return -1;
+}
+
+void rrcp_config_write_to_eeprom(void)
+{
+/*    int i,numreg;
+
+    numreg=(switchtypes[switchtype].num_ports==16)?12:13;
+    rrcp_config_read_from_switch();
+    if (eeprom_write(0x0d,swconfig.rrcp_config.raw)) {printf("write eeprom\n");exit(1);}
+    if (eeprom_write(0x0f,swconfig.rrcp_byport_disable.raw[0])) {printf("write eeprom\n");exit(1);}
+    if (eeprom_write(0x11,swconfig.rrcp_byport_disable.raw[1])) {printf("write eeprom\n");exit(1);}
+    if (eeprom_write(0x23,swconfig.alt_config.raw)) {printf("write eeprom\n");exit(1);}
+    if (eeprom_write(0x29,swconfig.vlan.raw[0])) {printf("write eeprom\n");exit(1);}
+    if (eeprom_write(0x2f,swconfig.qos_config.raw)) {printf("write eeprom\n");exit(1);}
+    if (eeprom_write(0x31,swconfig.qos_port_priority.raw[0])) {printf("write eeprom\n");exit(1);}
+    if (eeprom_write(0x33,swconfig.qos_port_priority.raw[1])) {printf("write eeprom\n");exit(1);}
+    if (eeprom_write(0x39,swconfig.port_config_global.raw)) {printf("write eeprom\n");exit(1);}
+    for(i=0;i<numreg;i++){
+	if (eeprom_write(0x3b+i*2,swconfig.port_config.raw[i])) {printf("write eeprom\n");exit(1);}
+    }
+*/
 }

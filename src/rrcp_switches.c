@@ -21,6 +21,7 @@
     to it's original author, Andrew Chernyak (nording@yandex.ru)
     This would be appreciated, however not required.
 */
+#include <stdio.h>
 #include <string.h>
 #include "rrcp_io.h"
 #include "rrcp_switches.h"
@@ -35,9 +36,9 @@ char* chipnames [3] = {
 
 uint32_t switchtype;
 
-const uint32_t switchtype_n = 6;
+const uint32_t switchtype_n = 7;
 
-struct switchtype_t switchtypes[6] = {
+struct switchtype_t switchtypes[7] = {
     {
 	"generic",
 	"rtl8316b",
@@ -91,6 +92,15 @@ struct switchtype_t switchtypes[6] = {
 	rtl8326,
 	26,
 	{2,4,6,8,10,12,14,16,18,20,22,24,1,3,5,7,9,11,13,15,17,19,21,23,25,26,0}
+    },
+    {
+	"zyxel",
+	"es116p",
+	"unknown",
+	"rtl8316b",
+	rtl8316b,
+	16,
+	{2,4,6,8,10,12,14,16,1,3,5,7,9,11,13,15,0,0,0,0,0,0,0,0,0,0,0}
     }
 };
 
@@ -98,28 +108,23 @@ uint16_t rrcp_switch_autodetect_chip(void){
     uint16_t saved_reg;
     uint16_t detected_chiptype=unknown;
     int i,errcnt=0;
-    struct tst{
-      union {
-        uint8_t b[6];
-        uint16_t w[3];
-      };
-    }test1;
+    uint8_t test1[6];
     uint8_t test2[4]={0x0,0x55,0xaa,0xff};
 
    /*
-     step 1: detect rtl8316b with flash
+     step 1: detect rtl8316b with EEPROM
    */
-    for(i=0;i<3;i++){
-      if ((errcnt=do_read_eeprom(0x13+i*2,&test1.w[i]))!=0){break;}
+    for(i=0;i<6;i++){
+      if ((errcnt=eeprom_read(0x12+i,&test1[i]))!=0){break;}
     }
     if (errcnt==0){
-      if (memcmp(&dest_mac[0],&test1.b[0],6)==0) {
-       // here it is possible to note, that the device is equipped by flash-memory
+      if (memcmp(&dest_mac[0],&test1[0],6)==0) {
+       // here it is possible to note, that the device is equipped with EEPROM
        return(rtl8316b);
       }
     }
     /*
-      step 2: if step 1 fail, detect rtl8316b without flash
+      step 2: if step 1 fail, detect rtl8316b without EEPROM
     */
     saved_reg=rtl83xx_readreg16(0x0218);
     for(i=0;i<4;i++){

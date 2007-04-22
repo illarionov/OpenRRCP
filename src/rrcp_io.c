@@ -415,7 +415,7 @@ void rtl83xx_scan(int verbose){
 			rep_reply->pktr.ether_shost[3],
 			rep_reply->pktr.ether_shost[4],
 			rep_reply->pktr.ether_shost[5]);
-                if (verbose) printf("    No hello-reply, RRCP disable?           Yes\n");
+                if (verbose) printf("    No hello-reply, RRCP disabled?          Yes\n");
                 else printf("   -    +\n");
             current=rep_reply->prev;
             free(rep_reply);
@@ -433,7 +433,7 @@ void rtl83xx_scan(int verbose){
                 hidden_mac[i*6+3],
                 hidden_mac[i*6+4],
                 hidden_mac[i*6+5]);
-         if (verbose) printf("    No hello-reply, RRCP disable?           No\n");
+         if (verbose) printf("    No hello-reply, RRCP disabled?          No\n");
          else printf("   -    -\n");
        }
      }
@@ -541,34 +541,47 @@ uint16_t res;
       bit 8-15 : data read from EEPROM
 */
 
-int do_write_eeprom(uint16_t addr,uint16_t data){
-
- rtl83xx_setreg16(0x218,data>>8);
- rtl83xx_setreg16(0x217,addr);
- if ((wait_eeprom()&0x2000)!=0) return 1;
- rtl83xx_setreg16(0x218,data&0x00ff);
- rtl83xx_setreg16(0x217,addr-1);
- if ((wait_eeprom()&0x2000)!=0) return 1;
- return 0;
-}
-
-int do_write_eeprom_byte(uint16_t addr,uint8_t data){
+int eeprom_write(uint16_t addr,uint8_t data){
     rtl83xx_setreg16(0x218,((uint16_t)data)&0xff);
-    rtl83xx_setreg16(0x217,addr);
-    if ((wait_eeprom()&0x2000)!=0)
+    rtl83xx_setreg16(0x217,addr&0x7ff);
+    if ((wait_eeprom()&0x2000)!=0){
 	return 1;
+    }
     return 0;
 }
 
-int do_read_eeprom(uint16_t addr,uint16_t *data){
+int eeprom_read(uint16_t addr,uint8_t *data){
+    uint16_t tmp;
 
- rtl83xx_setreg16(0x217,addr|0x800);
- if ((wait_eeprom()&0x2000)!=0) return 1;
- *data=rtl83xx_readreg16(0x218);
- rtl83xx_setreg16(0x217,(addr-1)|0x800);
- if ((wait_eeprom()&0x2000)!=0) return 1;
- *data|=rtl83xx_readreg16(0x218)>>8;
- return 0;
+    rtl83xx_setreg16(0x217,(addr&0x7ff)|0x800);
+    if ((wait_eeprom()&0x2000)!=0){
+	return 1;
+    }
+    tmp=rtl83xx_readreg16(0x218);
+    data[0]=(unsigned char)(tmp>>8);
+    return 0;
+}
+
+//old two-byte tweaked version - will be eventualy phased out
+int do_write_eeprom(uint16_t addr,uint16_t data){
+    rtl83xx_setreg16(0x218,data>>8);
+    rtl83xx_setreg16(0x217,addr);
+    if ((wait_eeprom()&0x2000)!=0) return 1;
+    rtl83xx_setreg16(0x218,data&0x00ff);
+    rtl83xx_setreg16(0x217,addr-1);
+    if ((wait_eeprom()&0x2000)!=0) return 1;
+    return 0;
+}
+
+//old two-byte tweaked version - will be eventualy phased out
+int do_read_eeprom(uint16_t addr,uint16_t *data){
+    rtl83xx_setreg16(0x217,addr|0x800);
+    if ((wait_eeprom()&0x2000)!=0) return 1;
+    *data=rtl83xx_readreg16(0x218);
+    rtl83xx_setreg16(0x217,(addr-1)|0x800);
+    if ((wait_eeprom()&0x2000)!=0) return 1;
+    *data|=rtl83xx_readreg16(0x218)>>8;
+    return 0;
 }
 
 //returns 1 if got response

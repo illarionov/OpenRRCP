@@ -22,9 +22,12 @@
     This would be appreciated, however not required.
 */
 
+#include <stdlib.h>
 #include <string.h>
 #include "../lib/libcli.h"
 #include "rrcp_config.h"
+#include "rrcp_lib.h"
+#include "rrcp_io.h"
 #include "rrcp_switches.h"
 #include "rrcp_cli_cmd_show.h"
 
@@ -73,11 +76,27 @@ int cmd_config_mac_aging(struct cli_def *cli, char *command, char *argv[], int a
     return CLI_OK;
 }
 
+int cmd_config_ip_igmp_snooping(struct cli_def *cli, char *command, char *argv[], int argc)
+{
+    if (argc>0){
+	if (strcmp(argv[0],"?")==0){
+	    cli_print(cli, "  <cr>");
+	}else{
+	    cli_print(cli, "%% Invalid input detected.");
+	}
+    }else{
+	if (strcasecmp(command,"ip igmp snooping")==0)    swconfig.alt_igmp_snooping.config.en_igmp_snooping=1;
+	if (strcasecmp(command,"no ip igmp snooping")==0) swconfig.alt_igmp_snooping.config.en_igmp_snooping=0;
+	rtl83xx_setreg16reg16(0x0308,swconfig.alt_igmp_snooping.raw);
+    }
+    return CLI_OK;
+}
+
 int cmd_config_rrcp(struct cli_def *cli, char *command, char *argv[], int argc)
 {
     if (argc>0){
 	if (strcmp(argv[0],"?")==0){
-	    cli_print(cli, "<CR>");
+	    cli_print(cli, "  <cr>");
 	}else{
 	    cli_print(cli, "%% Invalid input detected.");
 	}
@@ -92,13 +111,65 @@ int cmd_config_rrcp(struct cli_def *cli, char *command, char *argv[], int argc)
     return CLI_OK;
 }
 
+int cmd_config_rrcp_authkey(struct cli_def *cli, char *command, char *argv[], int argc)
+{
+    if (argc==1){
+	if (argv[0][strlen(argv[0])-1]=='?'){
+	    cli_print(cli, "0000-ffff           New RRCP Authentication key (hex)");
+	}else{
+	    int new_authkey;
+	    
+	    if (sscanf(argv[0],"%04x",&new_authkey)){
+		rtl83xx_setreg16(0x209,new_authkey);
+		authkey=new_authkey;
+	    }else{
+		cli_print(cli, "%% ERROR: Invalid authkey specification: '%s'",argv[0]);
+		return CLI_ERROR;
+	    }
+	}
+    }else{
+	cli_print(cli, "%% Invalid input detected.");
+	return CLI_ERROR;
+    }
+    return CLI_OK;
+}
+
 int cmd_config_vlan(struct cli_def *cli, char *command, char *argv[], int argc)
 {
     if (argc>0){
+	if (strcasecmp(command,"no vlan")==0) {
+	    if (argv[0][strlen(argv[0])-1]=='?'){
+		cli_print(cli, "  <1-4095>             Remove exiting vlan from switch");
+		cli_print(cli, "  <cr>");
+	        return CLI_ERROR;
+	    }else{
+		int vidlist[33];
+		int i,vi;
+
+		if (str_portlist_to_array_by_value(argv[0],vidlist,32)==0){
+		    for (i=0;(i<32)&&(vidlist[i]>0)&&(vidlist[i]<4095);i++){
+			vi=find_vlan_index_by_vid(vidlist[i]);
+			if (vi>=0){
+			    swconfig.vlan_entry.bitmap[vi]=0;
+			    if (vidlist[i]>1){
+				swconfig.vlan_vid[vi]=0;
+			    }
+			}
+		    }
+		    rrcp_config_commit_vlan_to_switch();
+		}else{
+		    cli_print(cli, "%% ERROR: Invalid vlan list: '%s'",argv[0]);
+		    return CLI_ERROR;
+		}
+		return CLI_OK;
+	    }
+	}
 	if (strcmp(argv[0],"?")==0){
-	    cli_print(cli, "<CR>");
+	    cli_print(cli, "  <cr>");
+	    return CLI_ERROR;
 	}else{
 	    cli_print(cli, "%% Invalid input detected.");
+	    return CLI_ERROR;
 	}
     }else{
 	if (strcasecmp(command,"no vlan")==0) {
@@ -106,23 +177,46 @@ int cmd_config_vlan(struct cli_def *cli, char *command, char *argv[], int argc)
 	    swconfig.vlan.s.config.enable=0;
 	    swconfig.vlan.s.config.drop_untagged_frames=0;
 	    swconfig.vlan.s.config.ingress_filtering=0;
+	    rrcp_config_commit_vlan_to_switch();
 	}
-	if (strcasecmp(command,"vlan portbased")==0) {swconfig.vlan.s.config.dot1q=0; swconfig.vlan.s.config.enable=1;}
-	if (strcasecmp(command,"vlan dot1q")==0){
+	if (strcasecmp(command,"vlan portbased")==0) {
+	    int i,port,port_phys;
+	    cli_print(cli, "%% WARNING: Portbased VLANs are not fully supported in this software yet.");
+	    for(i=1;i<32;i++){
+	        swconfig.vlan_vid[i]=i+1;
+	    }
+	    for(port=1;port<=switchtypes[switchtype].num_ports;port++){
+	        port_phys=map_port_number_from_logical_to_physical(port);
+		swconfig.vlan.s.port_vlan_index[port_phys]=0;
+	    }
+	    swconfig.vlan_port_insert_vid.bitmap=0;
+	    swconfig.vlan.s.config.dot1q=0;
+	    swconfig.vlan.s.config.enable=1;
+	    rrcp_config_commit_vlan_to_switch();
+	}
+	if ((strcasecmp(command,"vlan dot1q")==0)||(strcasecmp(command,"vlan dot1q force")==0)){
 	    if (switchtypes[switchtype].chip_id!=rtl8316b){
-		cli_print(cli, "%% IEEE 802.1Q VLANs not supported properly on this hardware. Use 'force' to persevere");
-		return CLI_ERROR;
+		if (strcasecmp(command,"vlan dot1q force")==0){
+		    cli_print(cli, "%% WARNING: Enabled IEEE 802.1Q VLANs on hardware, that do not supported them properly.");
+		}else{
+		    cli_print(cli, "%% IEEE 802.1Q VLANs not supported properly on this hardware. Use 'force' to persevere.");
+		    return CLI_ERROR;
+		}
 	    }else{
+		int i,port,port_phys;
+		swconfig.vlan_vid[0]=1;
+		for(i=1;i<32;i++){
+		    swconfig.vlan_vid[i]=0;
+		}
+		for(port=1;port<=switchtypes[switchtype].num_ports;port++){
+		    port_phys=map_port_number_from_logical_to_physical(port);
+		    swconfig.vlan.s.port_vlan_index[port_phys]=0;
+		}
+		swconfig.vlan_port_insert_vid.bitmap=0;
 	        swconfig.vlan.s.config.dot1q=1;
 		swconfig.vlan.s.config.enable=1;
+		rrcp_config_commit_vlan_to_switch();
 	    }
-	}
-	if (strcasecmp(command,"vlan dot1q force")==0){
-	    if (switchtypes[switchtype].chip_id!=rtl8316b){
-		cli_print(cli, "%% WARNING: Enabled IEEE 802.1Q VLANs on hardware, that do not supported them properly");
-	    }
-	    swconfig.vlan.s.config.dot1q=1;
-	    swconfig.vlan.s.config.enable=1;
 	}
     }
     return CLI_OK;
@@ -132,7 +226,7 @@ int cmd_config_vlan_leaky(struct cli_def *cli, char *command, char *argv[], int 
 {
     if (argc>0){
 	if (strcmp(argv[0],"?")==0){
-	    cli_print(cli, "<CR>");
+	    cli_print(cli, "  <cr>");
 	}else{
 	    cli_print(cli, "%% Invalid input detected.");
 	}
@@ -150,7 +244,7 @@ int cmd_config_vlan_drop(struct cli_def *cli, char *command, char *argv[], int a
 {
     if (argc>0){
 	if (strcmp(argv[0],"?")==0){
-	    cli_print(cli, "<CR>");
+	    cli_print(cli, "  <cr>");
 	}else{
 	    cli_print(cli, "%% Invalid input detected.");
 	}
@@ -167,7 +261,7 @@ int cmd_config_qos(struct cli_def *cli, char *command, char *argv[], int argc)
 {
     if (argc>0){
 	if (strcmp(argv[0],"?")==0){
-	    cli_print(cli, "<CR>");
+	    cli_print(cli, "  <cr>");
 	}else{
 	    cli_print(cli, "%% Invalid input detected.");
 	}
@@ -177,6 +271,7 @@ int cmd_config_qos(struct cli_def *cli, char *command, char *argv[], int argc)
 	if (strcasecmp(command,"mls qos trust cos")==0) swconfig.qos_config.config.cos_enable=1;
 	if (strcasecmp(command,"no mls qos trust cos")==0) swconfig.qos_config.config.cos_enable=0;
 	if (strcasecmp(command,"no wrr-queue ratio")==0) swconfig.qos_config.config.wrr_ratio=3;
+	rtl83xx_setreg16(0x0400,swconfig.qos_config.raw);
     }
     return CLI_OK;
 }
@@ -198,7 +293,9 @@ int cmd_config_qos_wrr_queue_ratio(struct cli_def *cli, char *command, char *arg
 		    hit=1;
 		}
 	    }
-	    if (!hit){
+	    if (hit){
+		rtl83xx_setreg16(0x0400,swconfig.qos_config.raw);
+	    }else{
 		cli_print(cli, "%% Invalid input detected.");
 	    }
 	}
@@ -212,7 +309,7 @@ int cmd_config_flowcontrol(struct cli_def *cli, char *command, char *argv[], int
 {
     if (argc>0){
 	if (strcmp(argv[0],"?")==0){
-	    cli_print(cli, "<CR>");
+	    cli_print(cli, "  <cr>");
 	}else{
 	    cli_print(cli, "%% Invalid input detected.");
 	}
@@ -223,6 +320,8 @@ int cmd_config_flowcontrol(struct cli_def *cli, char *command, char *argv[], int
 	if (strcasecmp(command,"no flowcontrol backpressure")==0) swconfig.port_config_global.config.flow_backpressure_disable=1;
 	if (strcasecmp(command,"flowcontrol ondemand-disable")==0) swconfig.qos_config.config.flow_ondemand_disable=1;
 	if (strcasecmp(command,"no flowcontrol ondemand-disable")==0) swconfig.qos_config.config.flow_ondemand_disable=0;
+	rtl83xx_setreg16(0x0607,swconfig.port_config_global.raw);
+	rtl83xx_setreg16(0x0400,swconfig.qos_config.raw);
     }
     return CLI_OK;
 }
@@ -231,7 +330,7 @@ int cmd_config_stormcontrol(struct cli_def *cli, char *command, char *argv[], in
 {
     if (argc>0){
 	if (strcmp(argv[0],"?")==0){
-	    cli_print(cli, "<CR>");
+	    cli_print(cli, "  <cr>");
 	}else{
 	    cli_print(cli, "%% Invalid input detected.");
 	}
@@ -254,6 +353,7 @@ int cmd_config_stormcontrol(struct cli_def *cli, char *command, char *argv[], in
 	if (strcasecmp(command,"storm-control multicast")==0) {
 	    swconfig.port_config_global.config.storm_control_multicast_strict=1;
 	}
+	rtl83xx_setreg16(0x0607,swconfig.port_config_global.raw);
     }
     return CLI_OK;
 }
@@ -262,7 +362,7 @@ int cmd_config_spanning_tree(struct cli_def *cli, char *command, char *argv[], i
 {
     if (argc>0){
 	if (strcmp(argv[0],"?")==0){
-	    cli_print(cli, "<CR>");
+	    cli_print(cli, "  <cr>");
 	}else{
 	    cli_print(cli, "%% Invalid input detected.");
 	}
@@ -270,6 +370,20 @@ int cmd_config_spanning_tree(struct cli_def *cli, char *command, char *argv[], i
 	if (strcasecmp(command,"spanning-tree bpdufilter enable")==0) swconfig.alt_config.s.config.stp_filter=1;
 	if ((strcasecmp(command,"no spanning-tree bpdufilter enable")==0)||
 	    (strcasecmp(command,"spanning-tree bpdufilter disable")==0)) swconfig.alt_config.s.config.stp_filter=0;
+    }
+    return CLI_OK;
+}
+
+int cmd_config_end(struct cli_def *cli, char *command, char *argv[], int argc)
+{
+    if (argc>0){
+	if (strcmp(argv[0],"?")==0){
+	    cli_print(cli, "  <cr>");
+	}else{
+	    cli_print(cli, "%% Invalid input detected.");
+	}
+    }else{
+	cli_set_configmode(cli, MODE_EXEC, NULL);
     }
     return CLI_OK;
 }
@@ -287,6 +401,17 @@ void cmd_config_register_commands(struct cli_def *cli)
     c=cli_register_command(cli, NULL, "mac-address-table", NULL, PRIVILEGE_PRIVILEGED, MODE_CONFIG, "Configure the MAC address table");
     cli_register_command(cli, c, "aging-time", cmd_config_mac_aging, PRIVILEGE_PRIVILEGED, MODE_CONFIG, "Set MAC address table entry maximum age");
     
+    { // ip config
+	struct cli_command *ip,*ip_igmp,*no_ip,*no_ip_igmp;
+	ip=cli_register_command(cli, NULL, "ip", NULL, PRIVILEGE_PRIVILEGED, MODE_CONFIG, "Global IP configuration subcommands");
+	ip_igmp=cli_register_command(cli, ip, "igmp", NULL, PRIVILEGE_PRIVILEGED, MODE_CONFIG, "IGMP global configuration");
+	cli_register_command(cli, ip_igmp, "snooping", cmd_config_ip_igmp_snooping, PRIVILEGE_PRIVILEGED, MODE_CONFIG, "Global IGMP Snooping enable");
+
+	no_ip=cli_register_command(cli, no, "ip", NULL, PRIVILEGE_PRIVILEGED, MODE_CONFIG, "Global IP configuration subcommands");
+	no_ip_igmp=cli_register_command(cli, no_ip, "igmp", NULL, PRIVILEGE_PRIVILEGED, MODE_CONFIG, "IGMP global configuration");
+	cli_register_command(cli, no_ip_igmp, "snooping", cmd_config_ip_igmp_snooping, PRIVILEGE_PRIVILEGED, MODE_CONFIG, "Global IGMP Snooping disable");
+    }
+
     { // rrcp config
 	c=cli_register_command(cli, NULL, "rrcp", NULL, PRIVILEGE_PRIVILEGED, MODE_CONFIG, "Global RRCP configuration subcommand");
 	cli_register_command(cli, c, "enable", cmd_config_rrcp, PRIVILEGE_PRIVILEGED, MODE_CONFIG, "Enable RRCP");
@@ -302,13 +427,15 @@ void cmd_config_register_commands(struct cli_def *cli)
 	cli_register_command(cli, c3, "enable", cmd_config_rrcp, PRIVILEGE_PRIVILEGED, MODE_CONFIG, "Enable RRCP-based loop detection");
 	c3=cli_register_command(cli, c2, "loop-detect", NULL, PRIVILEGE_PRIVILEGED, MODE_CONFIG, "Global RRCP-based loop detection configuration subcommand");
 	cli_register_command(cli, c3, "enable", cmd_config_rrcp, PRIVILEGE_PRIVILEGED, MODE_CONFIG, "Enable RRCP-based loop detection");
+
+	cli_register_command(cli, c, "authkey", cmd_config_rrcp_authkey, PRIVILEGE_PRIVILEGED, MODE_CONFIG, "Set new RRCP Authentication key");
     }
 
     { // vlan config
 	struct cli_command *vlan,*no_vlan,*vlan_leaky,*no_vlan_leaky,*vlan_drop,*no_vlan_drop;
 
 	vlan=cli_register_command(cli, NULL, "vlan", NULL, PRIVILEGE_PRIVILEGED, MODE_CONFIG, "Global VLAN mode");
-	no_vlan=cli_register_command(cli, no, "vlan", cmd_config_vlan, PRIVILEGE_PRIVILEGED, MODE_CONFIG, "Disable VLAN support globally");
+	no_vlan=cli_register_command(cli, no, "vlan", cmd_config_vlan, PRIVILEGE_PRIVILEGED, MODE_CONFIG, "Vlan commands");
 	cli_register_command(cli, vlan, "portbased", cmd_config_vlan, PRIVILEGE_PRIVILEGED, MODE_CONFIG, "Enable port-based VLANs only");
 	c2=cli_register_command(cli, vlan, "dot1q", cmd_config_vlan, PRIVILEGE_PRIVILEGED, MODE_CONFIG, "Enable full IEEE 802.1Q tagged VLANs");
 	cli_register_command(cli, c2, "force", cmd_config_vlan, PRIVILEGE_PRIVILEGED, MODE_CONFIG, "Enable IEEE 802.1Q VLANs even on buggy hardware");
@@ -387,4 +514,6 @@ void cmd_config_register_commands(struct cli_def *cli)
 	c=cli_register_command(cli, no_spanning_tree, "bpdufilter", cmd_config_spanning_tree, PRIVILEGE_PRIVILEGED, MODE_CONFIG, "Don't send or receive BPDUs on this interface");
 	cli_register_command(cli, c, "enable", cmd_config_spanning_tree, PRIVILEGE_PRIVILEGED, MODE_CONFIG, "Disable BPDU filtering for this interface");
     }
+    
+    cli_register_command(cli, NULL, "end", cmd_config_end, PRIVILEGE_PRIVILEGED, MODE_CONFIG, "Exit from configure mode");
 }

@@ -26,10 +26,12 @@
 #include <string.h>
 #include <stdlib.h>
 #include "../lib/libcli.h"
+#include "rrcp_lib.h"
 #include "rrcp_io.h"
 #include "rrcp_config.h"
 #include "rrcp_switches.h"
 #include "rrcp_cli_cmd_show.h"
+#include "rrcp_cli_cmd_config.h"
 
 #define MODE_CONFIG_INT		10
 
@@ -70,7 +72,7 @@ int cmd_config_int_shutdown(struct cli_def *cli, char *command, char *argv[], in
 {
     if (argc>0){
 	if (strcmp(argv[0],"?")==0){
-	    cli_print(cli, "<CR>");
+	    cli_print(cli, "  <cr>");
 	}else{
 	    cli_print(cli, "%% Invalid input detected.");
 	}
@@ -92,24 +94,124 @@ int cmd_config_int_switchport(struct cli_def *cli, char *command, char *argv[], 
 {
     if (argc>0){
 	if (strcmp(argv[0],"?")==0){
-	    cli_print(cli, "<CR>");
+	    cli_print(cli, "  <cr>");
 	}else{
 	    cli_print(cli, "%% Invalid input detected.");
 	}
     }else{
-	int port,port_phys;
+	int i,port,port_phys;
 	port=atoi(strrchr(cli->modestring,'/')+1);
 	port_phys=map_port_number_from_logical_to_physical(port);
-	if (strcasecmp(command,"switchport mode trunk")==0)
+	if (strcasecmp(command,"switchport mode trunk")==0){
+	    for(i=0;i<32;i++){
+                swconfig.vlan_entry.bitmap[i]&=~(1<<port_phys);
+            }
 	    swconfig.vlan_port_insert_vid.bitmap |= (1<<port_phys);
-	else if (strcasecmp(command,"switchport mode access")==0)
+	    rrcp_config_commit_vlan_to_switch();
+	}else if (strcasecmp(command,"switchport mode access")==0){
+	    for(i=0;i<32;i++){
+                swconfig.vlan_entry.bitmap[i]&=~(1<<port_phys);
+            }
 	    swconfig.vlan_port_insert_vid.bitmap &= (~(1<<port_phys));
-	else
+	    rrcp_config_commit_vlan_to_switch();
+	}else{
 	    cli_print(cli, "Internal error on command '%s'",command);
+	}
 	return CLI_OK;
     }
     cli_print(cli, "%% Not implemented yet.");
     return CLI_OK;
+}
+
+int cmd_config_int_switchport_access_vlan(struct cli_def *cli, char *command, char *argv[], int argc)
+{
+    if (argc>0){
+	if (strcmp(argv[0],"?")==0){
+	    cli_print(cli, "  <1-4094>  VLAN ID of the VLAN when this port is in access mode");
+	}else{
+	    int port,port_phys;
+	    port=atoi(strrchr(cli->modestring,'/')+1);
+	    port_phys=map_port_number_from_logical_to_physical(port);
+	    int vi=0;
+
+	    vi=find_or_create_vlan_index_by_vid(atoi(argv[0]));
+	    if (vi>=0){
+		swconfig.vlan.s.port_vlan_index[port_phys]=vi;
+		rrcp_config_commit_vlan_to_switch();
+	    }else{
+		cli_print(cli, "%% Too many VLANs: This switch only supports 32.");
+	    }
+	}
+	return CLI_OK;
+    }else{
+	cli_print(cli, "%% Invalid input detected.");
+	return CLI_OK;
+    }
+}
+
+int cmd_config_int_switchport_trunk_native_vlan(struct cli_def *cli, char *command, char *argv[], int argc)
+{
+    if (argc>0){
+	if (strcmp(argv[0],"?")==0){
+	    cli_print(cli, "  <1-4094>  VLAN ID of the native VLAN when this port is in trunking mode");
+	}else{
+	    int port,port_phys;
+	    port=atoi(strrchr(cli->modestring,'/')+1);
+	    port_phys=map_port_number_from_logical_to_physical(port);
+	    int vi=0;
+
+	    vi=find_or_create_vlan_index_by_vid(atoi(argv[0]));
+	    if (vi>=0){
+		swconfig.vlan.s.port_vlan_index[port_phys]=vi;
+		rrcp_config_commit_vlan_to_switch();
+	    }else{
+		cli_print(cli, "%% Too many VLANs: This switch only supports 32.");
+		return CLI_ERROR;
+	    }
+	}
+	return CLI_OK;
+    }else{
+	cli_print(cli, "%% Invalid input detected.");
+	return CLI_OK;
+    }
+}
+
+int cmd_config_int_switchport_trunk_allowed_vlan(struct cli_def *cli, char *command, char *argv[], int argc)
+{
+    if (argc>0){
+	if (strcmp(argv[0],"?")==0){
+	    cli_print(cli, "  WORD    VLAN IDs of the allowed VLANs when this port is in trunking mode");
+	    cli_print(cli, "  all     all VLANs");
+	    cli_print(cli, "  none    no VLANs");
+	}else{
+	    int port,port_phys;
+	    port=atoi(strrchr(cli->modestring,'/')+1);
+	    port_phys=map_port_number_from_logical_to_physical(port);
+	    int vidlist[32];
+	    int i,vi;
+
+	    if (str_portlist_to_array_by_value(argv[0],vidlist,32)==0){
+		for (i=0;(i<32)&&(vidlist[i]>0)&&(vidlist[i]<4095);i++){
+		    vi=find_or_create_vlan_index_by_vid(vidlist[i]);
+//		    printf("%d - %d - %d\n",i,vidlist[i],vi);
+		    if (vi>=0){
+			swconfig.vlan_entry.bitmap[vi]|=(1<<port_phys);
+		    }else{
+			cli_print(cli, "%% Too many VLANs: This swith only supports 32.");
+			return CLI_ERROR;
+		    }
+		}
+		rrcp_config_commit_vlan_to_switch();
+	    }else{
+		cli_print(cli, "%% Invalid input detected: Cannot recognize port list.");
+		return CLI_ERROR;
+	    }
+	}
+	return CLI_OK;
+    }else{
+	cli_print(cli, "%% Invalid input detected: Specify port list.");
+	return CLI_ERROR;
+    }
 }
 
 int cmd_rate_limit(struct cli_def *cli, char *command, char *argv[], int argc)
@@ -150,7 +252,7 @@ int cmd_config_int_mac_learning(struct cli_def *cli, char *command, char *argv[]
 {
     if (argc>0){
 	if (strcmp(argv[0],"?")==0){
-	    cli_print(cli, "<CR>");
+	    cli_print(cli, "  <cr>");
 	}else{
 	    cli_print(cli, "%% Invalid input detected.");
 	}
@@ -173,7 +275,7 @@ int cmd_config_int_rrcp(struct cli_def *cli, char *command, char *argv[], int ar
 {
     if (argc>0){
 	if (strcmp(argv[0],"?")==0){
-	    cli_print(cli, "<CR>");
+	    cli_print(cli, "  <cr>");
 	}else{
 	    cli_print(cli, "%% Invalid input detected.");
 	}
@@ -209,6 +311,8 @@ int cmd_config_int_mls(struct cli_def *cli, char *command, char *argv[], int arg
 	    cli_print(cli, "%% Invalid input detected.");
 	    return CLI_ERROR;
 	}
+	rtl83xx_setreg16(0x0401,swconfig.qos_port_priority.raw[0]);
+	rtl83xx_setreg16(0x0402,swconfig.qos_port_priority.raw[1]);
     }else{
 	cli_print(cli, "%% Specify new CoS value (0 or 7)");
     }
@@ -224,7 +328,7 @@ int cmd_config_int_speed_duplex(struct cli_def *cli, char *command, char *argv[]
 
     if (argc>0){
 	if (strcmp(argv[0],"?")==0){
-	    cli_print(cli, "<CR>");
+	    cli_print(cli, "  <cr>");
 	}else{
 	    cli_print(cli, "%% Invalid input detected.");
 	}
@@ -325,12 +429,12 @@ void cmd_config_int_register_commands(struct cli_def *cli)
 	cli_register_command(cli, switchport_mode, "access", cmd_config_int_switchport, PRIVILEGE_PRIVILEGED, MODE_CONFIG_INT, "Set trunking mode to ACCESS unconditionally");
 	cli_register_command(cli, switchport_mode, "trunk", cmd_config_int_switchport, PRIVILEGE_PRIVILEGED, MODE_CONFIG_INT, "Set trunking mode to TRUNK unconditionally");  
 	switchport_access=cli_register_command(cli, switchport, "access", NULL, PRIVILEGE_PRIVILEGED, MODE_CONFIG_INT, "Set access mode characteristics of the interface");
-	cli_register_command(cli, switchport_access, "vlan", cmd_config_int_switchport, PRIVILEGE_PRIVILEGED, MODE_CONFIG_INT, "Set VLAN when interface is in access mode");
+	cli_register_command(cli, switchport_access, "vlan", cmd_config_int_switchport_access_vlan, PRIVILEGE_PRIVILEGED, MODE_CONFIG_INT, "Set VLAN when interface is in access mode");
 	switchport_trunk=cli_register_command(cli, switchport, "trunk", NULL, PRIVILEGE_PRIVILEGED, MODE_CONFIG_INT, "Set trunking characteristics of the interface");
 	switchport_trunk_allowed=cli_register_command(cli, switchport_trunk, "allowed", NULL, PRIVILEGE_PRIVILEGED, MODE_CONFIG_INT, "Set allowed VLAN characteristics when interface is in trunking mode");
-	cli_register_command(cli, switchport_trunk_allowed, "vlan", cmd_config_int_switchport, PRIVILEGE_PRIVILEGED, MODE_CONFIG_INT, "Set allowed VLANs when interface is in trunking mode");
+	cli_register_command(cli, switchport_trunk_allowed, "vlan", cmd_config_int_switchport_trunk_allowed_vlan, PRIVILEGE_PRIVILEGED, MODE_CONFIG_INT, "Set allowed VLANs when interface is in trunking mode");
 	switchport_trunk_native=cli_register_command(cli, switchport_trunk, "native", NULL, PRIVILEGE_PRIVILEGED, MODE_CONFIG_INT, "Set trunking native characteristics when interface is in trunking mode");
-	cli_register_command(cli, switchport_trunk_native, "vlan", cmd_config_int_switchport, PRIVILEGE_PRIVILEGED, MODE_CONFIG_INT, "Set native VLAN when interface is in trunking mode");
+	cli_register_command(cli, switchport_trunk_native, "vlan", cmd_config_int_switchport_trunk_native_vlan, PRIVILEGE_PRIVILEGED, MODE_CONFIG_INT, "Set native VLAN when interface is in trunking mode");
     }
     {
 	struct cli_command *rate_limit;
@@ -376,4 +480,5 @@ void cmd_config_int_register_commands(struct cli_def *cli)
 	cli_register_command(cli, duplex, "full", cmd_config_int_speed_duplex, PRIVILEGE_PRIVILEGED, MODE_CONFIG_INT, "Force full duplex operation");
 	cli_register_command(cli, duplex, "half", cmd_config_int_speed_duplex, PRIVILEGE_PRIVILEGED, MODE_CONFIG_INT, "Force half-duplex operation");
     }
+    cli_register_command(cli, NULL, "end", cmd_config_end, PRIVILEGE_PRIVILEGED, MODE_CONFIG_INT, "Exit from configure mode");
 }

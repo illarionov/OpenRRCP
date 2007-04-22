@@ -31,7 +31,10 @@
 #include <getopt.h>
 #include <sys/time.h>
 #include <sys/types.h>
+#include <sys/stat.h>
 #include <sys/socket.h>
+#include <fcntl.h>
+#include <termios.h>
 
 #ifndef __linux__
 #include <netinet/in.h>
@@ -47,8 +50,7 @@
 #include "rrcp_cli_cmd_show.h"
 #include "rrcp_cli_cmd_config.h"
 #include "rrcp_cli_cmd_config_int.h"
-
-#define CLITEST_PORT		8000
+#include "rrcp_cli.h"
 
 int myPid = 0;
 
@@ -93,9 +95,17 @@ int main(int argc, char *argv[])
     int s, x;
     struct sockaddr_in servaddr;
     int on = 1;
+    int switchtype_force,tcp_port;
+    int authkey_tmp=-1;
 
     cli = cli_init();
-    cli_set_banner(cli, "OpenRRCP CLI Version 0.1.91");
+    {
+	char *p;
+	p=malloc(512);
+	sprintf(p,"OpenRRCP CLI Version %s",RRCP_CLI_VERSION);
+	cli_set_banner(cli, p);
+	free(p);
+    }
     cli_set_hostname(cli, "rrcpswitch");
 
     cmd_show_register_commands(cli);
@@ -120,40 +130,29 @@ int main(int argc, char *argv[])
 	    }
     }
 */
-    if ((s = socket(AF_INET, SOCK_STREAM, 0)) < 0)
-    {
-	perror("socket");
-	return 1;
-    }
-    setsockopt(s, SOL_SOCKET, SO_REUSEADDR, &on, sizeof(on));
-
-    memset(&servaddr, 0, sizeof(servaddr));
-    servaddr.sin_family = AF_INET;
-    servaddr.sin_addr.s_addr = htonl(INADDR_ANY);
-    servaddr.sin_port = htons(CLITEST_PORT);
-    if (bind(s, (struct sockaddr *)&servaddr, sizeof(servaddr)) < 0)
-    {
-	perror("bind");
-	return 1;
-    }
-
-    if (listen(s, 50) < 0)
-    {
-	perror("listen");
-	return 1;
-    }
 
     switchtype=-1;
+    switchtype_force=0;
+    tcp_port=0;
     while(1) {
 	char c;
-	c = getopt_long (argc, argv, "t:",
+	c = getopt_long (argc, argv, "k:t:fp:",
                         NULL, NULL);
 	if (c == -1)
     	    break;
 
         switch (c) {
+    	    case 'k':
+		sscanf(optarg,"%04x",&authkey_tmp);
+    		break;
     	    case 't':
 		switchtype=atoi(optarg);
+    		break;
+    	    case 'f':
+		switchtype_force=1;
+    		break;
+    	    case 'p':
+		tcp_port=atoi(optarg);
     		break;
 	}
     }
@@ -170,8 +169,12 @@ int main(int argc, char *argv[])
 	}
 	optind++;
     }else{
-	printf("Usage: rrcp_cli [-t <switch_type>] <if-name|xx:xx:xx:xx:xx:xx@if-name>\n");
-	printf(" supported <switch_type>'s are:\n");
+	printf("\nUsage: rrcp_cli [options] <xx:xx:xx:xx:xx:xx@if-name>\n");
+	printf(" -k <key>     RRCP Authentication Key (hex, 0000-ffff)\n");
+	printf(" -p <port>    go to background and listen on specified TCP port\n");
+	printf(" -t <number>  specify switch type\n");
+	printf(" -f           force switch_type (be careful!)\n");
+	printf("Supported switch types are:\n");
 	{
 	    int i;
 	    for (i=0;i<switchtype_n;i++){
@@ -188,6 +191,9 @@ int main(int argc, char *argv[])
 
 
     engage_timeout(10);
+    if (authkey_tmp>=0){
+	authkey=authkey_tmp;
+    }
     rtl83xx_prepare();
 
     if (switchtype==-1){
@@ -196,7 +202,7 @@ int main(int argc, char *argv[])
 	    switchtypes[switchtype].vendor,
 	    switchtypes[switchtype].model);
     }else{
-	if(switchtypes[switchtype].chip_id!=rrcp_switch_autodetect_chip()){
+	if(switchtypes[switchtype].chip_id!=rrcp_switch_autodetect_chip() && !switchtype_force){
 	    printf("%s: ERROR - Chip mismatch\n"
 		    "Specified switch: %s %s\n"
 		    "Specified chip: %s\n"
@@ -220,14 +226,50 @@ int main(int argc, char *argv[])
     printf("Fetching current config from switch\n");
     rrcp_config_read_from_switch();
     myPid = 0; //clear timeout handler
-    
-    printf("Listening on port %d\n", CLITEST_PORT);
-    while ((x = accept(s, NULL, 0)))
-    {
-	cli_loop(cli, x);
-	close(x);
-    }
 
+
+    if (tcp_port==0){
+	struct termios ttyarg, intrm ;           /* arguments for termios */
+	int n;
+
+	x=0;
+	tcgetattr( x , &intrm ) ;                /* get stdin arguments (SAVE) */
+	ttyarg = intrm ;                         /* saved original configuration */
+	ttyarg.c_iflag = 0 ;                     /* clear iflag of all input */
+	ttyarg.c_lflag = ISIG ;                  /* clear lflag of all processing, except for signals */
+	n = tcsetattr( x , TCSANOW , &ttyarg ) ; /* set changed tty arguments */
+	cli_set_privilege(cli, PRIVILEGE_PRIVILEGED);
+	cli_loop(cli, x);
+	system("reset"); //reset terminal on exit. FIXME: need to find more straight-forward solution to do this.
+    }else{
+	if (fork()==0){
+	    if ((s = socket(AF_INET, SOCK_STREAM, 0)) < 0){
+		perror("socket");
+		return 1;
+	    }
+	    setsockopt(s, SOL_SOCKET, SO_REUSEADDR, &on, sizeof(on));
+
+	    memset(&servaddr, 0, sizeof(servaddr));
+	    servaddr.sin_family = AF_INET;
+	    servaddr.sin_addr.s_addr = htonl(INADDR_ANY);
+	    servaddr.sin_port = htons(tcp_port);
+	    if (bind(s, (struct sockaddr *)&servaddr, sizeof(servaddr)) < 0){
+		perror("bind");
+		return 1;
+	    }
+
+	    if (listen(s, 50) < 0){
+		perror("listen");
+		return 1;
+	    }
+
+	    printf("Listening on port %d\n", tcp_port);
+	    while ((x = accept(s, NULL, 0))){
+		cli_loop(cli, x);
+		close(x);
+	    }
+	}
+    }
     cli_done(cli);
     return 0;
 }

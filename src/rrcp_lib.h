@@ -1,5 +1,5 @@
 /*
-    This file is part of OpenRRCP
+    This file is part of openrrcp
 
     OpenRRCP is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -22,4 +22,9 @@
     This would be appreciated, however not required.
 */
 
-#define RRCP_CLI_VERSION "0.1.94.beta1"
+int str_portlist_to_array(char *list,unsigned short int *arr,unsigned int arrlen);
+
+int str_portlist_to_array_by_value(char *list,int *arr,unsigned int arrlen);
+
+
+

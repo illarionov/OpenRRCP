@@ -441,6 +441,47 @@ void rtl83xx_scan(int verbose){
    if (hidden_mac != NULL) free(hidden_mac);
 }
 
+int rrcp_io_probe_switch_for_facing_switch_port(unsigned char *switch_mac_address, int *facing_switch_port_phys){
+    typedef struct sw_reply SW_REPLY;
+    int len = 0;
+    int i;
+    struct rrcp_packet_t pkt;
+    struct rrcp_helloreply_packet_t pktr;
+
+    memcpy(pkt.ether_dhost,switch_mac_address,6);
+    memcpy(pkt.ether_shost,my_mac,6);
+    pkt.ether_type=htons(0x8899);
+
+    /* scan with Hello packet */
+    pkt.rrcp_proto=0x01;
+    pkt.rrcp_opcode=0x00;
+    pkt.rrcp_isreply=0;
+    pkt.rrcp_authkey=htons(authkey);
+
+    sock_send(&pkt, sizeof(pkt));
+
+    for (i=0;i<10;i++){
+	usleep(10);
+	memset(&pktr,0,sizeof(pktr));
+	len=sock_rec_(&pktr, sizeof(pktr),5000);
+	if (len >14 &&
+    	    (memcmp(pktr.ether_dhost,my_mac,6)==0)&&
+	    pktr.ether_type==htons(0x8899) &&
+	    pktr.rrcp_proto==0x01 &&
+	    pktr.rrcp_opcode==0x00 &&
+	    pktr.rrcp_isreply==1 &&
+	    pktr.rrcp_authkey==htons(authkey)){
+	    *facing_switch_port_phys=(int)pktr.rrcp_downlink_port;
+	    break;
+	}
+    }
+    if (i>=10){
+	*facing_switch_port_phys=-1;
+	return -1;
+    }
+    return 0;
+}
+
 uint32_t rtl83xx_readreg32(uint16_t regno){
     int len = 0;
     struct rrcp_packet_t pkt,pktr;

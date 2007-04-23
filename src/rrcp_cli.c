@@ -163,6 +163,7 @@ int main(int argc, char *argv[])
 	if (sscanf(argv[optind], "%x:%x:%x:%x:%x:%x@%s",x,x+1,x+2,x+3,x+4,x+5,ifname)==7){
 	    for (i=0;i<6;i++){
 		dest_mac[i]=(unsigned char)x[i];
+		swconfig.mac_address[i]=(unsigned char)x[i];
 	    }
 	}else{
 	    strcpy(ifname,argv[optind]);

@@ -35,9 +35,11 @@
     } t_eeprom_type;
 
     struct t_swconfig {
+	unsigned char mac_address[6];
 	unsigned int switch_type;
 	unsigned int chip_type;
 	t_eeprom_type eeprom_type;
+	int facing_switch_port_phys;
 	union {//0x0200
 	    struct  t_rrcp_config{
 		uint16_t

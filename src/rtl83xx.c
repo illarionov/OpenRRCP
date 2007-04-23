@@ -264,58 +264,39 @@ void print_vlan_status(int show_vid){
     }
 }
 
-void do_vlan_enable_vlan(int is_8021q, int root_port, int vid_base){
-    int i,port,vlan,port_phys,root_port_phys;
-    unsigned short vlan_status;
+void do_vlan_enable_vlan(int is_8021q){
+    int i,port,vlan;
     union t_vlan_port_vlan vlan_port_vlan;
     union t_vlan_port_output_tag vlan_port_output_tag;
     union t_vlan_entry vlan_entry;
     unsigned short vlan_vid[32];
     union t_vlan_port_insert_vid vlan_port_insert_vid;
 
-    //fill-up local data structures
-    if (is_8021q){
-	vlan_status=(rtl83xx_readreg32(0x030b)|1)|(1<<4);
-    }else{
-	vlan_status=(rtl83xx_readreg32(0x030b)|1)&~(1<<4);
-    }
-
-    if (root_port < 0){
-      rtl83xx_setreg16reg16(0x030b,vlan_status);
-      return;
-    }
-
     vlan_port_output_tag.bitmap=0;
     vlan_port_insert_vid.bitmap=0;
-    for(port=1;port<=switchtypes[switchtype].num_ports;port++){
-    	port_phys=map_port_number_from_logical_to_physical(port);
-	if (port==root_port){
-	    vlan_port_vlan.index[port_phys]=0;
-	    vlan_port_output_tag.bitmap|=3<<port_phys*2;
-	    vlan_port_insert_vid.bitmap|=1<<port_phys;
-	}else{
-	    vlan_port_vlan.index[port_phys]=(unsigned char)port;
-	}
+
+    for(port=0;port<switchtypes[switchtype].num_ports;port++){
+	vlan_port_vlan.index[port]=(uint16_t)port;
+	vlan_port_output_tag.bitmap|=3<<port*2;
+//	vlan_port_insert_vid.bitmap|=(is_8021q)?1<<port:0;
+	vlan_port_insert_vid.bitmap|=0;
     }
 
-    root_port_phys=map_port_number_from_logical_to_physical(root_port);
     memset(&vlan_entry,0,sizeof(vlan_entry));
     memset(&vlan_vid,0,sizeof(vlan_vid));
-    if (is_8021q){
-	vlan_entry.bitmap[0]=0;
-    }else{
-	vlan_entry.bitmap[0]=0xffffffff>>(32-switchtypes[switchtype].num_ports);
-    }
-    for(vlan=1;vlan<=switchtypes[switchtype].num_ports;vlan++){
-	if (vlan!=root_port){
-	    port_phys=map_port_number_from_logical_to_physical(vlan);
-	    vlan_entry.bitmap[vlan]=(1<<port_phys)|(1<<root_port_phys);
-	    vlan_vid[vlan]=vid_base+vlan;
-	}
+    for(vlan=0;vlan<switchtypes[switchtype].num_ports;vlan++){
+	if ( (vlan!=(switchtypes[switchtype].num_ports-2)) &&
+             (vlan!=(switchtypes[switchtype].num_ports-1)) ) {
+	    vlan_entry.bitmap[vlan]=(1<<vlan)|(1<<(switchtypes[switchtype].num_ports-2))|(1<<(switchtypes[switchtype].num_ports-1));
+//	    vlan_vid[vlan]=(is_8021q)?vid_base+vlan:0;
+	    vlan_vid[vlan]=0;
+	}else{
+//	    vlan_entry.bitmap[vlan]=(is_8021q)?0:0xffffffff>>(32-switchtypes[switchtype].num_ports);
+	    vlan_entry.bitmap[vlan]=0xffffffff>>(32-switchtypes[switchtype].num_ports);
+        }
     }
 
     //write all relevant config to switch from our data structures    
-    rtl83xx_setreg16reg16(0x030b,vlan_status);
     for(i=0;i<13;i++){
 	rtl83xx_setreg16reg16(0x030c+i,vlan_port_vlan.raw[i]);
     }
@@ -331,12 +312,30 @@ void do_vlan_enable_vlan(int is_8021q, int root_port, int vid_base){
     rtl83xx_setreg16(0x037e,vlan_port_insert_vid.raw[1]);
 }
 
-void do_vlan_disable(){
-
+void do_vlan(int mode){
   swconfig.vlan.raw[0]=rtl83xx_readreg16(0x030b);
-  swconfig.vlan.s.config.enable=0;
-  if (swconfig.vlan.s.config.dot1q) swconfig.vlan.s.config.dot1q=0;
+  switch (mode){
+    case 1: // portbased
+      swconfig.vlan.s.config.enable=1;
+      swconfig.vlan.s.config.dot1q=0;
+      break;
+    case 2: // .1q
+      swconfig.vlan.s.config.enable=1;
+      swconfig.vlan.s.config.dot1q=1;
+      break;
+    default: // disable
+      swconfig.vlan.s.config.enable=0;
+      swconfig.vlan.s.config.dot1q=0;
+  }
   rtl83xx_setreg16(0x030b,swconfig.vlan.raw[0]);
+}
+
+void do_vlan_tmpl(int mode){
+ if (mode) {
+   do_vlan(mode);
+   do_vlan_enable_vlan(mode-1);
+ }
+ else printf("Under construction\n");
 }
 
 void do_write_memory(){
@@ -430,7 +429,10 @@ int compare_command(char *argv, char **command_list){
 
  do{
   if (strlen(argv) > strlen(command_list[i])) continue;
-  if (strstr(command_list[i],argv)==command_list[i]) {res=i; count++;}
+  if (strstr(command_list[i],argv)==command_list[i]) {
+   if (strcmp(argv,command_list[i])==0) {return(i);}
+   res=i; count++;
+  }
  }while (strlen(command_list[i++]));
  if (count > 1){
    printf("Ambiguous command: \"%s\"\n",argv);
@@ -501,9 +503,29 @@ void do_loopdetect(int state){
     rtl83xx_setreg16(0x0200,swconfig.rrcp_config.raw);
 }
 
-void do_broadcast_storm_control(int state){
+void do_storm_control(int mode,int state){
     swconfig.port_config_global.raw=rtl83xx_readreg16(0x0607);
-    swconfig.port_config_global.config.storm_control_broadcast_disable=~(state&0x1);
+    if (mode) { // broadcast
+      switch (state){ 
+        case 1: // relaxed
+              swconfig.port_config_global.config.storm_control_broadcast_disable=0;
+              swconfig.port_config_global.config.storm_control_broadcast_strict=0;
+              break;
+        case 2: // strict
+              swconfig.port_config_global.config.storm_control_broadcast_disable=0;
+              swconfig.port_config_global.config.storm_control_broadcast_strict=1;
+              break;
+        default: // off
+              swconfig.port_config_global.config.storm_control_broadcast_disable=1;
+              swconfig.port_config_global.config.storm_control_broadcast_strict=0;
+      }
+    }else{ // multicast
+      if (state){ 
+        swconfig.port_config_global.config.storm_control_multicast_strict=1;
+      }else{
+        swconfig.port_config_global.config.storm_control_multicast_strict=0;
+      }
+    } 
     rtl83xx_setreg16(0x0607,swconfig.port_config_global.raw);
 }
 
@@ -671,6 +693,30 @@ void do_alt_config(mode){
   rtl83xx_setreg16(0x0300,swconfig.alt_config.raw);
 }
 
+void do_glob_flowctrl(int mode, int state){
+ /*
+   mode: 0 - dot3x, 1 - backpressure, 3 - ondemand
+   state: 0 - no, 1 - yes
+ */
+ if (mode < 2) swconfig.port_config_global.raw=rtl83xx_readreg16(0x0607);
+ else swconfig.qos_config.raw=rtl83xx_readreg16(0x0400);
+ switch (mode){
+       case 0:
+              swconfig.port_config_global.config.flow_dot3x_disable=(!state)&0x1;
+              break;
+       case 1:
+              swconfig.port_config_global.config.flow_backpressure_disable=(!state)&0x1;
+              break;
+       case 2:
+              swconfig.qos_config.config.flow_ondemand_disable=state&0x1;
+              break;
+       default:
+              return;
+ }
+ if (mode < 2) rtl83xx_setreg16(0x0607,swconfig.port_config_global.raw);
+ else rtl83xx_setreg16(0x0400,swconfig.qos_config.raw);
+}
+
 void print_allow_command(char **command_list){
  int i=0;
 
@@ -746,6 +792,7 @@ void print_usage(void){
 	printf(" show running-config          - show current switch config\n");
 	printf(" show interface [<list ports>]- print link status for ports\n");
 	printf(" show interface [<list ports>] summary - print port rx/tx counters\n");
+	printf(" show vlan [vid <id>]         - show low-level vlan confg\n");
 	printf(" scan [verbose]               - scan network for rrcp-enabled switches\n");
 	printf(" reboot [soft|hard]           - initiate switch reboot\n");
 	printf(" config interface [<list ports>] ... - port(s) configuration\n");
@@ -756,20 +803,24 @@ void print_usage(void){
 	printf(" --\"\"-- mac-address learning enable|disable - enable/disable MAC-learning on port(s)\n");
 	printf(" --\"\"-- rrcp enable|disable - enable/disable rrcp on specified ports\n");
 	printf(" --\"\"-- mls qos cos 0|7 - set port priority\n");
-	printf(" --\"\"-- rrcp enable|disable - global rrcp enable|disable\n");
-	printf(" --\"\"-- rrcp echo enable|disable - rrcp echo (REP) enable|disable\n");
-	printf(" --\"\"-- rrcp loop-detect enable|disable - network loop detect enable|disable\n"); 
-        printf(" --\"\"-- rrcp authkey <hex-value> - set new authkey\n"); 
-	printf(" --\"\"-- mac-address-table aging-time|drop-unknown <arg>  - address lookup table control\n");
-//	printf(" vlan status                  - show low-level vlan confg\n");
-//	printf(" vlan enable_hvlan [<port>]   - configure switch as home-vlan tree with specified uplink port\n");
-//	printf(" vlan enable_8021q [<port>]   - configure switch as IEEE 802.1Q vlan tree with specified uplink port\n");
-//	printf(" vlan disable               - disable all VLAN support\n");
-//	printf(" bcast-storm-ctrl enable|disable   - broadcast storm control on/off\n"); 
+	printf(" config rrcp enable|disable - global rrcp enable|disable\n");
+	printf(" config rrcp echo enable|disable - rrcp echo (REP) enable|disable\n");
+	printf(" config rrcp loop-detect enable|disable - network loop detect enable|disable\n"); 
+        printf(" config rrcp authkey <hex-value> - set new authkey\n"); 
+	printf(" config vlan disable - disable all VLAN support\n");
+	printf(" config vlan mode portbased|dot1q - enable specified VLAN support\n");
+	printf(" config vlan template-load portbased|dot1qtree - load specified template\n");
+	printf(" config mac-address <mac> - set <mac> as new switch MAC address and reboots\n");
+	printf(" config mac-address-table aging-time|drop-unknown <arg>  - address lookup table control\n");
+        printf(" config flowcontrol dot3x enable|disable - globally disable full duplex flow control (802.3x pause)\n");
+        printf(" config flowcontrol backpressure enable|disable - globally disable/enable half duplex back pressure ability\n");
+        printf(" config flowcontrol ondemand-disable enable|disable - disable/enable flow control ability auto turn off for QoS\n");
+	printf(" config [no] storm-control broadcast relaxed|strict - broadcast storm control\n"); 
+	printf(" config [no] storm-control multicast - multicast storm control\n"); 
+        printf(" config [no] monitor [input|output] source interface <list ports> destination interface <port>\n");
 	printf(" ping                         - test if switch is responding\n");
 	printf(" write memory                 - save current config to EEPROM\n");
 	printf(" write defaults               - save to EEPROM chip-default values\n");
-	printf(" mac-address <mac>            - set <mac> as new switch MAC address and reboots\n");
         return;
 }
 
@@ -778,20 +829,24 @@ int main(int argc, char **argv){
     unsigned int ak;
     int i;
     char *p;
-//    int root_port=-1;
     int media_speed=0;
     int direction=0; 
     int bandw=0;
     int shift=0;
-//    int negate=0;
     int subcmd=0;
     int cmd;
     int vid=-1;
     int duplex=0;
+    int negate=0;
+    int t1=0;
+    int t2=0;
+    int exists_source=0;
+    int exists_destination=0;
+    int dest_port=0;
     unsigned short int *p_port_list=NULL;
     unsigned short int port_list[26];
     char *ena_disa[]={"disable","enable",""};
-    char *cmd_level_1[]={"show", "config", "scan", "reload", "reboot", "write", "ping", "mac-address",""}; 
+    char *cmd_level_1[]={"show","config","scan","reload","reboot","write","ping",""}; 
     char *show_sub_cmd[]={"running-config","startup-config","interface","vlan",""};
     char *scan_sub_cmd[]={"verbose",""};
     char *show_sub_cmd_l2[]={"full","verbose",""};
@@ -799,7 +854,7 @@ int main(int argc, char **argv){
     char *show_sub_cmd_l4[]={"id",""};
     char *reset_sub_cmd[]={"soft","hard",""};
     char *write_sub_cmd[]={"memory","eeprom","defaults",""};
-    char *config_sub_cmd_l1[]={"interface","rrcp","mac-address-table",""};
+    char *config_sub_cmd_l1[]={"interface","rrcp","vlan","mac-address","mac-address-table","flowcontrol","storm-control","monitor",""};
     char *config_intf_sub_cmd_l1[]={"no","shutdown","speed","duplex","rate-limit","mac-address","rrcp","mls","flow-control",""};
     char *config_duplex[]={"half","full",""};
     char *config_rate[]={"100m","128k","256k","512k","1m","2m","4m","8m","input","output",""};
@@ -810,6 +865,13 @@ int main(int argc, char **argv){
     char *config_alt[]={"aging-time","unknown-destination",""};
     char *config_alt_time[]={"0","12","300",""};
     char *config_alt_dest[]={"drop","pass",""};
+    char *config_vlan[]={"disable","transparent","clear","mode","template-load",""};
+    char *config_vlan_mode[]={"portbased","dot1q",""};
+    char *config_vlan_tmpl[]={"portbased","dot1qtree",""};
+    char *config_flowc[]={"dot3x","backpressure","ondemand-disable",""};
+    char *config_storm[]={"broadcast","multicast",""};
+    char *config_storm_br[]={"relaxed","strict",""};
+    char *config_monitor[]={"interface","source","destination","input","output",""};
 
     if (argc<3){
         print_usage();
@@ -920,6 +982,10 @@ int main(int argc, char **argv){
                 }
          case 1: //config
                 check_argc(argc,2+shift,NULL,&config_sub_cmd_l1[0]);
+                if (strcmp(argv[3+shift],"no")==0){ 
+                  shift++; negate++; 
+                  check_argc(argc,2+shift,NULL,&config_sub_cmd_l1[0]);
+                }
                 switch (compare_command(argv[3+shift],&config_sub_cmd_l1[0])){
                    case 0: // interface
                           check_argc(argc,3+shift,"No list of ports\n",NULL);
@@ -1034,7 +1100,44 @@ int main(int argc, char **argv){
                                  default:
                                          print_unknown(argv[4+shift],&config_rrcp[0]);
                           }
-                   case 2: // mac-address-table
+                   case 2: // vlan
+                          check_argc(argc,3+shift,NULL,&config_vlan[0]);
+                          switch (compare_command(argv[4+shift],&config_vlan[0])){
+                                 case 0: // disable
+                                 case 1: // transparent
+                                        do_vlan(0);
+                                        exit(0);
+                                 case 2: //clear
+                                        do_vlan_tmpl(0);
+                                 case 3: // mode
+                                        check_argc(argc,4+shift,NULL,&config_vlan_mode[0]);
+                                        subcmd=get_cmd_num(argv[5+shift],-1,NULL,&config_vlan_mode[0]);
+                                        do_vlan(subcmd+1);
+                                        exit(0);
+                                 case 4: // template-load
+                                        check_argc(argc,4+shift,NULL,&config_vlan_tmpl[0]);
+                                        subcmd=get_cmd_num(argv[5+shift],-1,NULL,&config_vlan_tmpl[0]);
+                                        do_vlan_tmpl(subcmd+1);
+                                        exit(0);
+                                 default: 
+                                         print_unknown(argv[4+shift],&config_vlan[0]);
+                          }
+                   case 3: // mac-address
+                          check_argc(argc,3+shift,"MAC address needed\n",NULL);
+   	                  if ((sscanf(argv[4+shift], "%02x:%02x:%02x:%02x:%02x:%02x",x,x+1,x+2,x+3,x+4,x+5)!=6)&&
+	                      (sscanf(argv[4+shift], "%02x%02x.%02x%02x.%02x%02x",x,x+1,x+2,x+3,x+4,x+5)!=6)){
+   		              printf("malformed mac address: '%s'!\n",argv[4+shift]);
+                              exit(1);
+                          }
+		          for (i=0;i<6;i++){
+		            if (do_write_eeprom_byte(0x12+i,(unsigned char)x[i])){
+		             printf ("error writing eeprom!\n");
+		             exit(1);
+		            }
+	                  }
+		          do_reboot();
+                          exit(0);
+                   case 4: // mac-address-table
                           check_argc(argc,3+shift,NULL,&config_alt[0]);
                           switch (compare_command(argv[4+shift],&config_alt[0])){
                                  case 0: // aging-time
@@ -1049,6 +1152,83 @@ int main(int argc, char **argv){
                                         exit(0);
                                  default: 
                                          print_unknown(argv[4+shift],&config_alt[0]);
+                          }
+                   case 5: // flowcontrol
+                          check_argc(argc,3+shift,NULL,&config_flowc[0]);
+                          subcmd=get_cmd_num(argv[4+shift],-1,NULL,&config_flowc[0]);
+                          check_argc(argc,4+shift,NULL,&ena_disa[0]);
+                          do_glob_flowctrl(subcmd,get_cmd_num(argv[5+shift],-1,NULL,&ena_disa[0]));
+                          exit(0);
+                   case 6: // storm-control
+                          check_argc(argc,3+shift,NULL,&config_storm[0]);
+                          switch (compare_command(argv[4+shift],&config_storm[0])){
+                                 case 0: // broadcast
+                                        check_argc(argc,4+shift,NULL,&config_storm_br[0]);
+                                        subcmd=get_cmd_num(argv[5+shift],-1,NULL,&config_storm_br[0]);
+                                        do_storm_control(1,(negate)?0:++subcmd);
+                                        exit(0);
+                                 case 1: // multicast
+                                        do_storm_control(0,!negate);
+                                        exit(0);
+                                 default: 
+                                         print_unknown(argv[4+shift],&config_alt[0]);
+                          }
+                   case 7: // monitor
+                          if (negate) {
+                            do_port_config_mirror(3,&port_list[0],1);
+                            exit(0);
+                          }
+                          direction=0;
+                          for (;;){
+                             if (exists_source && exists_destination){
+                               do_port_config_mirror(direction,&port_list[0],dest_port);
+                               exit(0);
+                             }
+                             check_argc(argc,3+shift,NULL,&config_monitor[0]);
+                             switch (compare_command(argv[4+shift],&config_monitor[0])){
+                                   case 1:
+                                          t1++;
+                                          shift++;
+                                          continue;
+                                   case 2:
+                                          t2++;
+                                          shift++;
+                                          continue;
+                                   case 3:
+                                          direction=1;
+                                          shift++;
+                                          continue;
+                                   case 4:
+                                          direction=2;
+                                          shift++;
+                                          continue;
+                                   case 0:
+                                          shift++;
+                                          if (t1){
+                                            check_argc(argc,3+shift,"No list of source ports\n",NULL);
+                                            if (str_portlist_to_array(argv[4+shift],&port_list[0],switchtypes[switchtype].num_ports)!=0){
+                                              printf("Incorrect list of ports: \"%s\"\n",argv[4+shift]);
+                                              exit(1);
+                                            }
+                                            t1=0; exists_source++;
+                                            shift++;
+                                            continue;
+                                          }
+                                          if (t2){
+                                            check_argc(argc,3+shift,"No destination port\n",NULL);
+                                            if (sscanf(argv[4+shift], "%i",&dest_port) != 1) { 
+                                              printf("Incorrect port: \"%s\"\n",argv[4+shift]);
+                                              exit(0); 
+                                            }
+                                            t2=0; exists_destination++;
+                                            shift++;
+                                            continue;
+                                          }
+                                          printf("Needed port(s)\n");
+                                          exit(0);
+                                   default: 
+                                           print_unknown(argv[4+shift],&config_monitor[0]);
+                             }
                           }
 
                    default:
@@ -1090,21 +1270,6 @@ int main(int argc, char **argv){
                 }
          case 6: //ping
                 do_ping();
-                exit(0);
-         case 7: //mac-address
-                check_argc(argc,2+shift,"MAC address needed\n",NULL);
-   	        if ((sscanf(argv[3+shift], "%02x:%02x:%02x:%02x:%02x:%02x",x,x+1,x+2,x+3,x+4,x+5)!=6)&&
-	            (sscanf(argv[3+shift], "%02x%02x.%02x%02x.%02x%02x",x,x+1,x+2,x+3,x+4,x+5)!=6)){
-   		   printf("malformed mac address: '%s'!\n",argv[3+shift]);
-                   exit(1);
-                }
-		for (i=0;i<6;i++){
-		   if (do_write_eeprom_byte(0x12+i,(unsigned char)x[i])){
-		      printf ("error writing eeprom!\n");
-		      exit(1);
-		   }
-	        }
-		do_reboot();
                 exit(0);
          default:
                 print_usage();

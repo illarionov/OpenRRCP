@@ -33,6 +33,7 @@
 
 int cmd_show_version(struct cli_def *cli, char *command, char *argv[], int argc)
 {
+    char s1[32];
     cli_print(cli, "OpenRRCP CLI, Version %s",RRCP_CLI_VERSION);
     cli_print(cli, "http://openrrcp.org.ru/");
     cli_print(cli, "Licensed under terms of GPL");
@@ -57,6 +58,9 @@ int cmd_show_version(struct cli_def *cli, char *command, char *argv[], int argc)
     cli_print(cli, "802.1Q support: %s",(switchtypes[switchtype].chip_id==rtl8326) ? "No/Buggy" : "Yes");
     cli_print(cli, "IGMP support: %s",(switchtypes[switchtype].chip_id==rtl8326) ? "v1" : "v1, v2");
     cli_print(cli, "Facing host interface: %s",ifname);
+    cli_print(cli, "Facing switch interface: %s",rrcp_config_get_portname(s1, sizeof(s1), 
+			map_port_number_from_physical_to_logical(swconfig.facing_switch_port_phys),
+			swconfig.facing_switch_port_phys));
     return CLI_OK;
 }
 

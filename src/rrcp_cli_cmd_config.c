@@ -144,7 +144,7 @@ int cmd_config_vlan(struct cli_def *cli, char *command, char *argv[], int argc)
 	        return CLI_ERROR;
 	    }else{
 		int vidlist[33];
-		int i,vi;
+		int i,vi,port,port_phys;
 
 		if (str_portlist_to_array_by_value(argv[0],vidlist,32)==0){
 		    for (i=0;(i<32)&&(vidlist[i]>0)&&(vidlist[i]<4095);i++){
@@ -153,6 +153,13 @@ int cmd_config_vlan(struct cli_def *cli, char *command, char *argv[], int argc)
 			    swconfig.vlan_entry.bitmap[vi]=0;
 			    if (vidlist[i]>1){
 				swconfig.vlan_vid[vi]=0;
+			    }
+			}
+			for(port=1;port<=switchtypes[switchtype].num_ports;port++){
+			    port_phys=map_port_number_from_logical_to_physical(port);
+			    if (swconfig.vlan.s.port_vlan_index[port_phys]==vi){
+				swconfig.vlan.s.port_vlan_index[port_phys]=find_vlan_index_by_vid(1);
+				swconfig.vlan_entry.bitmap[find_vlan_index_by_vid(1)]|=1<<port_phys;
 			    }
 			}
 		    }
@@ -203,19 +210,23 @@ int cmd_config_vlan(struct cli_def *cli, char *command, char *argv[], int argc)
 		    return CLI_ERROR;
 		}
 	    }else{
-		int i,port,port_phys;
-		swconfig.vlan_vid[0]=1;
-		for(i=1;i<32;i++){
-		    swconfig.vlan_vid[i]=0;
+	        if (!swconfig.vlan.s.config.dot1q || !swconfig.vlan.s.config.enable){
+		    int i,port,port_phys;
+		    swconfig.vlan_vid[0]=1;
+		    swconfig.vlan_entry.bitmap[0]=0xffffffff;
+		    for(i=1;i<32;i++){
+			swconfig.vlan_vid[i]=0;
+			swconfig.vlan_entry.bitmap[i]=0;
+		    }
+		    for(port=1;port<=switchtypes[switchtype].num_ports;port++){
+			port_phys=map_port_number_from_logical_to_physical(port);
+			swconfig.vlan.s.port_vlan_index[port_phys]=0;
+		    }
+		    swconfig.vlan_port_insert_vid.bitmap=0;
+		    swconfig.vlan.s.config.dot1q=1;
+		    swconfig.vlan.s.config.enable=1;
+		    rrcp_config_commit_vlan_to_switch();
 		}
-		for(port=1;port<=switchtypes[switchtype].num_ports;port++){
-		    port_phys=map_port_number_from_logical_to_physical(port);
-		    swconfig.vlan.s.port_vlan_index[port_phys]=0;
-		}
-		swconfig.vlan_port_insert_vid.bitmap=0;
-	        swconfig.vlan.s.config.dot1q=1;
-		swconfig.vlan.s.config.enable=1;
-		rrcp_config_commit_vlan_to_switch();
 	    }
 	}
     }

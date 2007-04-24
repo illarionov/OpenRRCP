@@ -1187,8 +1187,8 @@ int main(int argc, char **argv){
                                          print_unknown(argv[4+shift],&config_alt[0]);
                           }
                    case 7: // monitor
-                          if (switchtypes[switchtype].chip_id!=rtl8316b){
-                            printf("Port mirroring working only with hardware based on rtl8316b\n");
+                          if (switchtypes[switchtype].chip_id==rtl8326){
+                            printf("Port mirroring not working with hardware based on rtl8326/rtl8326s\n");
                             exit(1);
                           } 
                           if (negate) {

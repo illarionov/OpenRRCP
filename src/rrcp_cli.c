@@ -50,6 +50,7 @@
 #include "rrcp_cli_cmd_show.h"
 #include "rrcp_cli_cmd_config.h"
 #include "rrcp_cli_cmd_config_int.h"
+#include "rrcp_cli_cmd_other.h"
 #include "rrcp_cli.h"
 
 int myPid = 0;
@@ -111,6 +112,7 @@ int main(int argc, char *argv[])
     cmd_show_register_commands(cli);
     cmd_config_register_commands(cli);
     cmd_config_int_register_commands(cli);
+    cmd_other_register_commands(cli);
 
 //    cli_set_auth_callback(cli, check_auth);
 //    cli_set_enable_callback(cli, check_enable);

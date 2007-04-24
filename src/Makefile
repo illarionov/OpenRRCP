@@ -5,8 +5,8 @@ all: rtl8326 rtl8316b rtl83xx_dlink_des1016d rtl83xx_dlink_des1024d rtl83xx_comp
 clean:
 	rm -f ../bin/*
 
-rrcpcli: rrcp_cli.c rrcp_cli_cmd_show.c rrcp_cli_cmd_config.c rrcp_cli_cmd_config_int.c rrcp_config.c rrcp_io.c rrcp_lib.c rrcp_switches.c
-	gcc $(CFLAGS) rrcp_cli.c rrcp_cli_cmd_show.c rrcp_cli_cmd_config.c rrcp_cli_cmd_config_int.c rrcp_config.c rrcp_io.c rrcp_lib.c rrcp_switches.c ../lib/libcli.c -lcrypt -o ../bin/rrcpcli
+rrcpcli: rrcp_cli.c rrcp_cli_cmd_show.c rrcp_cli_cmd_config.c rrcp_cli_cmd_config_int.c rrcp_cli_cmd_other.c rrcp_config.c rrcp_io.c rrcp_lib.c rrcp_switches.c
+	gcc $(CFLAGS) rrcp_cli.c rrcp_cli_cmd_show.c rrcp_cli_cmd_config.c rrcp_cli_cmd_config_int.c rrcp_cli_cmd_other.c rrcp_config.c rrcp_io.c rrcp_lib.c rrcp_switches.c ../lib/libcli.c -lcrypt -o ../bin/rrcpcli
 
 rrcpcli-debug: rrcp_cli.c rrcp_cli_cmd_show.c rrcp_cli_cmd_config.c rrcp_cli_cmd_config_int.c rrcp_config.c rrcp_io.c rrcp_lib.c rrcp_switches.c
 	gcc -Wall -ggdb rrcp_cli.c rrcp_cli_cmd_show.c rrcp_cli_cmd_config.c rrcp_cli_cmd_config_int.c rrcp_config.c rrcp_io.c rrcp_lib.c rrcp_switches.c ../lib/libcli.c -lcrypt -o ../bin/rrcpcli-debug

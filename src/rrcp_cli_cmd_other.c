@@ -31,38 +31,6 @@
 #include "rrcp_io.h"
 #include "rrcp_config.h"
 
-
-int cmd_show_ip_igmp_snooping(struct cli_def *cli, char *command, char *argv[], int argc)
-{
-    if (argc>0){
-	if (strcmp(argv[0],"?")==0){
-	    cli_print(cli, "  |  Output modifiers");
-	    cli_print(cli, "  <cr>");
-	}else{
-	    cli_print(cli, "%% Invalid input detected.");
-	}
-    }else{
-	if (strcasecmp(command,"show ip igmp snooping")==0){
-	    cli_print(cli, "Global IGMP Snooping configuration:");
-	    cli_print(cli, "-----------------------------------");
-	    cli_print(cli, "IGMP snooping              : %s",swconfig.alt_igmp_snooping.config.en_igmp_snooping ? "Enabled":"Disabled");
-	}
-	if (strcasecmp(command,"show ip igmp snooping mrouter")==0){
-	    int port,port_phys;
-	    char pn[64];
-
-	    cli_print(cli, "Multicast routers found on port(s):");
-	    for(port=1;port<=switchtypes[switchtype].num_ports;port++){
-	        port_phys=map_port_number_from_logical_to_physical(port);
-	        if (swconfig.alt_mrouter_mask.mask & (1<<port_phys)){
-		    cli_print(cli, "%s",rrcp_config_get_portname(pn,sizeof(pn),port,port_phys));
-		}
-	    }
-	}
-    }
-    return CLI_OK;
-}
-
 int cmd_write_terminal(struct cli_def *cli, char *command, char *argv[], int argc)
 {
     char text[32768];
@@ -84,16 +52,65 @@ int cmd_write_terminal(struct cli_def *cli, char *command, char *argv[], int arg
     return CLI_OK;
 }
 
-int cmd_test(struct cli_def *cli, char *command, char *argv[], int argc)
+int cmd_write_memory(struct cli_def *cli, char *command, char *argv[], int argc)
 {
-    int i;
-    cli_print(cli, "called %s with \"%s\"", __FUNCTION__, command);
-    cli_print(cli, "%d arguments:", argc);
-    for (i = 0; i < argc; i++)
-    {
-	cli_print(cli, "	%s", argv[i]);
+    cli_print(cli, "%% Not implemented yet");
+    return CLI_ERROR;
+}
+
+int cmd_copy_running_config(struct cli_def *cli, char *command, char *argv[], int argc)
+{
+    if (argc>0){
+	if (argv[0][strlen(argv[0])-1]=='?'){
+	    cli_print(cli, "  file:<filename>  Copy EEPROM to a specified binary file");
+	}else{
+	    cli_print(cli, "%% Not implemented yet");
+	    return CLI_ERROR;
+	}
+	return CLI_OK;
+    }else{
+	cli_print(cli, "%% Invalid input detected.");
+	return CLI_OK;
     }
-    return CLI_OK;
+}
+
+int cmd_copy_eeprom(struct cli_def *cli, char *command, char *argv[], int argc)
+{
+    if (argc>0){
+	if (argv[0][strlen(argv[0])-1]=='?'){
+	    cli_print(cli, "  file:<filename>  Copy EEPROM to a specified binary file");
+	}else{
+	    char *s;
+	    uint8_t buf[2048];
+	    int i;
+	    FILE *f;
+
+	    if (strncmp(argv[0], "file:",5)==0){
+		s=argv[0]+5;
+		if ((f=fopen(s,"w"))!=NULL){
+		    for (i=0;i<2048;i++){
+			if (eeprom_read(i,&buf[i])){
+			    break;
+			}
+		    }
+		    fwrite(buf,i,1,f);
+		    fclose(f);
+		    cli_print(cli, "%% INFO: Wrote EEPROM contents (%d bytes) to file \"%s\" okay.",i,s);
+		    return CLI_OK;
+		}else{
+		    cli_print(cli, "%% ERROR: Can't open file \"%s\" for writing.",s);
+		    return CLI_ERROR;
+		}
+	    }else{
+		cli_print(cli, "%% Invalid input detected.");
+		return CLI_ERROR;
+	    }
+	}
+	return CLI_OK;
+    }else{
+	cli_print(cli, "%% Invalid input detected.");
+	return CLI_ERROR;
+    }
 }
 
 void cmd_other_register_commands(struct cli_def *cli)
@@ -102,4 +119,10 @@ void cmd_other_register_commands(struct cli_def *cli)
     c = cli_register_command(cli, NULL, "write", NULL,  PRIVILEGE_UNPRIVILEGED, MODE_EXEC, "Write running configuration to memory or terminal");
     cli_register_command(cli, c, "memory", cmd_write_memory, PRIVILEGE_UNPRIVILEGED, MODE_EXEC, "Write to NV memory");
     cli_register_command(cli, c, "terminal", cmd_write_terminal, PRIVILEGE_UNPRIVILEGED, MODE_EXEC, "Write to terminal");
+
+    {
+	c = cli_register_command(cli, NULL, "copy", NULL,  PRIVILEGE_UNPRIVILEGED, MODE_EXEC, "Copy from one file to another");
+	cli_register_command(cli, c, "running-config", cmd_copy_running_config, PRIVILEGE_UNPRIVILEGED, MODE_EXEC, "Copy from current system configuration");
+	cli_register_command(cli, c, "eeprom", cmd_copy_eeprom, PRIVILEGE_UNPRIVILEGED, MODE_EXEC, "Copy from EEPROM as binary file");
+    }
 }

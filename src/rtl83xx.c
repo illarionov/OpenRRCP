@@ -264,7 +264,7 @@ void print_vlan_status(int show_vid){
     }
 }
 
-void do_vlan_enable_vlan(int is_8021q){
+void do_vlan_enable_vlan(int is_8021q, int do_clear){
     int i,port,vlan;
     union t_vlan_port_vlan vlan_port_vlan;
     union t_vlan_port_output_tag vlan_port_output_tag;
@@ -276,24 +276,29 @@ void do_vlan_enable_vlan(int is_8021q){
     vlan_port_insert_vid.bitmap=0;
 
     for(port=0;port<switchtypes[switchtype].num_ports;port++){
-	vlan_port_vlan.index[port]=(uint16_t)port;
+	vlan_port_vlan.index[port]=(do_clear)?0:(uint16_t)port;
 	vlan_port_output_tag.bitmap|=3<<port*2;
-//	vlan_port_insert_vid.bitmap|=(is_8021q)?1<<port:0;
-	vlan_port_insert_vid.bitmap|=0;
+        vlan_port_insert_vid.bitmap|=0;
     }
 
     memset(&vlan_entry,0,sizeof(vlan_entry));
     memset(&vlan_vid,0,sizeof(vlan_vid));
-    for(vlan=0;vlan<switchtypes[switchtype].num_ports;vlan++){
-	if ( (vlan!=(switchtypes[switchtype].num_ports-2)) &&
-             (vlan!=(switchtypes[switchtype].num_ports-1)) ) {
-	    vlan_entry.bitmap[vlan]=(1<<vlan)|(1<<(switchtypes[switchtype].num_ports-2))|(1<<(switchtypes[switchtype].num_ports-1));
-//	    vlan_vid[vlan]=(is_8021q)?vid_base+vlan:0;
-	    vlan_vid[vlan]=0;
-	}else{
-//	    vlan_entry.bitmap[vlan]=(is_8021q)?0:0xffffffff>>(32-switchtypes[switchtype].num_ports);
-	    vlan_entry.bitmap[vlan]=0xffffffff>>(32-switchtypes[switchtype].num_ports);
-        }
+
+    if (do_clear) {
+     vlan_entry.bitmap[0]=0xffffffff>>(32-switchtypes[switchtype].num_ports);
+     vlan_vid[0]=(is_8021q)?1:0;
+    }else{
+     for(vlan=0;vlan<switchtypes[switchtype].num_ports;vlan++){
+ 	 if ( (vlan!=(switchtypes[switchtype].num_ports-2)) &&
+              (vlan!=(switchtypes[switchtype].num_ports-1)) ) {
+	     vlan_entry.bitmap[vlan]=(1<<vlan)|(1<<(switchtypes[switchtype].num_ports-2))|(1<<(switchtypes[switchtype].num_ports-1));
+//	     vlan_vid[vlan]=(is_8021q)?vid_base+vlan:0;
+	     vlan_vid[vlan]=0;
+	 }else{
+//	     vlan_entry.bitmap[vlan]=(is_8021q)?0:0xffffffff>>(32-switchtypes[switchtype].num_ports);
+	     vlan_entry.bitmap[vlan]=0xffffffff>>(32-switchtypes[switchtype].num_ports);
+         }
+     }
     }
 
     //write all relevant config to switch from our data structures    
@@ -333,9 +338,12 @@ void do_vlan(int mode){
 void do_vlan_tmpl(int mode){
  if (mode) {
    do_vlan(mode);
-   do_vlan_enable_vlan(mode-1);
+   do_vlan_enable_vlan(mode-1,0);
+ }else{
+   swconfig.vlan.raw[0]=rtl83xx_readreg16(0x030b);
+   if (!swconfig.vlan.s.config.enable) { printf("WARNING: vlan mode not enable\n"); } 
+   do_vlan_enable_vlan(swconfig.vlan.s.config.dot1q,1);
  }
- else printf("Under construction\n");
 }
 
 void do_write_memory(){
@@ -811,6 +819,7 @@ void print_usage(void){
 	printf(" config vlan disable - disable all VLAN support\n");
 	printf(" config vlan mode portbased|dot1q - enable specified VLAN support\n");
 	printf(" config vlan template-load portbased|dot1qtree - load specified template\n");
+	printf(" config vlan clear - clear vlan table (all ports bind to one vlan)\n");
 	printf(" config mac-address <mac> - set <mac> as new switch MAC address and reboots\n");
 	printf(" config mac-address-table aging-time|drop-unknown <arg>  - address lookup table control\n");
         printf(" config flowcontrol dot3x enable|disable - globally disable full duplex flow control (802.3x pause)\n");
@@ -1112,6 +1121,7 @@ int main(int argc, char **argv){
                                         exit(0);
                                  case 2: //clear
                                         do_vlan_tmpl(0);
+                                        exit(0);
                                  case 3: // mode
                                         check_argc(argc,4+shift,NULL,&config_vlan_mode[0]);
                                         subcmd=get_cmd_num(argv[5+shift],-1,NULL,&config_vlan_mode[0]);
@@ -1177,6 +1187,10 @@ int main(int argc, char **argv){
                                          print_unknown(argv[4+shift],&config_alt[0]);
                           }
                    case 7: // monitor
+                          if (switchtypes[switchtype].chip_id!=rtl8316b){
+                            printf("Port mirroring working only with hardware based on rtl8316b\n");
+                            exit(1);
+                          } 
                           if (negate) {
                             do_port_config_mirror(3,&port_list[0],1);
                             exit(0);

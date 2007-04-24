@@ -179,6 +179,7 @@
 extern const char *bandwidth_text[8];
 extern const char *wrr_ratio_text[4];
 extern const char *eeprom_type_text[7];
+extern const int eeprom_type_size[7];
 extern struct t_swconfig swconfig;
 
 void rrcp_config_read_from_switch(void);

@@ -74,6 +74,66 @@ int cmd_copy_running_config(struct cli_def *cli, char *command, char *argv[], in
     }
 }
 
+int cmd_copy(struct cli_def *cli, char *command, char *argv[], int argc)
+{
+    if (argc==1){
+	if (argv[0][strlen(argv[0])-1]=='?'){
+	    cli_print(cli, "  file:<filename>  Copy from specified file");
+	    return CLI_OK;
+	}
+    }
+    if (argc==2){
+	if (argv[1][strlen(argv[1])-1]=='?'){
+	    cli_print(cli, "  eeprom  Copy to EEPROM");
+	}else{
+	    char *s;
+	    uint8_t buf[2049];
+	    int i,l;
+	    FILE *f;
+
+	    if (strncmp(argv[0], "file:",5)==0){
+		s=argv[0]+5;
+		if (strcmp(argv[1], "eeprom")==0){
+		    if ((f=fopen(s,"r"))!=NULL){
+		    	l=fread(buf,1,sizeof(buf),f);
+			if (l!=eeprom_type_size[swconfig.eeprom_type]){
+			    cli_print(cli, "%% ERROR: File size (%d bytes) does not match EEPROM size (%d bytes)",l,eeprom_type_size[swconfig.eeprom_type]);
+			    return CLI_ERROR;
+			}else{
+			    cli_print(cli, "%% INFO: Successfully read %d bytes from file \"%s\".",l,s);
+			}
+		    	for (i=0;i<l;i++){
+			    if ((i % 32)==0){
+				fprintf(cli->client, "%% %4d bytes writen to EEPROM.\r", i);
+			    }
+			    if (eeprom_write(i,buf[i])){
+			    	break;
+			    }
+		    	}
+			fprintf(cli->client, "%% %4d bytes writen to EEPROM.\r\n", i);
+		    	fclose(f);
+			cli_print(cli, "%% WARNING: You need to reload switch to apply new configuration.");
+			return CLI_OK;
+		    }else{
+			cli_print(cli, "%% ERROR: Can't open file \"%s\" for reading.",s);
+			return CLI_ERROR;
+		    }
+		}else{
+		    cli_print(cli, "%% ERROR: Unknown destination: \"%s\".",argv[1]);
+		    return CLI_ERROR;
+		}
+	    }else{
+		cli_print(cli, "%% Invalid input detected.");
+		return CLI_ERROR;
+	    }
+	}
+	return CLI_OK;
+    }else{
+	cli_print(cli, "%% Invalid input detected.");
+	return CLI_ERROR;
+    }
+}
+
 int cmd_copy_eeprom(struct cli_def *cli, char *command, char *argv[], int argc)
 {
     if (argc>0){
@@ -89,13 +149,17 @@ int cmd_copy_eeprom(struct cli_def *cli, char *command, char *argv[], int argc)
 		s=argv[0]+5;
 		if ((f=fopen(s,"w"))!=NULL){
 		    for (i=0;i<2048;i++){
+			if ((i % 32)==0){
+			    fprintf(cli->client, "%% %4d bytes read from EEPROM.\r", i);
+			}
 			if (eeprom_read(i,&buf[i])){
 			    break;
 			}
 		    }
+		    fprintf(cli->client, "%% %4d bytes read from EEPROM.\r\n", i);
 		    fwrite(buf,i,1,f);
 		    fclose(f);
-		    cli_print(cli, "%% INFO: Wrote EEPROM contents (%d bytes) to file \"%s\" okay.",i,s);
+		    cli_print(cli, "%% INFO: Wrote EEPROM contents to file \"%s\" okay.",s);
 		    return CLI_OK;
 		}else{
 		    cli_print(cli, "%% ERROR: Can't open file \"%s\" for writing.",s);
@@ -121,7 +185,7 @@ void cmd_other_register_commands(struct cli_def *cli)
     cli_register_command(cli, c, "terminal", cmd_write_terminal, PRIVILEGE_UNPRIVILEGED, MODE_EXEC, "Write to terminal");
 
     {
-	c = cli_register_command(cli, NULL, "copy", NULL,  PRIVILEGE_UNPRIVILEGED, MODE_EXEC, "Copy from one file to another");
+	c = cli_register_command(cli, NULL, "copy", cmd_copy,  PRIVILEGE_UNPRIVILEGED, MODE_EXEC, "Copy from one file to another");
 	cli_register_command(cli, c, "running-config", cmd_copy_running_config, PRIVILEGE_UNPRIVILEGED, MODE_EXEC, "Copy from current system configuration");
 	cli_register_command(cli, c, "eeprom", cmd_copy_eeprom, PRIVILEGE_UNPRIVILEGED, MODE_EXEC, "Copy from EEPROM as binary file");
     }

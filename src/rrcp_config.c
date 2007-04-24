@@ -33,6 +33,7 @@
 const char *bandwidth_text[8]={"100M","128K","256K","512K","1M","2M","4M","8M"};
 const char *wrr_ratio_text[4]={"4:1","8:1","16:1","1:0"};
 const char *eeprom_type_text[7]={"N/A","Write Protected","2401","2402","2404","2408","2416"};
+const int eeprom_type_size[7]={0,0,128,256,512,1024,2048};
 
 struct t_swconfig swconfig;
 
@@ -475,7 +476,8 @@ int find_or_create_vlan_index_by_vid(int vid)
 
 void rrcp_config_write_to_eeprom(void)
 {
-/*    int i,numreg;
+/*
+    int i,numreg;
 
     numreg=(switchtypes[switchtype].num_ports==16)?12:13;
     rrcp_config_read_from_switch();

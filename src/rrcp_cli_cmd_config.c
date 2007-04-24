@@ -381,6 +381,7 @@ int cmd_config_spanning_tree(struct cli_def *cli, char *command, char *argv[], i
 	if (strcasecmp(command,"spanning-tree bpdufilter enable")==0) swconfig.alt_config.s.config.stp_filter=1;
 	if ((strcasecmp(command,"no spanning-tree bpdufilter enable")==0)||
 	    (strcasecmp(command,"spanning-tree bpdufilter disable")==0)) swconfig.alt_config.s.config.stp_filter=0;
+	rtl83xx_setreg16(0x0300,swconfig.alt_config.raw);
     }
     return CLI_OK;
 }

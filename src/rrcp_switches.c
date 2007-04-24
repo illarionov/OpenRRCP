@@ -24,6 +24,7 @@
 #include <stdio.h>
 #include <string.h>
 #include "rrcp_io.h"
+#include "rrcp_config.h"
 #include "rrcp_switches.h"
 
 const uint32_t chipname_n = 5;
@@ -38,9 +39,18 @@ char* chipnames [5] = {
 
 uint32_t switchtype;
 
-const uint32_t switchtype_n = 8;
+const uint32_t switchtype_n = 10;
 
-struct switchtype_t switchtypes[8] = {
+struct switchtype_t switchtypes[10] = {
+    {
+	"generic",
+	"rtl8326",
+	"unknown",
+	"rtl8326",
+	rtl8326,
+	26,
+	{1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,0}
+    },
     {
 	"generic",
 	"rtl8316b",
@@ -52,12 +62,21 @@ struct switchtype_t switchtypes[8] = {
     },
     {
 	"generic",
-	"rtl8326",
+	"rtl8318",
 	"unknown",
-	"rtl8326",
-	rtl8326,
-	26,
-	{1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,0}
+	"rtl8318",
+	rtl8318,
+	18,
+	{1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,0,0,0,0,0,0,0,0,0}
+    },
+    {
+	"generic",
+	"rtl8324",
+	"unknown",
+	"rtl8324",
+	rtl8324,
+	24,
+	{1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,0,0,0}
     },
     {
 	"dlink",
@@ -70,7 +89,7 @@ struct switchtype_t switchtypes[8] = {
     },
     {
 	"dlink",
-	"des1024d",
+	"des1024d_b1",
 	"B1",
 	"rtl8326",
 	rtl8326,
@@ -166,4 +185,108 @@ uint16_t rrcp_switch_autodetect(void){
     }else{
 	return 1; // generic rtl8326
     }
+}
+
+////////////////////////
+int rrcp_autodetectchip_try_to_write_eeprom (uint16_t addr1, uint16_t addr2)
+{
+    uint8_t tmp11=0, tmp12=0, tmp21=0, tmp22=0;
+
+    eeprom_read(addr1,&tmp11);
+    eeprom_read(addr2,&tmp12);
+    eeprom_write(addr1,tmp11+0x055);
+    eeprom_write(addr2,tmp11+0x0aa);
+    tmp21=tmp11;
+    tmp22=tmp11;
+    eeprom_read(addr1,&tmp21);
+    eeprom_read(addr2,&tmp22);
+    eeprom_write(addr1,tmp11);
+    eeprom_write(addr2,tmp12);
+    return ((tmp21==tmp11+0x055)&&(tmp22==tmp11+0x0aa));
+}
+
+uint8_t rrcp_autodetectswitch_port_count(void){
+    uint16_t r;
+    uint16_t port_count;
+
+    if (phy_read(8,3,&r)==0){
+	if (r==0xffff){
+	    port_count=16;
+	}else{
+	    port_count=24;
+	}
+    }else{
+	port_count=26;
+    }
+
+    return port_count;
+}
+
+uint16_t rrcp_autodetect_switch_chip_eeprom(uint8_t *switch_type, uint8_t *chip_type, t_eeprom_type *eeprom_type){
+    uint16_t saved_reg;
+    uint16_t detected_switchtype=-1;
+    uint16_t detected_chiptype=unknown;
+    t_eeprom_type detected_eeprom=EEPROM_NONE;
+    int i,errcnt=0;
+    uint8_t test1[6];
+    uint8_t test2[4]={0x0,0x55,0xaa,0xff};
+    uint8_t port_count;
+
+    // step 1: detect number of ports
+    port_count=rrcp_autodetectswitch_port_count();    
+
+    // step 2: detect EEPROM presence and size
+    for(i=0;i<6;i++){
+	if ((errcnt=eeprom_read(0x12+i,&test1[i]))!=0){break;}
+    }
+    if (errcnt==0){
+	if (rrcp_autodetectchip_try_to_write_eeprom(0x07e,0x07f)){
+	    detected_eeprom=EEPROM_2401;
+	    if (rrcp_autodetectchip_try_to_write_eeprom(0x07f,0x0ff)){
+		detected_eeprom=EEPROM_2402;
+		if (rrcp_autodetectchip_try_to_write_eeprom(0x0ff,0x01ff)){
+		    detected_eeprom=EEPROM_2404;
+		    if (rrcp_autodetectchip_try_to_write_eeprom(0x01ff,0x03ff)){
+			detected_eeprom=EEPROM_2408;
+			if (rrcp_autodetectchip_try_to_write_eeprom(0x03ff,0x07ff)){
+			    detected_eeprom=EEPROM_2416;
+			}
+		    }
+		}
+	    }
+	}else{
+	    detected_eeprom=EEPROM_WRITEPOTECTED;
+	}
+    }
+
+    // step 3: check for registers, absent on rtl8326
+    saved_reg=rtl83xx_readreg16(0x0218);
+    for(i=0;i<4;i++){
+	rtl83xx_setreg16(0x0218,test2[i]);
+	if (rtl83xx_readreg16(0x0218) != test2[i]) {
+	    errcnt++; 
+	    break;
+	}
+    }
+    rtl83xx_setreg16(0x0218,saved_reg);
+
+    // make final decision
+    if (errcnt) {
+        detected_chiptype=rtl8326;
+	detected_switchtype=0; // generic rtl8326
+    }else if (port_count==16){
+	detected_chiptype=rtl8316b;
+	detected_switchtype=1; // generic rtl8316b
+    }else if (port_count==18){
+        detected_chiptype=rtl8318;
+        detected_switchtype=2; // generic rtl8318
+    }else{
+        detected_chiptype=rtl8324;
+        detected_switchtype=3; // generic rtl8324
+    }
+
+    *switch_type=detected_switchtype;
+    *chip_type=detected_chiptype;
+    *eeprom_type=detected_eeprom;
+    return 0;
 }

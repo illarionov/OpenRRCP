@@ -27,9 +27,9 @@
 #include <string.h>
 #include "../lib/libcli.h"
 #include "rrcp_cli.h"
-#include "rrcp_switches.h"
 #include "rrcp_io.h"
 #include "rrcp_config.h"
+#include "rrcp_switches.h"
 
 int cmd_write_terminal(struct cli_def *cli, char *command, char *argv[], int argc)
 {

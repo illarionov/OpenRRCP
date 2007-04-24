@@ -52,6 +52,7 @@
 #include <errno.h>
 #include "rrcp_packet.h"
 #include "rrcp_io.h"
+#include "rrcp_config.h"
 #include "rrcp_switches.h"
 
 char ifname[128] = "";

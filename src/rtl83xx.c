@@ -38,8 +38,8 @@
 #include <unistd.h>
 #include "rrcp_packet.h"
 #include "rrcp_io.h"
-#include "rrcp_switches.h"
 #include "rrcp_config.h"
+#include "rrcp_switches.h"
 
 int myPid = 0;
 
@@ -891,22 +891,26 @@ int main(int argc, char **argv){
     if ((p=rindex(p,'/'))==NULL){
 	p=argv[0];
     }
-    if (strstr(p,"rtl8316b")==argv[0]+strlen(argv[0])-8){
+    if (strstr(p,"rtl8326")==argv[0]+strlen(argv[0])-7){
 	switchtype=0;
-    }else if (strstr(p,"rtl8326")==argv[0]+strlen(argv[0])-7){
+    }else if (strstr(p,"rtl8316b")==argv[0]+strlen(argv[0])-8){
 	switchtype=1;
-    }else if (strstr(p,"rtl83xx_dlink_des1016d")==argv[0]+strlen(argv[0])-22){
+    }else if (strstr(p,"rtl8318")==argv[0]+strlen(argv[0])-8){
 	switchtype=2;
-    }else if (strstr(p,"rtl83xx_dlink_des1024d_b1")==argv[0]+strlen(argv[0])-25){
+    }else if (strstr(p,"rtl8324")==argv[0]+strlen(argv[0])-7){
 	switchtype=3;
-    }else if (strstr(p,"rtl83xx_dlink_des1024d_c1")==argv[0]+strlen(argv[0])-25){
+    }else if (strstr(p,"rtl83xx_dlink_des1016d")==argv[0]+strlen(argv[0])-22){
 	switchtype=4;
-    }else if (strstr(p,"rtl83xx_compex_ps2216")==argv[0]+strlen(argv[0])-21){
+    }else if (strstr(p,"rtl83xx_dlink_des1024d_b1")==argv[0]+strlen(argv[0])-25){
 	switchtype=5;
-    }else if (strstr(p,"rtl83xx_ovislink_fsh2402gt")==argv[0]+strlen(argv[0])-26){
+    }else if (strstr(p,"rtl83xx_dlink_des1024d_c1")==argv[0]+strlen(argv[0])-25){
 	switchtype=6;
+    }else if (strstr(p,"rtl83xx_compex_ps2216")==argv[0]+strlen(argv[0])-21){
+	switchtype=7;
+    }else if (strstr(p,"rtl83xx_ovislink_fsh2402gt")==argv[0]+strlen(argv[0])-26){
+	switchtype=8;
     }else if (strstr(p,"rtl83xx_zyxel_es116p")==argv[0]+strlen(argv[0])-20){ 
-        switchtype=7; 
+        switchtype=9; 
     }else {
 	printf("%s: unknown switch/chip type\n",argv[0]);
 	exit(0);

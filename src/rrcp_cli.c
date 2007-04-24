@@ -44,8 +44,8 @@
 #include <arpa/inet.h>
 #include "rrcp_packet.h"
 #include "rrcp_io.h"
-#include "rrcp_switches.h"
 #include "rrcp_config.h"
+#include "rrcp_switches.h"
 #include "../lib/libcli.h"
 #include "rrcp_cli_cmd_show.h"
 #include "rrcp_cli_cmd_config.h"
@@ -198,14 +198,15 @@ int main(int argc, char *argv[])
 	authkey=authkey_tmp;
     }
     rtl83xx_prepare();
+    rrcp_autodetect_switch_chip_eeprom(&swconfig.switch_type, &swconfig.chip_type, &swconfig.eeprom_type);
 
     if (switchtype==-1){
-	switchtype=rrcp_switch_autodetect();
+	switchtype=swconfig.switch_type;
 	printf("detected %s %s\n",
 	    switchtypes[switchtype].vendor,
 	    switchtypes[switchtype].model);
     }else{
-	if(switchtypes[switchtype].chip_id!=rrcp_switch_autodetect_chip() && !switchtype_force){
+	if(switchtypes[switchtype].chip_id!=swconfig.chip_type && !switchtype_force){
 	    printf("%s: ERROR - Chip mismatch\n"
 		    "Specified switch: %s %s\n"
 		    "Specified chip: %s\n"
@@ -214,7 +215,7 @@ int main(int argc, char *argv[])
 		    switchtypes[switchtype].vendor,
 		    switchtypes[switchtype].model,
 		    switchtypes[switchtype].chip_name,
-		    "");
+		    chipnames[swconfig.chip_type]);
 	    exit(0);
 	}
     }

@@ -27,8 +27,8 @@
 #include <stdarg.h>
 #include <string.h>
 #include "rrcp_io.h"
-#include "rrcp_switches.h"
 #include "rrcp_config.h"
+#include "rrcp_switches.h"
 
 const char *bandwidth_text[8]={"100M","128K","256K","512K","1M","2M","4M","8M"};
 const char *wrr_ratio_text[4]={"4:1","8:1","16:1","1:0"};
@@ -37,121 +37,12 @@ const int eeprom_type_size[7]={0,0,128,256,512,1024,2048};
 
 struct t_swconfig swconfig;
 
-int rrcp_config_autodetect_chip_try_to_write_eeprom (uint16_t addr1, uint16_t addr2)
-{
-    uint8_t tmp11=0, tmp12=0, tmp21=0, tmp22=0;
-
-    eeprom_read(addr1,&tmp11);
-    eeprom_read(addr2,&tmp12);
-    eeprom_write(addr1,tmp11+0x055);
-    eeprom_write(addr2,tmp11+0x0aa);
-    tmp21=tmp11;
-    tmp22=tmp11;
-    eeprom_read(addr1,&tmp21);
-    eeprom_read(addr2,&tmp22);
-    eeprom_write(addr1,tmp11);
-    eeprom_write(addr2,tmp12);
-    return ((tmp21==tmp11+0x055)&&(tmp22==tmp11+0x0aa));
-}
-
-uint8_t rrcp_config_autodetect_switch_port_count(void){
-    uint16_t saved_reg0402,r,i;
-    uint16_t port_count;
-    
-    saved_reg0402=rtl83xx_readreg16(0x0402);
-    rtl83xx_setreg16(0x0402,0);
-    r=rtl83xx_readreg16(0x0402);
-    port_count=32;
-    for (i=0;i<=15;i++){
-	if ((r & (1<i))!=0){
-	    port_count=32-i;
-	}
-    }
-    rtl83xx_setreg16(0x0402,0xffff);
-    r=rtl83xx_readreg16(0x0402);
-    port_count=32;
-    for (i=0;i<=15;i++){
-	if ((r & (1<i))==0){
-	    port_count=32-i;
-	}
-    }
-    rtl83xx_setreg16(0x0402,saved_reg0402);
-
-    return port_count;
-}
-
-uint16_t rrcp_config_autodetect_switch_chip_eeprom(uint8_t *switch_type, uint8_t *chip_type, t_eeprom_type *eeprom_type){
-    uint16_t saved_reg;
-    uint16_t detected_switchtype=-1;
-    uint16_t detected_chiptype=unknown;
-    t_eeprom_type detected_eeprom=EEPROM_NONE;
-    int i,errcnt=0;
-    uint8_t test1[6];
-    uint8_t test2[4]={0x0,0x55,0xaa,0xff};
-    uint8_t port_count;
-
-    port_count=rrcp_config_autodetect_switch_port_count();    
-    printf("Detected %d port switch\n",port_count);
-
-    // step 1: detect EEPROM presence and size
-    for(i=0;i<6;i++){
-	if ((errcnt=eeprom_read(0x12+i,&test1[i]))!=0){break;}
-    }
-    if (errcnt==0){
-	if (rrcp_config_autodetect_chip_try_to_write_eeprom(0x07e,0x07f)){
-	    detected_eeprom=EEPROM_2401;
-	    if (rrcp_config_autodetect_chip_try_to_write_eeprom(0x07f,0x0ff)){
-		detected_eeprom=EEPROM_2402;
-		if (rrcp_config_autodetect_chip_try_to_write_eeprom(0x0ff,0x01ff)){
-		    detected_eeprom=EEPROM_2404;
-		    if (rrcp_config_autodetect_chip_try_to_write_eeprom(0x01ff,0x03ff)){
-			detected_eeprom=EEPROM_2408;
-			if (rrcp_config_autodetect_chip_try_to_write_eeprom(0x03ff,0x07ff)){
-			    detected_eeprom=EEPROM_2416;
-			}
-		    }
-		}
-	    }
-	}else{
-	    detected_eeprom=EEPROM_WRITEPOTECTED;
-	}
-    }
-
-    // step 2: if step 1 fail, detect rtl8316b/rtl8324 without EEPROM
-    saved_reg=rtl83xx_readreg16(0x0218);
-    for(i=0;i<4;i++){
-	rtl83xx_setreg16(0x0218,test2[i]);
-	if (rtl83xx_readreg16(0x0218) != test2[i]) {
-	    errcnt++; 
-	    break;
-	}
-    }
-    rtl83xx_setreg16(0x0218,saved_reg);
-
-    if (errcnt) {
-        detected_chiptype=rtl8326;
-    }else{
-	detected_chiptype=rtl8316b;
-    }
-
-    if(detected_chiptype==rtl8316b){
-	detected_switchtype=0; // generic rtl8316b
-    }else{
-	detected_switchtype=1; // generic rtl8326
-    }
-
-    *switch_type=detected_switchtype;
-    *chip_type=detected_chiptype;
-    *eeprom_type=detected_eeprom;
-    return 0;
-}
-
 ////////////// read all relevant config from switch into our data structures    
 void rrcp_config_read_from_switch(void)
 {
     int i;
 
-    rrcp_config_autodetect_switch_chip_eeprom(&swconfig.switch_type, &swconfig.chip_type, &swconfig.eeprom_type);
+    rrcp_autodetect_switch_chip_eeprom(&swconfig.switch_type, &swconfig.chip_type, &swconfig.eeprom_type);
     rrcp_io_probe_switch_for_facing_switch_port(swconfig.mac_address,&swconfig.facing_switch_port_phys);
 
     swconfig.rrcp_config.raw=rtl83xx_readreg16(0x0200);

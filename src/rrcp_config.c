@@ -86,7 +86,7 @@ uint16_t rrcp_config_autodetect_switch_chip_eeprom(unsigned int *switch_type, un
 	}
     }
 
-    // step 2: if step 1 fail, detect rtl8316b without EEPROM
+    // step 2: if step 1 fail, detect rtl8316b/rtl8324 without EEPROM
     saved_reg=rtl83xx_readreg16(0x0218);
     for(i=0;i<4;i++){
 	rtl83xx_setreg16(0x0218,test2[i]);
@@ -248,7 +248,7 @@ void rrcp_config_bin2text(char *sc, int l, int show_defaults)
     {
 	if (swconfig.vlan.s.config.enable){
 	    if (swconfig.vlan.s.config.dot1q){
-		if (switchtypes[switchtype].chip_id!=rtl8316b){
+		if (switchtypes[switchtype].chip_id==rtl8326){
 		    sncprintf(sc,l,"! WARNING: 802.1Q VLANs enabled on hardware, that do not support them properly.\n");
 		    sncprintf(sc,l,"! WARNING: Read here: http://openrrcp.org.ru/wiki:rtl8326_dot1q_bug for details.\n");
 		    sncprintf(sc,l,"vlan dot1q force\n");
@@ -375,8 +375,8 @@ void rrcp_config_bin2text(char *sc, int l, int show_defaults)
 	if (show_defaults || swconfig.bandwidth.rxtx[port_phys].tx!=0){
 	    sncprintf(sc,l," rate-limit output %s\n",bandwidth_text[swconfig.bandwidth.rxtx[port_phys].tx]);
 	}
-	if (switchtypes[switchtype].chip_id==rtl8316b){
-	    //port mirroring working only with rtl8316b
+	if (switchtypes[switchtype].chip_id!=rtl8326){
+	    //port mirroring working only with rtl8316b/rtl8324
 	    if (swconfig.port_monitor.sniff.sniffer & (1<<port_phys)){
 		for(port2=1;port2<=switchtypes[switchtype].num_ports;port2++){
 		    port2_phys=map_port_number_from_logical_to_physical(port2);

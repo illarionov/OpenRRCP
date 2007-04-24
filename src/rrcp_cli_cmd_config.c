@@ -202,7 +202,7 @@ int cmd_config_vlan(struct cli_def *cli, char *command, char *argv[], int argc)
 	    rrcp_config_commit_vlan_to_switch();
 	}
 	if ((strcasecmp(command,"vlan dot1q")==0)||(strcasecmp(command,"vlan dot1q force")==0)){
-	    if (switchtypes[switchtype].chip_id!=rtl8316b){
+	    if (switchtypes[switchtype].chip_id==rtl8326){
 		if (strcasecmp(command,"vlan dot1q force")==0){
 		    cli_print(cli, "%% WARNING: Enabled IEEE 802.1Q VLANs on hardware, that do not supported them properly.");
 		}else{

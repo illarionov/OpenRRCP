@@ -26,19 +26,21 @@
 #include "rrcp_io.h"
 #include "rrcp_switches.h"
 
-const uint32_t chipname_n = 3;
+const uint32_t chipname_n = 5;
 
-char* chipnames [3] = {
+char* chipnames [5] = {
     "unknown",
+    "rtl8326",
     "rtl8316b",
-    "rtl8326"
+    "rtl8318",
+    "rtl8324"
 };
 
 uint32_t switchtype;
 
-const uint32_t switchtype_n = 7;
+const uint32_t switchtype_n = 8;
 
-struct switchtype_t switchtypes[7] = {
+struct switchtype_t switchtypes[8] = {
     {
 	"generic",
 	"rtl8316b",
@@ -69,9 +71,18 @@ struct switchtype_t switchtypes[7] = {
     {
 	"dlink",
 	"des1024d",
-	"unknown",
+	"B1",
 	"rtl8326",
 	rtl8326,
+	24,
+	{2,1,4,3,6,5,8,7,10,9,12,11,14,13,16,15,18,17,20,19,22,21,24,23,0,0,0}
+    },
+    {
+	"dlink",
+	"des1024d_c1",
+	"C1",
+	"rtl8324",
+	rtl8324,
 	24,
 	{2,1,4,3,6,5,8,7,10,9,12,11,14,13,16,15,18,17,20,19,22,21,24,23,0,0,0}
     },

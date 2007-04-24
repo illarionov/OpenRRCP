@@ -27,8 +27,10 @@
 
 //chip types
 #define unknown 0
-#define rtl8316b 1
-#define rtl8326 2
+#define rtl8326 1
+#define rtl8316b 2
+#define rtl8318 3
+#define rtl8324 4
 
 struct switchtype_t {
 	char		*vendor;
@@ -71,11 +73,11 @@ union t_vlan_port_insert_vid {
 };
 
 extern const uint32_t chipname_n;
-extern char* chipnames [3];
+extern char* chipnames [5];
 
 extern uint32_t switchtype;
 extern const uint32_t switchtype_n;
-extern struct switchtype_t switchtypes[7];
+extern struct switchtype_t switchtypes[8];
 
 uint16_t rrcp_switch_autodetect_chip(void);
 

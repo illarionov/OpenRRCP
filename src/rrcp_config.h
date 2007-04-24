@@ -69,7 +69,7 @@
 		uint32_t sniffed_tx;
 	    } sniff;
 	    uint16_t raw[6];
-	} port_monitor; // 0x0219..0x021e, supported only on rtl8316b
+	} port_monitor; // 0x0219..0x021e, supported only on rtl8316b/rtl8324
 	union {
 	    struct t_alt_config_s{
 		struct  t_alt_config{

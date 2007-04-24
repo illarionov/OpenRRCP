@@ -441,7 +441,7 @@ void rtl83xx_scan(int verbose){
    if (hidden_mac != NULL) free(hidden_mac);
 }
 
-int rrcp_io_probe_switch_for_facing_switch_port(unsigned char *switch_mac_address, int *facing_switch_port_phys){
+int rrcp_io_probe_switch_for_facing_switch_port(uint8_t *switch_mac_address, uint8_t *facing_switch_port_phys){
     typedef struct sw_reply SW_REPLY;
     int len = 0;
     int i;
@@ -603,6 +603,18 @@ int eeprom_read(uint16_t addr,uint8_t *data){
     return 0;
 }
 
+int phy_wait(){
+    int i;
+    uint16_t res;
+
+    for(i=0;i<10;i++){
+    res=rtl83xx_readreg16(0x500);
+    if ((res&0x8000) == 0) return(res);
+	usleep(1000);
+    }
+    return(0xffff);
+}
+
 //old two-byte tweaked version - will be eventualy phased out
 int do_write_eeprom(uint16_t addr,uint16_t data){
     rtl83xx_setreg16(0x218,data>>8);
@@ -622,6 +634,18 @@ int do_read_eeprom(uint16_t addr,uint16_t *data){
     rtl83xx_setreg16(0x217,(addr-1)|0x800);
     if ((wait_eeprom()&0x2000)!=0) return 1;
     *data|=rtl83xx_readreg16(0x218)>>8;
+    return 0;
+}
+
+int phy_read(uint16_t phy_number,uint8_t phy_reg, uint16_t *data){
+    uint16_t tmp;
+
+    rtl83xx_setreg16(0x500,((phy_number&0x01f)<<5)|(phy_reg&0x01f));
+    if ((phy_wait()&0x8000)!=0){
+	return 1;
+    }
+    tmp=rtl83xx_readreg16(0x502);
+    data[0]=tmp;
     return 0;
 }
 

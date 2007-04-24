@@ -54,7 +54,33 @@ int rrcp_config_autodetect_chip_try_to_write_eeprom (uint16_t addr1, uint16_t ad
     return ((tmp21==tmp11+0x055)&&(tmp22==tmp11+0x0aa));
 }
 
-uint16_t rrcp_config_autodetect_switch_chip_eeprom(unsigned int *switch_type, unsigned int *chip_type, t_eeprom_type *eeprom_type){
+uint8_t rrcp_config_autodetect_switch_port_count(void){
+    uint16_t saved_reg0402,r,i;
+    uint16_t port_count;
+    
+    saved_reg0402=rtl83xx_readreg16(0x0402);
+    rtl83xx_setreg16(0x0402,0);
+    r=rtl83xx_readreg16(0x0402);
+    port_count=32;
+    for (i=0;i<=15;i++){
+	if ((r & (1<i))!=0){
+	    port_count=32-i;
+	}
+    }
+    rtl83xx_setreg16(0x0402,0xffff);
+    r=rtl83xx_readreg16(0x0402);
+    port_count=32;
+    for (i=0;i<=15;i++){
+	if ((r & (1<i))==0){
+	    port_count=32-i;
+	}
+    }
+    rtl83xx_setreg16(0x0402,saved_reg0402);
+
+    return port_count;
+}
+
+uint16_t rrcp_config_autodetect_switch_chip_eeprom(uint8_t *switch_type, uint8_t *chip_type, t_eeprom_type *eeprom_type){
     uint16_t saved_reg;
     uint16_t detected_switchtype=-1;
     uint16_t detected_chiptype=unknown;
@@ -62,6 +88,10 @@ uint16_t rrcp_config_autodetect_switch_chip_eeprom(unsigned int *switch_type, un
     int i,errcnt=0;
     uint8_t test1[6];
     uint8_t test2[4]={0x0,0x55,0xaa,0xff};
+    uint8_t port_count;
+
+    port_count=rrcp_config_autodetect_switch_port_count();    
+    printf("Detected %d port switch\n",port_count);
 
     // step 1: detect EEPROM presence and size
     for(i=0;i<6;i++){
@@ -123,7 +153,7 @@ void rrcp_config_read_from_switch(void)
 
     rrcp_config_autodetect_switch_chip_eeprom(&swconfig.switch_type, &swconfig.chip_type, &swconfig.eeprom_type);
     rrcp_io_probe_switch_for_facing_switch_port(swconfig.mac_address,&swconfig.facing_switch_port_phys);
-    
+
     swconfig.rrcp_config.raw=rtl83xx_readreg16(0x0200);
     for(i=0;i<2;i++)
 	swconfig.rrcp_byport_disable.raw[i]=rtl83xx_readreg16(0x0201+i);

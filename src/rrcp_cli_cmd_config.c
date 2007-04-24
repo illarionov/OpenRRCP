@@ -412,7 +412,7 @@ void cmd_config_register_commands(struct cli_def *cli)
 
     c=cli_register_command(cli, NULL, "mac-address-table", NULL, PRIVILEGE_PRIVILEGED, MODE_CONFIG, "Configure the MAC address table");
     cli_register_command(cli, c, "aging-time", cmd_config_mac_aging, PRIVILEGE_PRIVILEGED, MODE_CONFIG, "Set MAC address table entry maximum age");
-    
+
     { // ip config
 	struct cli_command *ip,*ip_igmp,*no_ip,*no_ip_igmp;
 	ip=cli_register_command(cli, NULL, "ip", NULL, PRIVILEGE_PRIVILEGED, MODE_CONFIG, "Global IP configuration subcommands");

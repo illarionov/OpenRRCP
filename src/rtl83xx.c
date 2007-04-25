@@ -864,7 +864,7 @@ int main(int argc, char **argv){
     char *show_sub_cmd_l4[]={"id",""};
     char *reset_sub_cmd[]={"soft","hard",""};
     char *write_sub_cmd[]={"memory","eeprom","defaults",""};
-    char *config_sub_cmd_l1[]={"interface","rrcp","vlan","mac-address","mac-address-table","flowcontrol","storm-control","monitor",""};
+    char *config_sub_cmd_l1[]={"interface","rrcp","vlan","mac-address","mac-address-table","flowcontrol","storm-control","monitor","vendor-id",""};
     char *config_intf_sub_cmd_l1[]={"no","shutdown","speed","duplex","rate-limit","mac-address","rrcp","mls","flow-control",""};
     char *config_duplex[]={"half","full",""};
     char *config_rate[]={"100m","128k","256k","512k","1m","2m","4m","8m","input","output",""};
@@ -1251,6 +1251,20 @@ int main(int argc, char **argv){
                                            print_unknown(argv[4+shift],&config_monitor[0]);
                              }
                           }
+                   case 8: // vendor-id
+                          check_argc(argc,3+shift,"vendor-id needed\n",NULL);
+   	                  if (sscanf(argv[4+shift], "%02x%02x%02x%02x",x,x+1,x+2,x+3)!=4){
+   		              printf("malformed vendor-id: '%s'!\n",argv[4+shift]);
+                              exit(1);
+                          }
+		          for (i=0;i<4;i++){
+		            if (do_write_eeprom_byte(0x1a+(3-i),(unsigned char)x[i])){
+		             printf ("error writing eeprom!\n");
+		             exit(1);
+		            }
+	                  }
+		          do_reboot();
+                          exit(0);
 
                    default:
                           print_unknown(argv[3+shift],&config_sub_cmd_l1[0]);

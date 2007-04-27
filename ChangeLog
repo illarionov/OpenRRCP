@@ -1,3 +1,27 @@
+Fri Apr 27 16:01:15 MSD 2007
+        * Merge commandset-ng branch - a whole new commandset for rtl83xx tool [amelnik]
+
+        * fix BSD make system - now single Makefile for both Linux and *BSD [nording]
+
+        * Fixed port order for "DLink DES1024D HW.rev.C1" [timshin oleg]
+
+        * Added explicit support for "DLink DES1024D HW.rev.C1 [nording]
+
+        * Improve switch/chip autodetection; add support for RTL8324 chip [nording]
+
+        * added config vendor-id [amelnik]
+
+        * fix port mirroring [amelnik]
+
+        * added vlan clear, rm Makefile.bsd [amelnik]
+
+	* rrcpcli: add low-lever diagnostic commands: show switch-register, show eeprom-register, show phy-register [nording]
+
+	* rrcpcli: add 'copy file: eeprom' and 'copy eeprom file:' commands [nording]
+
+        * rrcpcli: A log to fixes, mainly with 802.1Q handling [nording]
+
+
 Wed Apr 11 15:38:14 MSD 2007
         * Added explicit support for "Zyxel ES116P" (contributed by Oleg Timshin)
 

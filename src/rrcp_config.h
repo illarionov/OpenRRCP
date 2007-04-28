@@ -35,9 +35,12 @@
     } t_eeprom_type;
 
     struct t_swconfig {
-	unsigned int switch_type;
-	unsigned int chip_type;
+	uint8_t mac_address[6];
+	uint8_t switch_type;
+	uint8_t chip_type;
 	t_eeprom_type eeprom_type;
+	uint8_t	port_count;
+	uint8_t facing_switch_port_phys;
 	union {//0x0200
 	    struct  t_rrcp_config{
 		uint16_t
@@ -67,7 +70,7 @@
 		uint32_t sniffed_tx;
 	    } sniff;
 	    uint16_t raw[6];
-	} port_monitor; // 0x0219..0x021e, supported only on rtl8316b
+	} port_monitor; // 0x0219..0x021e, supported only on rtl8316b/rtl8324
 	union {
 	    struct t_alt_config_s{
 		struct  t_alt_config{
@@ -177,6 +180,7 @@
 extern const char *bandwidth_text[8];
 extern const char *wrr_ratio_text[4];
 extern const char *eeprom_type_text[7];
+extern const int eeprom_type_size[7];
 extern struct t_swconfig swconfig;
 
 void rrcp_config_read_from_switch(void);

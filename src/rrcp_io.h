@@ -51,6 +51,8 @@ void rtl83xx_prepare();
 
 void rtl83xx_scan(int verbose);
 
+int rrcp_io_probe_switch_for_facing_switch_port(uint8_t *mac_address, uint8_t *facing_switch_port_phys);
+
 uint32_t rtl83xx_readreg32(uint16_t regno);
 
 uint16_t rtl83xx_readreg16(uint16_t regno);
@@ -70,6 +72,8 @@ int do_write_eeprom(uint16_t addr,uint16_t data);
 
 //old two-byte tweaked version - will be eventualy phased out
 int do_read_eeprom(uint16_t addr,uint16_t *data);
+
+int phy_read(uint16_t phy_number,uint8_t phy_reg, uint16_t *data);
 
 uint32_t rtl83xx_ping(void);
 

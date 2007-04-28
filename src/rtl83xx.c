@@ -38,8 +38,14 @@
 #include <unistd.h>
 #include "rrcp_packet.h"
 #include "rrcp_io.h"
-#include "rrcp_switches.h"
 #include "rrcp_config.h"
+#include "rrcp_switches.h"
+#include "../lib/fake-libcli.h"
+#include "rrcp_cli_cmd_show.h"
+//#include "rrcp_cli_cmd_config.h"
+//#include "rrcp_cli_cmd_config_int.h"
+//#include "rrcp_cli_cmd_other.h"
+#include "rrcp_cli.h"
 
 int myPid = 0;
 
@@ -110,7 +116,7 @@ void print_port_link_status(int port_no, int enabled, unsigned char encoded_stat
     printf("\n");
 }
 
-void print_link_status(unsigned short int *arr){
+void print_link_status(void){
     int i;
     union {
 	uint16_t sh[13];
@@ -134,7 +140,6 @@ void print_link_status(unsigned short int *arr){
     EnLoopDet=rtl83xx_readreg16(0x0200)&0x4;
     if (EnLoopDet) port_loop_status=rtl83xx_readreg32(0x0101);
     for(i=1;i<=switchtypes[switchtype].num_ports;i++){
-        if (arr) { if (!*(arr+i-1)){ continue;} }
 	print_port_link_status(
 		i,
 		!((u.signlelong>>(map_port_number_from_logical_to_physical(i)))&1),
@@ -227,14 +232,14 @@ void print_vlan_status(int show_vid){
 	    (vlan_status & 1<<4) ? "yes" : "no");
     for (port=1;port<=switchtypes[switchtype].num_ports;port++){
 	port_phys=map_port_number_from_logical_to_physical(port);
-	//insert_vid option is available only in rtl8316b
+	//insert_vid option is available only in rtl8316b/rtl8324
         if ( (show_vid >= 0) && (show_vid != vlan_vid[vlan_port_vlan.index[port_phys]]) ) continue; 
 	printf("%s/%-2d: VLAN_IDX=%02d, VID=%d, Insert_VID=%s, Out_tag_strip=%s\n",
 		ifname,
 		port,
 		vlan_port_vlan.index[port_phys],
 		vlan_vid[vlan_port_vlan.index[port_phys]],
-		(switchtypes[switchtype].chip_id==rtl8316b) ? (vlan_port_insert_vid.bitmap&(1<<port_phys) ? "yes" : "no ") : "N/A",
+		(switchtypes[switchtype].chip_id==rtl8326) ? "N/A" : (vlan_port_insert_vid.bitmap&(1<<port_phys) ? "yes" : "no "),
 		vlan_port_output_tag_descr[(vlan_port_output_tag.bitmap>>(port_phys*2))&3]
 		);
     }
@@ -264,7 +269,7 @@ void print_vlan_status(int show_vid){
     }
 }
 
-void do_vlan_enable_vlan(int is_8021q){
+void do_vlan_enable_vlan(int is_8021q, int do_clear){
     int i,port,vlan;
     union t_vlan_port_vlan vlan_port_vlan;
     union t_vlan_port_output_tag vlan_port_output_tag;
@@ -276,24 +281,29 @@ void do_vlan_enable_vlan(int is_8021q){
     vlan_port_insert_vid.bitmap=0;
 
     for(port=0;port<switchtypes[switchtype].num_ports;port++){
-	vlan_port_vlan.index[port]=(uint16_t)port;
+	vlan_port_vlan.index[port]=(do_clear)?0:(uint16_t)port;
 	vlan_port_output_tag.bitmap|=3<<port*2;
-//	vlan_port_insert_vid.bitmap|=(is_8021q)?1<<port:0;
-	vlan_port_insert_vid.bitmap|=0;
+        vlan_port_insert_vid.bitmap|=0;
     }
 
     memset(&vlan_entry,0,sizeof(vlan_entry));
     memset(&vlan_vid,0,sizeof(vlan_vid));
-    for(vlan=0;vlan<switchtypes[switchtype].num_ports;vlan++){
-	if ( (vlan!=(switchtypes[switchtype].num_ports-2)) &&
-             (vlan!=(switchtypes[switchtype].num_ports-1)) ) {
-	    vlan_entry.bitmap[vlan]=(1<<vlan)|(1<<(switchtypes[switchtype].num_ports-2))|(1<<(switchtypes[switchtype].num_ports-1));
-//	    vlan_vid[vlan]=(is_8021q)?vid_base+vlan:0;
-	    vlan_vid[vlan]=0;
-	}else{
-//	    vlan_entry.bitmap[vlan]=(is_8021q)?0:0xffffffff>>(32-switchtypes[switchtype].num_ports);
-	    vlan_entry.bitmap[vlan]=0xffffffff>>(32-switchtypes[switchtype].num_ports);
-        }
+
+    if (do_clear) {
+     vlan_entry.bitmap[0]=0xffffffff>>(32-switchtypes[switchtype].num_ports);
+     vlan_vid[0]=(is_8021q)?1:0;
+    }else{
+     for(vlan=0;vlan<switchtypes[switchtype].num_ports;vlan++){
+ 	 if ( (vlan!=(switchtypes[switchtype].num_ports-2)) &&
+              (vlan!=(switchtypes[switchtype].num_ports-1)) ) {
+	     vlan_entry.bitmap[vlan]=(1<<vlan)|(1<<(switchtypes[switchtype].num_ports-2))|(1<<(switchtypes[switchtype].num_ports-1));
+//	     vlan_vid[vlan]=(is_8021q)?vid_base+vlan:0;
+	     vlan_vid[vlan]=0;
+	 }else{
+//	     vlan_entry.bitmap[vlan]=(is_8021q)?0:0xffffffff>>(32-switchtypes[switchtype].num_ports);
+	     vlan_entry.bitmap[vlan]=0xffffffff>>(32-switchtypes[switchtype].num_ports);
+         }
+     }
     }
 
     //write all relevant config to switch from our data structures    
@@ -333,9 +343,12 @@ void do_vlan(int mode){
 void do_vlan_tmpl(int mode){
  if (mode) {
    do_vlan(mode);
-   do_vlan_enable_vlan(mode-1);
+   do_vlan_enable_vlan(mode-1,0);
+ }else{
+   swconfig.vlan.raw[0]=rtl83xx_readreg16(0x030b);
+   if (!swconfig.vlan.s.config.enable) { printf("WARNING: vlan mode not enable\n"); } 
+   do_vlan_enable_vlan(swconfig.vlan.s.config.dot1q,1);
  }
- else printf("Under construction\n");
 }
 
 void do_write_memory(){
@@ -784,7 +797,8 @@ void print_usage(void){
 	printf("Usage: rtl8316b [[authkey-]xx:xx:xx:xx:xx:xx@]if-name <command> [<argument>]\n");
 	printf("       rtl8326 ----\"\"----\n");
 	printf("       rtl83xx_dlink_des1016d ----\"\"----\n");
-	printf("       rtl83xx_dlink_des1024d ----\"\"----\n");
+	printf("       rtl83xx_dlink_des1024d_c1 ----\"\"----\n");
+	printf("       rtl83xx_dlink_des1024d_d1 ----\"\"----\n");
 	printf("       rtl83xx_compex_ps2216 ----\"\"----\n");
         printf("       rtl83xx_ovislink_fsh2402gt ----\"\"----\n");
 	printf("       rtl83xx_zyxel_es116p ----\"\"----\n");
@@ -810,6 +824,7 @@ void print_usage(void){
 	printf(" config vlan disable - disable all VLAN support\n");
 	printf(" config vlan mode portbased|dot1q - enable specified VLAN support\n");
 	printf(" config vlan template-load portbased|dot1qtree - load specified template\n");
+	printf(" config vlan clear - clear vlan table (all ports bind to one vlan)\n");
 	printf(" config mac-address <mac> - set <mac> as new switch MAC address and reboots\n");
 	printf(" config mac-address-table aging-time|drop-unknown <arg>  - address lookup table control\n");
         printf(" config flowcontrol dot3x enable|disable - globally disable full duplex flow control (802.3x pause)\n");
@@ -825,6 +840,7 @@ void print_usage(void){
 }
 
 int main(int argc, char **argv){
+    struct cli_def *cli;
     unsigned int x[6];
     unsigned int ak;
     int i;
@@ -845,16 +861,19 @@ int main(int argc, char **argv){
     int dest_port=0;
     unsigned short int *p_port_list=NULL;
     unsigned short int port_list[26];
+    char qs[]="?";
+    char *internal_argv[32];
+    char temp_str[128];
     char *ena_disa[]={"disable","enable",""};
     char *cmd_level_1[]={"show","config","scan","reload","reboot","write","ping",""}; 
-    char *show_sub_cmd[]={"running-config","startup-config","interface","vlan",""};
+    char *show_sub_cmd[]={"running-config","startup-config","interface","vlan","version","switch-register","eeprom-register","phy-register",""};
     char *scan_sub_cmd[]={"verbose",""};
     char *show_sub_cmd_l2[]={"full","verbose",""};
     char *show_sub_cmd_l3[]={"summary",""};
     char *show_sub_cmd_l4[]={"id",""};
     char *reset_sub_cmd[]={"soft","hard",""};
     char *write_sub_cmd[]={"memory","eeprom","defaults",""};
-    char *config_sub_cmd_l1[]={"interface","rrcp","vlan","mac-address","mac-address-table","flowcontrol","storm-control","monitor",""};
+    char *config_sub_cmd_l1[]={"interface","rrcp","vlan","mac-address","mac-address-table","flowcontrol","storm-control","monitor","vendor-id",""};
     char *config_intf_sub_cmd_l1[]={"no","shutdown","speed","duplex","rate-limit","mac-address","rrcp","mls","flow-control",""};
     char *config_duplex[]={"half","full",""};
     char *config_rate[]={"100m","128k","256k","512k","1m","2m","4m","8m","input","output",""};
@@ -881,20 +900,26 @@ int main(int argc, char **argv){
     if ((p=rindex(p,'/'))==NULL){
 	p=argv[0];
     }
-    if (strstr(p,"rtl8316b")==argv[0]+strlen(argv[0])-8){
+    if (strstr(p,"rtl8326")==argv[0]+strlen(argv[0])-7){
 	switchtype=0;
-    }else if (strstr(p,"rtl8326")==argv[0]+strlen(argv[0])-7){
+    }else if (strstr(p,"rtl8316b")==argv[0]+strlen(argv[0])-8){
 	switchtype=1;
-    }else if (strstr(p,"rtl83xx_dlink_des1016d")==argv[0]+strlen(argv[0])-22){
+    }else if (strstr(p,"rtl8318")==argv[0]+strlen(argv[0])-8){
 	switchtype=2;
-    }else if (strstr(p,"rtl83xx_dlink_des1024d")==argv[0]+strlen(argv[0])-22){
+    }else if (strstr(p,"rtl8324")==argv[0]+strlen(argv[0])-7){
 	switchtype=3;
-    }else if (strstr(p,"rtl83xx_compex_ps2216")==argv[0]+strlen(argv[0])-21){
+    }else if (strstr(p,"rtl83xx_dlink_des1016d")==argv[0]+strlen(argv[0])-22){
 	switchtype=4;
-    }else if (strstr(p,"rtl83xx_ovislink_fsh2402gt")==argv[0]+strlen(argv[0])-26){
+    }else if (strstr(p,"rtl83xx_dlink_des1024d_b1")==argv[0]+strlen(argv[0])-25){
 	switchtype=5;
+    }else if (strstr(p,"rtl83xx_dlink_des1024d_c1")==argv[0]+strlen(argv[0])-25){
+	switchtype=6;
+    }else if (strstr(p,"rtl83xx_compex_ps2216")==argv[0]+strlen(argv[0])-21){
+	switchtype=7;
+    }else if (strstr(p,"rtl83xx_ovislink_fsh2402gt")==argv[0]+strlen(argv[0])-26){
+	switchtype=8;
     }else if (strstr(p,"rtl83xx_zyxel_es116p")==argv[0]+strlen(argv[0])-20){ 
-        switchtype=6; 
+        switchtype=9; 
     }else {
 	printf("%s: unknown switch/chip type\n",argv[0]);
 	exit(0);
@@ -928,9 +953,11 @@ int main(int argc, char **argv){
 	    switchtypes[switchtype].model,
 	    argv[1]);
 
-    engage_timeout(5);
+    engage_timeout(10);
     rtl83xx_prepare();
 
+    cli=cli_init();
+  
     cmd=compare_command(argv[2+shift],&cmd_level_1[0]);
     switch (cmd){
          case 0: //show
@@ -938,24 +965,30 @@ int main(int argc, char **argv){
                 switch(compare_command(argv[3+shift],&show_sub_cmd[0])){
                    case 0: // running-config
    	                  if (argc == (3+shift+1)){
-	           	     do_show_config(0);
+	           	     cmd_show_config(cli,"", &argv[5+shift], argc-shift);
                              exit(0);
                           }
                           (void) get_cmd_num(argv[4+shift],-1,NULL,&show_sub_cmd_l2[0]);
-	                  do_show_config(1);
+                           cmd_show_config(cli,"show running-config full",&argv[5+shift], argc-shift-3);
                           exit(0);
                    case 1: // startup-config
                           printf("Under construction\n");
                           exit(0);
                    case 2: // interfaces
    	                  if (argc == (3+shift+1)){
-                             print_link_status(NULL);
+                             print_link_status();
                              exit(0);
                           }
                           if (str_portlist_to_array(argv[4+shift],&port_list[0],switchtypes[switchtype].num_ports)==0){
                             p_port_list=&port_list[0];
    	                    if (argc == (4+shift+1)){
-                               print_link_status(p_port_list);
+                               for(i=0;i<switchtypes[switchtype].num_ports;i++){
+                                 if (!port_list[i]) continue;
+                                 bzero(temp_str,128);
+                                 snprintf(temp_str,127,"%u",i+1);
+                                 internal_argv[0]=temp_str;
+                                 cmd_show_interfaces(cli,"",&internal_argv[0],1);
+                               }
                                exit(0);
                             }
                             shift++;
@@ -977,6 +1010,32 @@ int main(int argc, char **argv){
                           }
 	                  printf("Vlan-id not specified\n");
                           exit(1);
+                   case 4: // version
+                          rrcp_autodetect_switch_chip_eeprom(&swconfig.switch_type, &swconfig.chip_type, &swconfig.eeprom_type);
+                          cmd_show_version(cli, "version", &argv[5+shift], argc-shift-3);
+                          exit(0);
+                   case 5: // switch-register
+   	                  if (argc == (3+shift+1)){
+                            internal_argv[0]=qs;
+                          }else{
+                            internal_argv[0]=argv[4+shift];
+                          }
+                          exit(cmd_show_switch_register(cli,"",&internal_argv[0],1));
+                   case 6: // eeprom-register
+   	                  if (argc == (3+shift+1)){
+                            internal_argv[0]=qs;
+                          }else{
+                            internal_argv[0]=argv[4+shift];
+                          }
+                          exit(cmd_show_eeprom_register(cli,"",&internal_argv[0],1));
+                   case 7: // phy-register
+   	                  if (argc == (3+shift+1)){
+                            internal_argv[0]=qs;
+                          }else{
+                            internal_argv[0]=argv[4+shift];
+                          }
+                          exit(cmd_show_phy_register(cli,"",&internal_argv[0],1));
+                      
                    default: 
                           print_unknown(argv[3+shift],&show_sub_cmd[0]);
                 }
@@ -1109,6 +1168,7 @@ int main(int argc, char **argv){
                                         exit(0);
                                  case 2: //clear
                                         do_vlan_tmpl(0);
+                                        exit(0);
                                  case 3: // mode
                                         check_argc(argc,4+shift,NULL,&config_vlan_mode[0]);
                                         subcmd=get_cmd_num(argv[5+shift],-1,NULL,&config_vlan_mode[0]);
@@ -1174,6 +1234,10 @@ int main(int argc, char **argv){
                                          print_unknown(argv[4+shift],&config_alt[0]);
                           }
                    case 7: // monitor
+                          if (switchtypes[switchtype].chip_id==rtl8326){
+                            printf("Port mirroring not working with hardware based on rtl8326/rtl8326s\n");
+                            exit(1);
+                          } 
                           if (negate) {
                             do_port_config_mirror(3,&port_list[0],1);
                             exit(0);
@@ -1230,6 +1294,20 @@ int main(int argc, char **argv){
                                            print_unknown(argv[4+shift],&config_monitor[0]);
                              }
                           }
+                   case 8: // vendor-id
+                          check_argc(argc,3+shift,"vendor-id needed\n",NULL);
+   	                  if (sscanf(argv[4+shift], "%02x%02x%02x%02x",x,x+1,x+2,x+3)!=4){
+   		              printf("malformed vendor-id: '%s'!\n",argv[4+shift]);
+                              exit(1);
+                          }
+		          for (i=0;i<4;i++){
+		            if (do_write_eeprom_byte(0x1a+(3-i),(unsigned char)x[i])){
+		             printf ("error writing eeprom!\n");
+		             exit(1);
+		            }
+	                  }
+		          do_reboot();
+                          exit(0);
 
                    default:
                           print_unknown(argv[3+shift],&config_sub_cmd_l1[0]);

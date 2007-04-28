@@ -22,8 +22,20 @@
     This would be appreciated, however not required.
 */
 
+#ifdef RTL83XX
+#include "../lib/fake-libcli.h"
+#else
 #include "../lib/libcli.h"
+#endif
 
 int cmd_show_version(struct cli_def *cli, char *command, char *argv[], int argc);
 int cmd_show_config(struct cli_def *cli, char *command, char *argv[], int argc);
+#ifdef RTL83XX
+int cmd_show_interfaces(struct cli_def *cli, char *command, char *argv[], int argc);
+int cmd_show_ip_igmp_snooping(struct cli_def *cli, char *command, char *argv[], int argc);
+int cmd_show_switch_register(struct cli_def *cli, char *command, char *argv[], int argc);
+int cmd_show_eeprom_register(struct cli_def *cli, char *command, char *argv[], int argc);
+int cmd_show_phy_register(struct cli_def *cli, char *command, char *argv[], int argc);
+#else
 void cmd_show_register_commands(struct cli_def *cli);
+#endif

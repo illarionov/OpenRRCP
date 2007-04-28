@@ -25,14 +25,19 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#ifdef RTL83XX
+#include "../lib/fake-libcli.h"
+#else
 #include "../lib/libcli.h"
+#endif
 #include "rrcp_cli.h"
-#include "rrcp_switches.h"
 #include "rrcp_io.h"
 #include "rrcp_config.h"
+#include "rrcp_switches.h"
 
 int cmd_show_version(struct cli_def *cli, char *command, char *argv[], int argc)
 {
+    char s1[32];
     cli_print(cli, "OpenRRCP CLI, Version %s",RRCP_CLI_VERSION);
     cli_print(cli, "http://openrrcp.org.ru/");
     cli_print(cli, "Licensed under terms of GPL");
@@ -57,6 +62,9 @@ int cmd_show_version(struct cli_def *cli, char *command, char *argv[], int argc)
     cli_print(cli, "802.1Q support: %s",(switchtypes[switchtype].chip_id==rtl8326) ? "No/Buggy" : "Yes");
     cli_print(cli, "IGMP support: %s",(switchtypes[switchtype].chip_id==rtl8326) ? "v1" : "v1, v2");
     cli_print(cli, "Facing host interface: %s",ifname);
+    cli_print(cli, "Facing switch interface: %s",rrcp_config_get_portname(s1, sizeof(s1), 
+			map_port_number_from_physical_to_logical(swconfig.facing_switch_port_phys),
+			swconfig.facing_switch_port_phys));
     return CLI_OK;
 }
 
@@ -172,6 +180,84 @@ int cmd_show_ip_igmp_snooping(struct cli_def *cli, char *command, char *argv[], 
     return CLI_OK;
 }
 
+int cmd_show_switch_register(struct cli_def *cli, char *command, char *argv[], int argc)
+{
+    if (argc==1){
+	if (strcmp(argv[0],"?")==0){
+	    cli_print(cli, "  |  Output modifiers");
+	    cli_print(cli, "  <0-fff> Specify register number (hex)");
+	}else{
+	    int regno;
+	    if (sscanf(argv[0],"%x",&regno)==1){
+		cli_print(cli, "  reg(0x%04x)=0x%04x",regno,rtl83xx_readreg16(regno));
+	    }else{
+		cli_print(cli, "%% ERROR: Invalig register number: '%s'.",argv[0]);
+	    }
+	}
+	return CLI_OK;
+    }
+    cli_print(cli, "%% Invalid input detected.");
+    return CLI_ERROR;
+}
+
+int cmd_show_eeprom_register(struct cli_def *cli, char *command, char *argv[], int argc)
+{
+    if (argc==1){
+	if (strcmp(argv[0],"?")==0){
+	    cli_print(cli, "  |  Output modifiers");
+	    cli_print(cli, "  <0-fff> Specify register number (hex)");
+	}else{
+	    int regno;
+	    unsigned char regval;
+	    if (sscanf(argv[0],"%x",&regno)==1){
+		if (eeprom_read(regno,&regval)==0){
+		    cli_print(cli, "  eeprom(0x%04x)=0x%02x",regno,regval);
+		}else{
+		    cli_print(cli, "%% ERROR: Can't access EEPROM register 0x%04x.",regno);
+		}
+	    }else{
+		cli_print(cli, "%% ERROR: Invalig register number: '%s'.",argv[0]);
+	    }
+	}
+	return CLI_OK;
+    }
+    cli_print(cli, "%% Invalid input detected.");
+    return CLI_ERROR;
+}
+
+int cmd_show_phy_register(struct cli_def *cli, char *command, char *argv[], int argc)
+{
+    if (argc==1){
+	if (strcmp(argv[0],"?")==0){
+	    cli_print(cli, "  |  Output modifiers");
+	    cli_print(cli, "  <2-3,8-31> Specify register number (dec)");
+	}else{
+	    uint16_t regno,regval[4];
+	    int i,j;	    
+
+	    if (sscanf(argv[0],"%d",&i)==1){
+		regno=(uint16_t)i;
+		cli_print(cli, "  PHY number %d registers hex dump:",(int)regno);
+		cli_print(cli, "   +0x00  +0x08  +0x10  +0x18");
+		for(i=0;i<8;i++){
+		    for(j=0;j<4;j++){
+			if (phy_read(regno,i+j*8,&regval[j])!=0){
+			    cli_print(cli, "%% ERROR: Can't access PHY number %d, register %d(0x%02d)",regno,i+j*8,i+j*8);
+			    break;
+			}
+		    }
+		    cli_print(cli, "  0x%04x 0x%04x 0x%04x 0x%04x",(int)regval[0],(int)regval[1],(int)regval[2],(int)regval[3]);
+		}
+	    }else{
+		cli_print(cli, "%% ERROR: Invalig register number: '%s'.",argv[0]);
+	    }
+	}
+	return CLI_OK;
+    }
+    cli_print(cli, "%% Invalid input detected.");
+    return CLI_ERROR;
+}
+
 int cmd_test(struct cli_def *cli, char *command, char *argv[], int argc)
 {
     int i;
@@ -184,12 +270,16 @@ int cmd_test(struct cli_def *cli, char *command, char *argv[], int argc)
     return CLI_OK;
 }
 
+#ifndef RTL83XX
 void cmd_show_register_commands(struct cli_def *cli)
 {
     struct cli_command *c;
     c = cli_register_command(cli, NULL, "show", NULL,  PRIVILEGE_UNPRIVILEGED, MODE_EXEC, "Show running system information");
     cli_register_command(cli, c, "version", cmd_show_version, PRIVILEGE_UNPRIVILEGED, MODE_EXEC, "System hardware and software status");
     cli_register_command(cli, c, "configuration", cmd_test, PRIVILEGE_PRIVILEGED, MODE_EXEC, "Contents of Non-Volatile memory");
+    cli_register_command(cli, c, "switch-register", cmd_show_switch_register, PRIVILEGE_PRIVILEGED, MODE_EXEC, "Contents of internal switch controller register");
+    cli_register_command(cli, c, "eeprom-register", cmd_show_eeprom_register, PRIVILEGE_PRIVILEGED, MODE_EXEC, "Contents of internal switch EEPROM register");
+    cli_register_command(cli, c, "phy-register", cmd_show_phy_register, PRIVILEGE_PRIVILEGED, MODE_EXEC, "Contents of internal switch PHY register");
     {//show running-config
 	struct cli_command *show_runningconfig;
 	show_runningconfig = cli_register_command(cli, c, "running-config", cmd_show_config, PRIVILEGE_PRIVILEGED, MODE_EXEC, "Current operating configuration");
@@ -205,3 +295,4 @@ void cmd_show_register_commands(struct cli_def *cli)
 	cli_register_command(cli, show_ip_igmp_snooping, "mrouter", cmd_show_ip_igmp_snooping, PRIVILEGE_PRIVILEGED, MODE_EXEC, "Show multicast routers on this switch");
     }
 }
+#endif

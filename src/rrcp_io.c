@@ -52,6 +52,7 @@
 #include <errno.h>
 #include "rrcp_packet.h"
 #include "rrcp_io.h"
+#include "rrcp_config.h"
 #include "rrcp_switches.h"
 
 char ifname[128] = "";
@@ -441,6 +442,47 @@ void rtl83xx_scan(int verbose){
    if (hidden_mac != NULL) free(hidden_mac);
 }
 
+int rrcp_io_probe_switch_for_facing_switch_port(uint8_t *switch_mac_address, uint8_t *facing_switch_port_phys){
+    typedef struct sw_reply SW_REPLY;
+    int len = 0;
+    int i;
+    struct rrcp_packet_t pkt;
+    struct rrcp_helloreply_packet_t pktr;
+
+    memcpy(pkt.ether_dhost,switch_mac_address,6);
+    memcpy(pkt.ether_shost,my_mac,6);
+    pkt.ether_type=htons(0x8899);
+
+    /* scan with Hello packet */
+    pkt.rrcp_proto=0x01;
+    pkt.rrcp_opcode=0x00;
+    pkt.rrcp_isreply=0;
+    pkt.rrcp_authkey=htons(authkey);
+
+    sock_send(&pkt, sizeof(pkt));
+
+    for (i=0;i<10;i++){
+	usleep(10);
+	memset(&pktr,0,sizeof(pktr));
+	len=sock_rec_(&pktr, sizeof(pktr),5000);
+	if (len >14 &&
+    	    (memcmp(pktr.ether_dhost,my_mac,6)==0)&&
+	    pktr.ether_type==htons(0x8899) &&
+	    pktr.rrcp_proto==0x01 &&
+	    pktr.rrcp_opcode==0x00 &&
+	    pktr.rrcp_isreply==1 &&
+	    pktr.rrcp_authkey==htons(authkey)){
+	    *facing_switch_port_phys=(int)pktr.rrcp_downlink_port;
+	    break;
+	}
+    }
+    if (i>=10){
+	*facing_switch_port_phys=-1;
+	return -1;
+    }
+    return 0;
+}
+
 uint32_t rtl83xx_readreg32(uint16_t regno){
     int len = 0;
     struct rrcp_packet_t pkt,pktr;
@@ -562,25 +604,45 @@ int eeprom_read(uint16_t addr,uint8_t *data){
     return 0;
 }
 
+int phy_wait(){
+    int i;
+    uint16_t res;
+
+    for(i=0;i<10;i++){
+    res=rtl83xx_readreg16(0x500);
+    if ((res&0x8000) == 0) return(res);
+	usleep(1000);
+    }
+    return(0xffff);
+}
+
 //old two-byte tweaked version - will be eventualy phased out
 int do_write_eeprom(uint16_t addr,uint16_t data){
-    rtl83xx_setreg16(0x218,data>>8);
-    rtl83xx_setreg16(0x217,addr);
-    if ((wait_eeprom()&0x2000)!=0) return 1;
-    rtl83xx_setreg16(0x218,data&0x00ff);
-    rtl83xx_setreg16(0x217,addr-1);
-    if ((wait_eeprom()&0x2000)!=0) return 1;
+    if (eeprom_write(addr,data>>8)) return 1;
+    if (eeprom_write(addr-1,data&0x00ff)) return 1;
     return 0;
 }
 
 //old two-byte tweaked version - will be eventualy phased out
 int do_read_eeprom(uint16_t addr,uint16_t *data){
-    rtl83xx_setreg16(0x217,addr|0x800);
-    if ((wait_eeprom()&0x2000)!=0) return 1;
-    *data=rtl83xx_readreg16(0x218);
-    rtl83xx_setreg16(0x217,(addr-1)|0x800);
-    if ((wait_eeprom()&0x2000)!=0) return 1;
-    *data|=rtl83xx_readreg16(0x218)>>8;
+uint8_t temp_reg=0;
+
+    if (eeprom_read(addr|0x800, &temp_reg)) return 1;
+    *data=temp_reg<<8;
+    if (eeprom_read((addr-1)|0x800, &temp_reg)) return 1;
+    *data|=(uint16_t)temp_reg;
+    return 0;
+}
+
+int phy_read(uint16_t phy_number,uint8_t phy_reg, uint16_t *data){
+    uint16_t tmp;
+
+    rtl83xx_setreg16(0x500,((phy_number&0x01f)<<5)|(phy_reg&0x01f));
+    if ((phy_wait()&0x8000)!=0){
+	return 1;
+    }
+    tmp=rtl83xx_readreg16(0x502);
+    data[0]=tmp;
     return 0;
 }
 

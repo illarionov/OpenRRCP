@@ -136,7 +136,12 @@ int cmd_config_int_switchport_access_vlan(struct cli_def *cli, char *command, ch
 
 	    vi=find_or_create_vlan_index_by_vid(atoi(argv[0]));
 	    if (vi>=0){
+		int i;
 		swconfig.vlan.s.port_vlan_index[port_phys]=vi;
+		for(i=0;i<32;i++){
+		    swconfig.vlan_entry.bitmap[i]&=~(1<<port_phys);
+		}
+		swconfig.vlan_entry.bitmap[vi]|=1<<port_phys;
 		rrcp_config_commit_vlan_to_switch();
 	    }else{
 		cli_print(cli, "%% Too many VLANs: This switch only supports 32.");

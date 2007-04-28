@@ -144,7 +144,7 @@ int cmd_config_vlan(struct cli_def *cli, char *command, char *argv[], int argc)
 	        return CLI_ERROR;
 	    }else{
 		int vidlist[33];
-		int i,vi;
+		int i,vi,port,port_phys;
 
 		if (str_portlist_to_array_by_value(argv[0],vidlist,32)==0){
 		    for (i=0;(i<32)&&(vidlist[i]>0)&&(vidlist[i]<4095);i++){
@@ -153,6 +153,13 @@ int cmd_config_vlan(struct cli_def *cli, char *command, char *argv[], int argc)
 			    swconfig.vlan_entry.bitmap[vi]=0;
 			    if (vidlist[i]>1){
 				swconfig.vlan_vid[vi]=0;
+			    }
+			}
+			for(port=1;port<=switchtypes[switchtype].num_ports;port++){
+			    port_phys=map_port_number_from_logical_to_physical(port);
+			    if (swconfig.vlan.s.port_vlan_index[port_phys]==vi){
+				swconfig.vlan.s.port_vlan_index[port_phys]=find_vlan_index_by_vid(1);
+				swconfig.vlan_entry.bitmap[find_vlan_index_by_vid(1)]|=1<<port_phys;
 			    }
 			}
 		    }
@@ -195,7 +202,7 @@ int cmd_config_vlan(struct cli_def *cli, char *command, char *argv[], int argc)
 	    rrcp_config_commit_vlan_to_switch();
 	}
 	if ((strcasecmp(command,"vlan dot1q")==0)||(strcasecmp(command,"vlan dot1q force")==0)){
-	    if (switchtypes[switchtype].chip_id!=rtl8316b){
+	    if (switchtypes[switchtype].chip_id==rtl8326){
 		if (strcasecmp(command,"vlan dot1q force")==0){
 		    cli_print(cli, "%% WARNING: Enabled IEEE 802.1Q VLANs on hardware, that do not supported them properly.");
 		}else{
@@ -203,19 +210,23 @@ int cmd_config_vlan(struct cli_def *cli, char *command, char *argv[], int argc)
 		    return CLI_ERROR;
 		}
 	    }else{
-		int i,port,port_phys;
-		swconfig.vlan_vid[0]=1;
-		for(i=1;i<32;i++){
-		    swconfig.vlan_vid[i]=0;
+	        if (!swconfig.vlan.s.config.dot1q || !swconfig.vlan.s.config.enable){
+		    int i,port,port_phys;
+		    swconfig.vlan_vid[0]=1;
+		    swconfig.vlan_entry.bitmap[0]=0xffffffff;
+		    for(i=1;i<32;i++){
+			swconfig.vlan_vid[i]=0;
+			swconfig.vlan_entry.bitmap[i]=0;
+		    }
+		    for(port=1;port<=switchtypes[switchtype].num_ports;port++){
+			port_phys=map_port_number_from_logical_to_physical(port);
+			swconfig.vlan.s.port_vlan_index[port_phys]=0;
+		    }
+		    swconfig.vlan_port_insert_vid.bitmap=0;
+		    swconfig.vlan.s.config.dot1q=1;
+		    swconfig.vlan.s.config.enable=1;
+		    rrcp_config_commit_vlan_to_switch();
 		}
-		for(port=1;port<=switchtypes[switchtype].num_ports;port++){
-		    port_phys=map_port_number_from_logical_to_physical(port);
-		    swconfig.vlan.s.port_vlan_index[port_phys]=0;
-		}
-		swconfig.vlan_port_insert_vid.bitmap=0;
-	        swconfig.vlan.s.config.dot1q=1;
-		swconfig.vlan.s.config.enable=1;
-		rrcp_config_commit_vlan_to_switch();
 	    }
 	}
     }
@@ -370,6 +381,7 @@ int cmd_config_spanning_tree(struct cli_def *cli, char *command, char *argv[], i
 	if (strcasecmp(command,"spanning-tree bpdufilter enable")==0) swconfig.alt_config.s.config.stp_filter=1;
 	if ((strcasecmp(command,"no spanning-tree bpdufilter enable")==0)||
 	    (strcasecmp(command,"spanning-tree bpdufilter disable")==0)) swconfig.alt_config.s.config.stp_filter=0;
+	rtl83xx_setreg16(0x0300,swconfig.alt_config.raw);
     }
     return CLI_OK;
 }
@@ -400,7 +412,7 @@ void cmd_config_register_commands(struct cli_def *cli)
 
     c=cli_register_command(cli, NULL, "mac-address-table", NULL, PRIVILEGE_PRIVILEGED, MODE_CONFIG, "Configure the MAC address table");
     cli_register_command(cli, c, "aging-time", cmd_config_mac_aging, PRIVILEGE_PRIVILEGED, MODE_CONFIG, "Set MAC address table entry maximum age");
-    
+
     { // ip config
 	struct cli_command *ip,*ip_igmp,*no_ip,*no_ip_igmp;
 	ip=cli_register_command(cli, NULL, "ip", NULL, PRIVILEGE_PRIVILEGED, MODE_CONFIG, "Global IP configuration subcommands");

@@ -44,12 +44,13 @@
 #include <arpa/inet.h>
 #include "rrcp_packet.h"
 #include "rrcp_io.h"
-#include "rrcp_switches.h"
 #include "rrcp_config.h"
+#include "rrcp_switches.h"
 #include "../lib/libcli.h"
 #include "rrcp_cli_cmd_show.h"
 #include "rrcp_cli_cmd_config.h"
 #include "rrcp_cli_cmd_config_int.h"
+#include "rrcp_cli_cmd_other.h"
 #include "rrcp_cli.h"
 
 int myPid = 0;
@@ -111,6 +112,7 @@ int main(int argc, char *argv[])
     cmd_show_register_commands(cli);
     cmd_config_register_commands(cli);
     cmd_config_int_register_commands(cli);
+    cmd_other_register_commands(cli);
 
 //    cli_set_auth_callback(cli, check_auth);
 //    cli_set_enable_callback(cli, check_enable);
@@ -163,6 +165,7 @@ int main(int argc, char *argv[])
 	if (sscanf(argv[optind], "%x:%x:%x:%x:%x:%x@%s",x,x+1,x+2,x+3,x+4,x+5,ifname)==7){
 	    for (i=0;i<6;i++){
 		dest_mac[i]=(unsigned char)x[i];
+		swconfig.mac_address[i]=(unsigned char)x[i];
 	    }
 	}else{
 	    strcpy(ifname,argv[optind]);
@@ -195,14 +198,15 @@ int main(int argc, char *argv[])
 	authkey=authkey_tmp;
     }
     rtl83xx_prepare();
+    rrcp_autodetect_switch_chip_eeprom(&swconfig.switch_type, &swconfig.chip_type, &swconfig.eeprom_type);
 
     if (switchtype==-1){
-	switchtype=rrcp_switch_autodetect();
+	switchtype=swconfig.switch_type;
 	printf("detected %s %s\n",
 	    switchtypes[switchtype].vendor,
 	    switchtypes[switchtype].model);
     }else{
-	if(switchtypes[switchtype].chip_id!=rrcp_switch_autodetect_chip() && !switchtype_force){
+	if(switchtypes[switchtype].chip_id!=swconfig.chip_type && !switchtype_force){
 	    printf("%s: ERROR - Chip mismatch\n"
 		    "Specified switch: %s %s\n"
 		    "Specified chip: %s\n"
@@ -211,7 +215,7 @@ int main(int argc, char *argv[])
 		    switchtypes[switchtype].vendor,
 		    switchtypes[switchtype].model,
 		    switchtypes[switchtype].chip_name,
-		    "");
+		    chipnames[swconfig.chip_type]);
 	    exit(0);
 	}
     }

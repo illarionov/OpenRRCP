@@ -27,101 +27,24 @@
 #include <stdarg.h>
 #include <string.h>
 #include "rrcp_io.h"
-#include "rrcp_switches.h"
 #include "rrcp_config.h"
+#include "rrcp_switches.h"
 
 const char *bandwidth_text[8]={"100M","128K","256K","512K","1M","2M","4M","8M"};
 const char *wrr_ratio_text[4]={"4:1","8:1","16:1","1:0"};
 const char *eeprom_type_text[7]={"N/A","Write Protected","2401","2402","2404","2408","2416"};
+const int eeprom_type_size[7]={0,0,128,256,512,1024,2048};
 
 struct t_swconfig swconfig;
-
-int rrcp_config_autodetect_chip_try_to_write_eeprom (uint16_t addr1, uint16_t addr2)
-{
-    uint8_t tmp11=0, tmp12=0, tmp21=0, tmp22=0;
-
-    eeprom_read(addr1,&tmp11);
-    eeprom_read(addr2,&tmp12);
-    eeprom_write(addr1,tmp11+0x055);
-    eeprom_write(addr2,tmp11+0x0aa);
-    tmp21=tmp11;
-    tmp22=tmp11;
-    eeprom_read(addr1,&tmp21);
-    eeprom_read(addr2,&tmp22);
-    eeprom_write(addr1,tmp11);
-    eeprom_write(addr2,tmp12);
-    return ((tmp21==tmp11+0x055)&&(tmp22==tmp11+0x0aa));
-}
-
-uint16_t rrcp_config_autodetect_switch_chip_eeprom(unsigned int *switch_type, unsigned int *chip_type, t_eeprom_type *eeprom_type){
-    uint16_t saved_reg;
-    uint16_t detected_switchtype=-1;
-    uint16_t detected_chiptype=unknown;
-    t_eeprom_type detected_eeprom=EEPROM_NONE;
-    int i,errcnt=0;
-    uint8_t test1[6];
-    uint8_t test2[4]={0x0,0x55,0xaa,0xff};
-
-    // step 1: detect EEPROM presence and size
-    for(i=0;i<6;i++){
-	if ((errcnt=eeprom_read(0x12+i,&test1[i]))!=0){break;}
-    }
-    if (errcnt==0){
-	if (rrcp_config_autodetect_chip_try_to_write_eeprom(0x07e,0x07f)){
-	    detected_eeprom=EEPROM_2401;
-	    if (rrcp_config_autodetect_chip_try_to_write_eeprom(0x07f,0x0ff)){
-		detected_eeprom=EEPROM_2402;
-		if (rrcp_config_autodetect_chip_try_to_write_eeprom(0x0ff,0x01ff)){
-		    detected_eeprom=EEPROM_2404;
-		    if (rrcp_config_autodetect_chip_try_to_write_eeprom(0x01ff,0x03ff)){
-			detected_eeprom=EEPROM_2408;
-			if (rrcp_config_autodetect_chip_try_to_write_eeprom(0x03ff,0x07ff)){
-			    detected_eeprom=EEPROM_2416;
-			}
-		    }
-		}
-	    }
-	}else{
-	    detected_eeprom=EEPROM_WRITEPOTECTED;
-	}
-    }
-
-    // step 2: if step 1 fail, detect rtl8316b without EEPROM
-    saved_reg=rtl83xx_readreg16(0x0218);
-    for(i=0;i<4;i++){
-	rtl83xx_setreg16(0x0218,test2[i]);
-	if (rtl83xx_readreg16(0x0218) != test2[i]) {
-	    errcnt++; 
-	    break;
-	}
-    }
-    rtl83xx_setreg16(0x0218,saved_reg);
-
-    if (errcnt) {
-        detected_chiptype=rtl8326;
-    }else{
-	detected_chiptype=rtl8316b;
-    }
-
-    if(detected_chiptype==rtl8316b){
-	detected_switchtype=0; // generic rtl8316b
-    }else{
-	detected_switchtype=1; // generic rtl8326
-    }
-
-    *switch_type=detected_switchtype;
-    *chip_type=detected_chiptype;
-    *eeprom_type=detected_eeprom;
-    return 0;
-}
 
 ////////////// read all relevant config from switch into our data structures    
 void rrcp_config_read_from_switch(void)
 {
     int i;
 
-    rrcp_config_autodetect_switch_chip_eeprom(&swconfig.switch_type, &swconfig.chip_type, &swconfig.eeprom_type);
-    
+    rrcp_autodetect_switch_chip_eeprom(&swconfig.switch_type, &swconfig.chip_type, &swconfig.eeprom_type);
+    rrcp_io_probe_switch_for_facing_switch_port(swconfig.mac_address,&swconfig.facing_switch_port_phys);
+
     swconfig.rrcp_config.raw=rtl83xx_readreg16(0x0200);
     for(i=0;i<2;i++)
 	swconfig.rrcp_byport_disable.raw[i]=rtl83xx_readreg16(0x0201+i);
@@ -247,7 +170,7 @@ void rrcp_config_bin2text(char *sc, int l, int show_defaults)
     {
 	if (swconfig.vlan.s.config.enable){
 	    if (swconfig.vlan.s.config.dot1q){
-		if (switchtypes[switchtype].chip_id!=rtl8316b){
+		if (switchtypes[switchtype].chip_id==rtl8326){
 		    sncprintf(sc,l,"! WARNING: 802.1Q VLANs enabled on hardware, that do not support them properly.\n");
 		    sncprintf(sc,l,"! WARNING: Read here: http://openrrcp.org.ru/wiki:rtl8326_dot1q_bug for details.\n");
 		    sncprintf(sc,l,"vlan dot1q force\n");
@@ -374,8 +297,8 @@ void rrcp_config_bin2text(char *sc, int l, int show_defaults)
 	if (show_defaults || swconfig.bandwidth.rxtx[port_phys].tx!=0){
 	    sncprintf(sc,l," rate-limit output %s\n",bandwidth_text[swconfig.bandwidth.rxtx[port_phys].tx]);
 	}
-	if (switchtypes[switchtype].chip_id==rtl8316b){
-	    //port mirroring working only with rtl8316b
+	if (switchtypes[switchtype].chip_id!=rtl8326){
+	    //port mirroring working only with rtl8316b/rtl8324
 	    if (swconfig.port_monitor.sniff.sniffer & (1<<port_phys)){
 		for(port2=1;port2<=switchtypes[switchtype].num_ports;port2++){
 		    port2_phys=map_port_number_from_logical_to_physical(port2);
@@ -416,17 +339,6 @@ void rrcp_config_bin2text(char *sc, int l, int show_defaults)
 	sncprintf(sc,l,"!\n");
     }
     sncprintf(sc,l,"end\n");
-}
-
-void do_show_config(int verbose)
-{
-    char *text;
-
-    text=malloc(65536);
-    rrcp_config_read_from_switch();
-    rrcp_config_bin2text(text,65535,verbose);
-    printf("%s",text);
-    free(text);
 }
 
 int find_vlan_index_by_vid(int vid)
@@ -474,7 +386,8 @@ int find_or_create_vlan_index_by_vid(int vid)
 
 void rrcp_config_write_to_eeprom(void)
 {
-/*    int i,numreg;
+/*
+    int i,numreg;
 
     numreg=(switchtypes[switchtype].num_ports==16)?12:13;
     rrcp_config_read_from_switch();

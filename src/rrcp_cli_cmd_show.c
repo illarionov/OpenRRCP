@@ -71,7 +71,9 @@ int cmd_show_version(struct cli_def *cli, char *command, char *argv[], int argc)
 int cmd_show_config(struct cli_def *cli, char *command, char *argv[], int argc)
 {
     char text[32768];
-
+#ifdef RTL83XX
+    rrcp_config_read_from_switch();
+#endif
     cli_print(cli, "!");
     cli_print(cli, "! Config for %s %s switch at %02x:%02x:%02x:%02x:%02x:%02x@%s",
 		    switchtypes[switchtype].vendor,
@@ -121,6 +123,15 @@ int cmd_show_interfaces(struct cli_def *cli, char *command, char *argv[], int ar
 	    char *sp[4] = {"10","100","1000","???"};
 
 	    port_phys=map_port_number_from_logical_to_physical(port);
+#ifdef RTL83XX
+            int i;
+            for(i=0;i<2;i++){
+               swconfig.port_disable.raw[i]=rtl83xx_readreg16(0x0608+i);
+            }
+            for(i=0;i<13;i++){
+               swconfig.port_config.raw[i]=rtl83xx_readreg16(0x060a+i);
+            }
+#endif
 	    link_status.raw=(uint8_t)(rtl83xx_readreg16(0x0619+port_phys/2)>>(8*(port_phys%2)));
 	    cli_print(cli, "%s is %s, line protocol is %s",
 		rrcp_config_get_portname(s, sizeof(s), port, port_phys),
@@ -160,6 +171,9 @@ int cmd_show_ip_igmp_snooping(struct cli_def *cli, char *command, char *argv[], 
 	}
     }else{
 	if (strcasecmp(command,"show ip igmp snooping")==0){
+#ifdef RTL83XX
+            swconfig.alt_igmp_snooping.raw=rtl83xx_readreg16(0x0308);
+#endif
 	    cli_print(cli, "Global IGMP Snooping configuration:");
 	    cli_print(cli, "-----------------------------------");
 	    cli_print(cli, "IGMP snooping              : %s",swconfig.alt_igmp_snooping.config.en_igmp_snooping ? "Enabled":"Disabled");
@@ -167,7 +181,11 @@ int cmd_show_ip_igmp_snooping(struct cli_def *cli, char *command, char *argv[], 
 	if (strcasecmp(command,"show ip igmp snooping mrouter")==0){
 	    int port,port_phys;
 	    char pn[64];
-
+#ifdef RTL83XX
+            int i;
+            for(i=0;i<2;i++)
+               swconfig.alt_mrouter_mask.raw[i]=rtl83xx_readreg16(0x0309+i);
+#endif
 	    cli_print(cli, "Multicast routers found on port(s):");
 	    for(port=1;port<=switchtypes[switchtype].num_ports;port++){
 	        port_phys=map_port_number_from_logical_to_physical(port);

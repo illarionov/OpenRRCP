@@ -24,7 +24,11 @@
 
 #include <stdlib.h>
 #include <string.h>
+#ifdef RTL83XX
+#include "../lib/fake-libcli.h"
+#else
 #include "../lib/libcli.h"
+#endif
 #include "rrcp_config.h"
 #include "rrcp_lib.h"
 #include "rrcp_io.h"
@@ -41,6 +45,7 @@ int cmd_config_version(struct cli_def *cli, char *command, char *argv[], int arg
     return CLI_OK;
 }
 
+#ifndef RTL83XX
 int cmd_config_hostname(struct cli_def *cli, char *command, char *argv[], int argc)
 {
     if (argc==1){
@@ -54,6 +59,7 @@ int cmd_config_hostname(struct cli_def *cli, char *command, char *argv[], int ar
     }
     return CLI_OK;
 }
+#endif
 
 int cmd_config_mac_aging(struct cli_def *cli, char *command, char *argv[], int argc)
 {
@@ -85,6 +91,10 @@ int cmd_config_ip_igmp_snooping(struct cli_def *cli, char *command, char *argv[]
 	    cli_print(cli, "%% Invalid input detected.");
 	}
     }else{
+#ifdef RTL83XX
+        swconfig.alt_igmp_snooping.raw=rtl83xx_readreg16(0x0308);
+#endif
+        cli_print(cli, "%% %s",command);
 	if (strcasecmp(command,"ip igmp snooping")==0)    swconfig.alt_igmp_snooping.config.en_igmp_snooping=1;
 	if (strcasecmp(command,"no ip igmp snooping")==0) swconfig.alt_igmp_snooping.config.en_igmp_snooping=0;
 	rtl83xx_setreg16reg16(0x0308,swconfig.alt_igmp_snooping.raw);
@@ -101,12 +111,18 @@ int cmd_config_rrcp(struct cli_def *cli, char *command, char *argv[], int argc)
 	    cli_print(cli, "%% Invalid input detected.");
 	}
     }else{
+#ifdef RTL83XX
+        swconfig.rrcp_config.raw=rtl83xx_readreg16(0x0200);
+#endif
 	if (strcasecmp(command,"rrcp enable")==0)    swconfig.rrcp_config.config.rrcp_disable=0;
 	if (strcasecmp(command,"no rrcp enable")==0) swconfig.rrcp_config.config.rrcp_disable=1;
 	if (strcasecmp(command,"rrcp echo enable")==0)    swconfig.rrcp_config.config.echo_disable=0;
 	if (strcasecmp(command,"no rrcp echo enable")==0) swconfig.rrcp_config.config.echo_disable=1;
 	if (strcasecmp(command,"rrcp loop-detect enable")==0)    swconfig.rrcp_config.config.loop_enable=1;
 	if (strcasecmp(command,"no rrcp loop-detect enable")==0) swconfig.rrcp_config.config.loop_enable=0;
+#ifdef RTL83XX
+        rtl83xx_setreg16reg16(0x0200,swconfig.rrcp_config.raw);
+#endif
     }
     return CLI_OK;
 }
@@ -277,6 +293,10 @@ int cmd_config_qos(struct cli_def *cli, char *command, char *argv[], int argc)
 	    cli_print(cli, "%% Invalid input detected.");
 	}
     }else{
+#ifdef RTL83XX
+        swconfig.qos_config.raw=rtl83xx_readreg16(0x400);
+#endif
+	cli_print(cli, "%% command=\"%s\"",command);
 	if (strcasecmp(command,"mls qos trust dscp")==0) swconfig.qos_config.config.dscp_enable=1;
 	if (strcasecmp(command,"no mls qos trust dscp")==0) swconfig.qos_config.config.dscp_enable=0;
 	if (strcasecmp(command,"mls qos trust cos")==0) swconfig.qos_config.config.cos_enable=1;
@@ -297,6 +317,9 @@ int cmd_config_qos_wrr_queue_ratio(struct cli_def *cli, char *command, char *arg
 	    }
 	}else{
 	    int i,hit;
+#ifdef RTL83XX
+            swconfig.qos_config.raw=rtl83xx_readreg16(0x400);
+#endif
 	    hit=0;
 	    for (i=0;i<4;i++){
 		if (strcmp(wrr_ratio_text[i],argv[0])==0){
@@ -325,6 +348,10 @@ int cmd_config_flowcontrol(struct cli_def *cli, char *command, char *argv[], int
 	    cli_print(cli, "%% Invalid input detected.");
 	}
     }else{
+#ifdef RTL83XX
+        swconfig.port_config_global.raw=rtl83xx_readreg16(0x607);
+        swconfig.qos_config.raw=rtl83xx_readreg16(0x400);
+#endif
 	if (strcasecmp(command,"flowcontrol dot3x")==0) swconfig.port_config_global.config.flow_dot3x_disable=0;
 	if (strcasecmp(command,"no flowcontrol dot3x")==0) swconfig.port_config_global.config.flow_dot3x_disable=1;
 	if (strcasecmp(command,"flowcontrol backpressure")==0) swconfig.port_config_global.config.flow_backpressure_disable=0;
@@ -346,6 +373,9 @@ int cmd_config_stormcontrol(struct cli_def *cli, char *command, char *argv[], in
 	    cli_print(cli, "%% Invalid input detected.");
 	}
     }else{
+#ifdef RTL83XX
+        swconfig.port_config_global.raw=rtl83xx_readreg16(0x607);
+#endif
 	if (strcasecmp(command,"no storm-control broadcast")==0) {
 	    swconfig.port_config_global.config.storm_control_broadcast_disable=1;
 	    swconfig.port_config_global.config.storm_control_broadcast_strict=0;
@@ -378,6 +408,9 @@ int cmd_config_spanning_tree(struct cli_def *cli, char *command, char *argv[], i
 	    cli_print(cli, "%% Invalid input detected.");
 	}
     }else{
+#ifdef RTL83XX
+        swconfig.alt_config.raw=rtl83xx_readreg16(0x300);
+#endif
 	if (strcasecmp(command,"spanning-tree bpdufilter enable")==0) swconfig.alt_config.s.config.stp_filter=1;
 	if ((strcasecmp(command,"no spanning-tree bpdufilter enable")==0)||
 	    (strcasecmp(command,"spanning-tree bpdufilter disable")==0)) swconfig.alt_config.s.config.stp_filter=0;
@@ -385,6 +418,8 @@ int cmd_config_spanning_tree(struct cli_def *cli, char *command, char *argv[], i
     }
     return CLI_OK;
 }
+
+#ifndef RTL83XX
 
 int cmd_config_end(struct cli_def *cli, char *command, char *argv[], int argc)
 {
@@ -529,3 +564,4 @@ void cmd_config_register_commands(struct cli_def *cli)
     
     cli_register_command(cli, NULL, "end", cmd_config_end, PRIVILEGE_PRIVILEGED, MODE_CONFIG, "Exit from configure mode");
 }
+#endif

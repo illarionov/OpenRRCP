@@ -22,8 +22,28 @@
     This would be appreciated, however not required.
 */
 
+#ifdef RTL83XX
+#include "../lib/fake-libcli.h"
+#else
 #include "../lib/libcli.h"
+#endif
 
+#ifdef RTL83XX
+int cmd_config_mac_aging(struct cli_def *cli, char *command, char *argv[], int argc);
+int cmd_config_ip_igmp_snooping(struct cli_def *cli, char *command, char *argv[], int argc);
+int cmd_config_rrcp(struct cli_def *cli, char *command, char *argv[], int argc);
+int cmd_config_rrcp_authkey(struct cli_def *cli, char *command, char *argv[], int argc);
+int cmd_config_vlan(struct cli_def *cli, char *command, char *argv[], int argc);
+int cmd_config_vlan_leaky(struct cli_def *cli, char *command, char *argv[], int argc);
+int cmd_config_vlan_drop(struct cli_def *cli, char *command, char *argv[], int argc);
+int cmd_config_qos(struct cli_def *cli, char *command, char *argv[], int argc);
+int cmd_config_qos_wrr_queue_ratio(struct cli_def *cli, char *command, char *argv[], int argc);
+int cmd_config_flowcontrol(struct cli_def *cli, char *command, char *argv[], int argc);
+int cmd_config_stormcontrol(struct cli_def *cli, char *command, char *argv[], int argc);
+int cmd_config_spanning_tree(struct cli_def *cli, char *command, char *argv[], int argc);
+#else
 void cmd_config_register_commands(struct cli_def *cli);
-
 int cmd_config_end(struct cli_def *cli, char *command, char *argv[], int argc);
+#endif
+
+

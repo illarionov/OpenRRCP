@@ -38,11 +38,12 @@
 #include <unistd.h>
 #include "rrcp_packet.h"
 #include "rrcp_io.h"
+#include "rrcp_lib.h"
 #include "rrcp_config.h"
 #include "rrcp_switches.h"
 #include "../lib/fake-libcli.h"
 #include "rrcp_cli_cmd_show.h"
-//#include "rrcp_cli_cmd_config.h"
+#include "rrcp_cli_cmd_config.h"
 //#include "rrcp_cli_cmd_config_int.h"
 //#include "rrcp_cli_cmd_other.h"
 #include "rrcp_cli.h"
@@ -395,6 +396,7 @@ void do_write_eeprom_defaults(){
  if (switchtypes[switchtype].num_ports==26) {if (do_write_eeprom(0x53,0xbfbf)) {printf("write eeprom\n");exit(1);}}
 }
 
+#ifndef RTL83XX
 int str_portlist_to_array(char *list,unsigned short int *arr,unsigned int arrlen){
 short int i,k;
 char *s,*c,*n;
@@ -429,6 +431,7 @@ unsigned int st,sp;
  }
  return(0);
 }
+#endif
 
 int compare_command(char *argv, char **command_list){
 /*
@@ -496,50 +499,6 @@ void do_port_disable(unsigned short int *arr,unsigned short int val){
 void do_port_learning(int mode,unsigned short int *arr){
     do_32bit_reg_action(arr,mode,0x301);
     if (!mode) printf ("Warning! This setting(s) can be saved and be forged after reboot\n");
-}
-
-void do_rrcp_ctrl(int state){
-    swconfig.rrcp_config.raw=rtl83xx_readreg16(0x0200);
-    swconfig.rrcp_config.config.rrcp_disable=state&0x1;
-    rtl83xx_setreg16(0x0200,swconfig.rrcp_config.raw);
-}
-
-void do_rrcp_echo(int state){
-    swconfig.rrcp_config.raw=rtl83xx_readreg16(0x0200);
-    swconfig.rrcp_config.config.echo_disable=state&0x1;
-    rtl83xx_setreg16(0x0200,swconfig.rrcp_config.raw);
-}
-
-void do_loopdetect(int state){
-    swconfig.rrcp_config.raw=rtl83xx_readreg16(0x0200);
-    swconfig.rrcp_config.config.loop_enable=state&0x1;
-    rtl83xx_setreg16(0x0200,swconfig.rrcp_config.raw);
-}
-
-void do_storm_control(int mode,int state){
-    swconfig.port_config_global.raw=rtl83xx_readreg16(0x0607);
-    if (mode) { // broadcast
-      switch (state){ 
-        case 1: // relaxed
-              swconfig.port_config_global.config.storm_control_broadcast_disable=0;
-              swconfig.port_config_global.config.storm_control_broadcast_strict=0;
-              break;
-        case 2: // strict
-              swconfig.port_config_global.config.storm_control_broadcast_disable=0;
-              swconfig.port_config_global.config.storm_control_broadcast_strict=1;
-              break;
-        default: // off
-              swconfig.port_config_global.config.storm_control_broadcast_disable=1;
-              swconfig.port_config_global.config.storm_control_broadcast_strict=0;
-      }
-    }else{ // multicast
-      if (state){ 
-        swconfig.port_config_global.config.storm_control_multicast_strict=1;
-      }else{
-        swconfig.port_config_global.config.storm_control_multicast_strict=0;
-      }
-    } 
-    rtl83xx_setreg16(0x0607,swconfig.port_config_global.raw);
 }
 
 void do_port_config(int mode,unsigned short int *arr, int val){
@@ -656,6 +615,33 @@ void do_port_config_bandwidth(int dir,unsigned short int *arr, int val){
   if (val) printf ("Warning! This setting(s) can be saved and be forged after hardware reset\n");
 }
 
+void do_alt_config(mode){
+  swconfig.alt_config.raw=rtl83xx_readreg16(0x0300);
+  switch (mode){
+    case 1:
+           swconfig.alt_config.s.config.mac_aging_disable=1;
+           swconfig.alt_config.s.config.mac_aging_fast=0;
+           break;
+    case 2:
+           swconfig.alt_config.s.config.mac_aging_disable=0;
+           swconfig.alt_config.s.config.mac_aging_fast=1;
+           break;
+    case 3:
+           swconfig.alt_config.s.config.mac_aging_disable=0;
+           swconfig.alt_config.s.config.mac_aging_fast=0;
+           break;
+    case 4:
+           swconfig.alt_config.s.config.mac_drop_unknown=1;
+           break;
+    case 5:
+           swconfig.alt_config.s.config.mac_drop_unknown=0;
+           break;
+    default:
+           return;
+  }
+  rtl83xx_setreg16(0x0300,swconfig.alt_config.raw);
+}
+
 void do_port_config_mirror(int dir,unsigned short int *arr, int dest_port ){
   int i,step;
   
@@ -677,57 +663,6 @@ void do_port_config_mirror(int dir,unsigned short int *arr, int dest_port ){
   for (i=0;i<6;i+=step){
     rtl83xx_setreg16(0x219+i, swconfig.port_monitor.raw[0+i]);
   }
-}
-
-void do_alt_config(mode){
-  swconfig.alt_config.raw=rtl83xx_readreg16(0x0300);
-  switch (mode){
-    case 1: 
-           swconfig.alt_config.s.config.mac_aging_disable=1;
-           swconfig.alt_config.s.config.mac_aging_fast=0;
-           break;
-    case 2: 
-           swconfig.alt_config.s.config.mac_aging_disable=0;
-           swconfig.alt_config.s.config.mac_aging_fast=1;
-           break;
-    case 3: 
-           swconfig.alt_config.s.config.mac_aging_disable=0;
-           swconfig.alt_config.s.config.mac_aging_fast=0;
-           break;
-    case 4: 
-           swconfig.alt_config.s.config.mac_drop_unknown=1;
-           break;
-    case 5: 
-           swconfig.alt_config.s.config.mac_drop_unknown=0;
-           break;
-    default:
-           return;
-  }
-  rtl83xx_setreg16(0x0300,swconfig.alt_config.raw);
-}
-
-void do_glob_flowctrl(int mode, int state){
- /*
-   mode: 0 - dot3x, 1 - backpressure, 3 - ondemand
-   state: 0 - no, 1 - yes
- */
- if (mode < 2) swconfig.port_config_global.raw=rtl83xx_readreg16(0x0607);
- else swconfig.qos_config.raw=rtl83xx_readreg16(0x0400);
- switch (mode){
-       case 0:
-              swconfig.port_config_global.config.flow_dot3x_disable=(!state)&0x1;
-              break;
-       case 1:
-              swconfig.port_config_global.config.flow_backpressure_disable=(!state)&0x1;
-              break;
-       case 2:
-              swconfig.qos_config.config.flow_ondemand_disable=state&0x1;
-              break;
-       default:
-              return;
- }
- if (mode < 2) rtl83xx_setreg16(0x0607,swconfig.port_config_global.raw);
- else rtl83xx_setreg16(0x0400,swconfig.qos_config.raw);
 }
 
 void print_allow_command(char **command_list){
@@ -785,6 +720,11 @@ int subcmd=-1;
    print_allow_command(command_list);
   }
   exit(1);
+}
+
+void cmdcat(char *cmd_str,int size,char *cmd){
+ if (strlen(cmd_str)) strncat(cmd_str," ",size);
+ strncat(cmd_str,cmd,size);
 }
 
 void print_unknown(char *argv, char **command_list){
@@ -851,6 +791,7 @@ int main(int argc, char **argv){
     int shift=0;
     int subcmd=0;
     int cmd;
+    int subconfcmd;
     int vid=-1;
     int duplex=0;
     int negate=0;
@@ -864,33 +805,42 @@ int main(int argc, char **argv){
     char qs[]="?";
     char *internal_argv[32];
     char temp_str[128];
+    char cmd_to_cli[128];
+    char temp_cmd_to_cli[128];
     char *ena_disa[]={"disable","enable",""};
+    char *ena_only[]={"enable",""};
     char *cmd_level_1[]={"show","config","scan","reload","reboot","write","ping",""}; 
-    char *show_sub_cmd[]={"running-config","startup-config","interface","vlan","version","switch-register","eeprom-register","phy-register",""};
+    char *show_sub_cmd[]={"running-config","startup-config","interface","vlan","version","switch-register","eeprom-register","phy-register","ip",""};
     char *scan_sub_cmd[]={"verbose",""};
     char *show_sub_cmd_l2[]={"full","verbose",""};
     char *show_sub_cmd_l3[]={"summary",""};
     char *show_sub_cmd_l4[]={"id",""};
+    char *show_sub_cmd_l5[]={"igmp","snooping","mrouter",""};
     char *reset_sub_cmd[]={"soft","hard",""};
     char *write_sub_cmd[]={"memory","eeprom","defaults",""};
-    char *config_sub_cmd_l1[]={"interface","rrcp","vlan","mac-address","mac-address-table","flowcontrol","storm-control","monitor","vendor-id",""};
+    char *config_sub_cmd_l1[]={"interface","rrcp","vlan","mac-address","mac-address-table","flowcontrol","storm-control","monitor","vendor-id","ip","spanning-tree","mls","wrr-queue",""};
     char *config_intf_sub_cmd_l1[]={"no","shutdown","speed","duplex","rate-limit","mac-address","rrcp","mls","flow-control",""};
     char *config_duplex[]={"half","full",""};
     char *config_rate[]={"100m","128k","256k","512k","1m","2m","4m","8m","input","output",""};
     char *config_mac_learn[]={"learning","disable","enable",""};
     char *config_port_qos[]={"7","0","qos","cos",""};
     char *config_port_flow[]={"none","asym2remote","symmetric","asym2local",""};
-    char *config_rrcp[]={"disable","enable","echo","loop-detect","authkey",""};
+    char *config_rrcp[]={"enable","echo","loop-detect","authkey",""};
     char *config_alt[]={"aging-time","unknown-destination",""};
-    char *config_alt_time[]={"0","12","300",""};
     char *config_alt_dest[]={"drop","pass",""};
-    char *config_vlan[]={"disable","transparent","clear","mode","template-load",""};
+    char *config_vlan[]={"disable","transparent","clear","mode","template-load","leaky","drop",""};
     char *config_vlan_mode[]={"portbased","dot1q",""};
     char *config_vlan_tmpl[]={"portbased","dot1qtree",""};
+    char *config_vlan_leaky[]={"arp","multicast","unicast",""};
+    char *config_vlan_drop[]={"untagged_frames","invalid_vid",""};
     char *config_flowc[]={"dot3x","backpressure","ondemand-disable",""};
     char *config_storm[]={"broadcast","multicast",""};
     char *config_storm_br[]={"relaxed","strict",""};
     char *config_monitor[]={"interface","source","destination","input","output",""};
+    char *config_ip_igmp[]={"igmp","snooping",""};
+    char *config_span_tree[]={"bpdufilter",""};
+    char *config_mls[]={"qos","trust","cos","dscp",""};
+    char *config_wrr[]={"ratio",""};
 
     if (argc<3){
         print_usage();
@@ -937,6 +887,7 @@ int main(int argc, char **argv){
     }else if (sscanf(argv[1], "%x:%x:%x:%x:%x:%x@%s",x,x+1,x+2,x+3,x+4,x+5,ifname)==7){
 	for (i=0;i<6;i++){
 	    dest_mac[i]=(unsigned char)x[i];
+            swconfig.mac_address[i]=(unsigned char)x[i];
 	}
     }else{
 	strcpy(ifname,argv[1]);
@@ -957,37 +908,44 @@ int main(int argc, char **argv){
     rtl83xx_prepare();
 
     cli=cli_init();
-  
+    bzero(cmd_to_cli,sizeof(cmd_to_cli));
+
     cmd=compare_command(argv[2+shift],&cmd_level_1[0]);
     switch (cmd){
          case 0: //show
+                cmdcat(cmd_to_cli,sizeof(cmd_to_cli)-1,"show");
                 check_argc(argc,2+shift,NULL,&show_sub_cmd[0]);
-                switch(compare_command(argv[3+shift],&show_sub_cmd[0])){
+                subcmd=compare_command(argv[3+shift],&show_sub_cmd[0]);
+                cmdcat(cmd_to_cli,sizeof(cmd_to_cli)-1,show_sub_cmd[subcmd]);
+                switch(subcmd){
                    case 0: // running-config
-   	                  if (argc == (3+shift+1)){
-	           	     cmd_show_config(cli,"", &argv[5+shift], argc-shift);
+   	                  if (argc == (4+shift)){
+	           	     cmd_show_config(cli,cmd_to_cli, NULL, 0);
                              exit(0);
                           }
                           (void) get_cmd_num(argv[4+shift],-1,NULL,&show_sub_cmd_l2[0]);
-                           cmd_show_config(cli,"show running-config full",&argv[5+shift], argc-shift-3);
+                           cmdcat(cmd_to_cli,sizeof(cmd_to_cli)-1,show_sub_cmd_l2[0]);
+                           cmd_show_config(cli,cmd_to_cli,&argv[4+shift], argc-shift-4);
                           exit(0);
                    case 1: // startup-config
                           printf("Under construction\n");
                           exit(0);
                    case 2: // interfaces
-   	                  if (argc == (3+shift+1)){
+   	                  if (argc == (4+shift)){
                              print_link_status();
                              exit(0);
                           }
                           if (str_portlist_to_array(argv[4+shift],&port_list[0],switchtypes[switchtype].num_ports)==0){
                             p_port_list=&port_list[0];
-   	                    if (argc == (4+shift+1)){
+   	                    if (argc == (5+shift)){
                                for(i=0;i<switchtypes[switchtype].num_ports;i++){
                                  if (!port_list[i]) continue;
-                                 bzero(temp_str,128);
-                                 snprintf(temp_str,127,"%u",i+1);
+                                 bzero(temp_str,sizeof(temp_str));
+                                 bzero(temp_cmd_to_cli,sizeof(temp_cmd_to_cli));
+                                 snprintf(temp_str,sizeof(temp_str)-1,"%u",i+1);
+                                 snprintf(temp_cmd_to_cli,sizeof(temp_cmd_to_cli)-1,"%s %u",cmd_to_cli,i+1);
                                  internal_argv[0]=temp_str;
-                                 cmd_show_interfaces(cli,"",&internal_argv[0],1);
+                                 cmd_show_interfaces(cli,temp_cmd_to_cli,&internal_argv[0],1);
                                }
                                exit(0);
                             }
@@ -1012,40 +970,63 @@ int main(int argc, char **argv){
                           exit(1);
                    case 4: // version
                           rrcp_autodetect_switch_chip_eeprom(&swconfig.switch_type, &swconfig.chip_type, &swconfig.eeprom_type);
-                          cmd_show_version(cli, "version", &argv[5+shift], argc-shift-3);
+                          rrcp_io_probe_switch_for_facing_switch_port(swconfig.mac_address,&swconfig.facing_switch_port_phys);
+                          cmd_show_version(cli, cmd_to_cli, &argv[4+shift], argc-shift-4);
                           exit(0);
                    case 5: // switch-register
-   	                  if (argc == (3+shift+1)){
+   	                  if (argc == (4+shift)){
                             internal_argv[0]=qs;
+                            exit(cmd_show_switch_register(cli,cmd_to_cli,&internal_argv[0],1));
                           }else{
-                            internal_argv[0]=argv[4+shift];
+                            cmdcat(cmd_to_cli,sizeof(cmd_to_cli)-1,argv[4+shift]);
+                            exit(cmd_show_switch_register(cli,cmd_to_cli,&argv[4+shift],argc-shift-4));
                           }
-                          exit(cmd_show_switch_register(cli,"",&internal_argv[0],1));
                    case 6: // eeprom-register
-   	                  if (argc == (3+shift+1)){
+   	                  if (argc == (4+shift)){
                             internal_argv[0]=qs;
+                            exit(cmd_show_eeprom_register(cli,cmd_to_cli,&internal_argv[0],1));
                           }else{
-                            internal_argv[0]=argv[4+shift];
+                            cmdcat(cmd_to_cli,sizeof(cmd_to_cli)-1,argv[4+shift]);
+                            exit(cmd_show_eeprom_register(cli,cmd_to_cli,&argv[4+shift],argc-shift-4));
                           }
-                          exit(cmd_show_eeprom_register(cli,"",&internal_argv[0],1));
                    case 7: // phy-register
-   	                  if (argc == (3+shift+1)){
+   	                  if (argc == (4+shift)){
                             internal_argv[0]=qs;
+                            exit(cmd_show_phy_register(cli,cmd_to_cli,&internal_argv[0],1));
                           }else{
-                            internal_argv[0]=argv[4+shift];
+                            cmdcat(cmd_to_cli,sizeof(cmd_to_cli)-1,argv[4+shift]);
+                            exit(cmd_show_phy_register(cli,cmd_to_cli,&argv[4+shift],argc-shift-4));
                           }
-                          exit(cmd_show_phy_register(cli,"",&internal_argv[0],1));
-                      
+                   case 8: // ip igmp snooping
+                          for(;;){
+                            check_argc(argc,3+shift,"No sub-command, allowed commands: igmp snooping [mrouter]\n",NULL);
+                            subcmd=get_cmd_num(argv[4+shift],-1,"Incorrect sub-commands, allowed: igmp snooping [mrouter]\n",&show_sub_cmd_l5[0]);
+                            cmdcat(cmd_to_cli,sizeof(cmd_to_cli)-1,show_sub_cmd_l5[subcmd]);
+//                            printf("argc=%i, argv[%i]=%s, command=%s\n",argc-shift-4,4+shift,argv[4+shift],cmd_to_cli);
+                            shift++;
+                            if (argc == (4+shift)){ 
+                             if (subcmd) break;
+                             else{ 
+                               printf("No sub-command, allowed commands: igmp snooping [mrouter]\n");
+                               exit(1);
+                             }
+                            }
+                          }
+                          exit(cmd_show_ip_igmp_snooping(cli,cmd_to_cli,NULL,0));
+
                    default: 
                           print_unknown(argv[3+shift],&show_sub_cmd[0]);
                 }
          case 1: //config
                 check_argc(argc,2+shift,NULL,&config_sub_cmd_l1[0]);
                 if (strcmp(argv[3+shift],"no")==0){ 
-                  shift++; negate++; 
+                  shift++; negate++;
+                  cmdcat(cmd_to_cli,sizeof(cmd_to_cli)-1,"no"); 
                   check_argc(argc,2+shift,NULL,&config_sub_cmd_l1[0]);
                 }
-                switch (compare_command(argv[3+shift],&config_sub_cmd_l1[0])){
+                subconfcmd=compare_command(argv[3+shift],&config_sub_cmd_l1[0]);
+                cmdcat(cmd_to_cli,sizeof(cmd_to_cli)-1,config_sub_cmd_l1[subconfcmd]); 
+                switch (subconfcmd){
                    case 0: // interface
                           check_argc(argc,3+shift,"No list of ports\n",NULL);
                           if (str_portlist_to_array(argv[4+shift],&port_list[0],switchtypes[switchtype].num_ports)!=0){
@@ -1127,41 +1108,26 @@ int main(int argc, char **argv){
                           }
                    case 1: // rrcp
                           check_argc(argc,3+shift,NULL,&config_rrcp[0]);
-                          switch (compare_command(argv[4+shift],&config_rrcp[0])){
-                                 case 0: // rrcp disable
-                                        do_rrcp_ctrl(1);
-                                        exit(1);
-                                 case 1: // rrcp enable
-                                        do_rrcp_ctrl(0);
-                                        exit(1);
-                                 case 2: // rrcp echo
-                                        check_argc(argc,4+shift,"No sub-command, allowed commands: enable|disable\n",NULL);
-                                        subcmd=get_cmd_num(argv[5+shift],-1,NULL,&ena_disa[0]);
-                                        do_rrcp_echo(!subcmd);
-                                        exit(0);
-                                 case 3: // rrcp loopdetect
-                                        check_argc(argc,4+shift,"No sub-command, allowed commands: enable|disable\n",NULL);
-                                        subcmd=get_cmd_num(argv[5+shift],-1,NULL,&ena_disa[0]);
-                                        do_loopdetect(subcmd);
-                                        exit(0);
-                                 case 4: // rrcp authkey
-                                        check_argc(argc,4+shift,"Authkey needed\n",NULL);
-                                        if (sscanf(argv[5+shift],"%04x",&ak) == 1){
-                                          if (ak <= 0xffff) {
-                                            rtl83xx_setreg16(0x209,ak);
-                                            printf ("Setting of new authkey is no save into EEPROM and may be forged after reboot.\n");
-                                            printf ("After change authkey switch not answering on broadcast \"Hello\" scan, be close.\n");
-                                            exit(0);
-                                          }
-                                         }
-                                         printf("Invalid Authkey\n");
-                                         exit(1);
+                          subcmd=compare_command(argv[4+shift],&config_rrcp[0]);
+                          cmdcat(cmd_to_cli,sizeof(cmd_to_cli)-1,config_rrcp[subcmd]);
+                          switch (subcmd){
+                                 case 1: // rrcp echo
+                                 case 2: // rrcp loopdetect
+                                        check_argc(argc,4+shift,"No sub-command, allowed commands: enable\n",NULL);
+                                        subcmd=get_cmd_num(argv[5+shift],-1,NULL,&ena_only[0]);
+                                        cmdcat(cmd_to_cli,sizeof(cmd_to_cli)-1,ena_only[subcmd]);
+                                 case 0: // rrcp enable
+                                        exit(cmd_config_rrcp(cli,cmd_to_cli,NULL,0));
+                                 case 3: // rrcp authkey
+                                        exit(cmd_config_rrcp_authkey(cli,cmd_to_cli,&argv[5+shift],argc-shift-5));
                                  default:
                                          print_unknown(argv[4+shift],&config_rrcp[0]);
                           }
                    case 2: // vlan
                           check_argc(argc,3+shift,NULL,&config_vlan[0]);
-                          switch (compare_command(argv[4+shift],&config_vlan[0])){
+                          subcmd=compare_command(argv[4+shift],&config_vlan[0]);
+                          cmdcat(cmd_to_cli,sizeof(cmd_to_cli)-1,config_vlan[subcmd]);
+                          switch (subcmd){
                                  case 0: // disable
                                  case 1: // transparent
                                         do_vlan(0);
@@ -1179,6 +1145,16 @@ int main(int argc, char **argv){
                                         subcmd=get_cmd_num(argv[5+shift],-1,NULL,&config_vlan_tmpl[0]);
                                         do_vlan_tmpl(subcmd+1);
                                         exit(0);
+                                 case 5: // leaky
+                                        check_argc(argc,4+shift,NULL,&config_vlan_leaky[0]);
+                                        subcmd=get_cmd_num(argv[5+shift],-1,NULL,&config_vlan_leaky[0]);
+                                        cmdcat(cmd_to_cli,sizeof(cmd_to_cli)-1,config_vlan_leaky[subcmd]);
+                                        exit(cmd_config_vlan_leaky(cli,cmd_to_cli,NULL,0));
+                                 case 6: // drop
+                                        check_argc(argc,4+shift,NULL,&config_vlan_drop[0]);
+                                        subcmd=get_cmd_num(argv[5+shift],-1,NULL,&config_vlan_drop[0]);
+                                        cmdcat(cmd_to_cli,sizeof(cmd_to_cli)-1,config_vlan_drop[subcmd]);
+                                        exit(cmd_config_vlan_drop(cli,cmd_to_cli,NULL,0));
                                  default: 
                                          print_unknown(argv[4+shift],&config_vlan[0]);
                           }
@@ -1199,12 +1175,17 @@ int main(int argc, char **argv){
                           exit(0);
                    case 4: // mac-address-table
                           check_argc(argc,3+shift,NULL,&config_alt[0]);
-                          switch (compare_command(argv[4+shift],&config_alt[0])){
+                          subcmd=compare_command(argv[4+shift],&config_alt[0]);
+                          cmdcat(cmd_to_cli,sizeof(cmd_to_cli)-1,config_alt[subcmd]);
+                          switch (subcmd){
                                  case 0: // aging-time
-                                        check_argc(argc,4+shift,NULL,&config_alt_time[0]);
-                                        subcmd=get_cmd_num(argv[5+shift],-1,NULL,&config_alt_time[0]);
-                                        do_alt_config(subcmd+1);
-                                        exit(0);
+               	                        if (argc == (5+shift)){
+                                          internal_argv[0]=qs;
+                                          exit(cmd_config_mac_aging(cli,cmd_to_cli,&internal_argv[0],1));
+                                        }else{
+                                          cmdcat(cmd_to_cli,sizeof(cmd_to_cli)-1,argv[5+shift]);
+                                          exit(cmd_config_mac_aging(cli,cmd_to_cli,&argv[5+shift],argc-5-shift));
+                                        }
                                  case 1: // unknown-destination
                                         check_argc(argc,4+shift,NULL,&config_alt_dest[0]);
                                         subcmd=get_cmd_num(argv[5+shift],-1,NULL,&config_alt_dest[0]);
@@ -1216,22 +1197,23 @@ int main(int argc, char **argv){
                    case 5: // flowcontrol
                           check_argc(argc,3+shift,NULL,&config_flowc[0]);
                           subcmd=get_cmd_num(argv[4+shift],-1,NULL,&config_flowc[0]);
-                          check_argc(argc,4+shift,NULL,&ena_disa[0]);
-                          do_glob_flowctrl(subcmd,get_cmd_num(argv[5+shift],-1,NULL,&ena_disa[0]));
-                          exit(0);
+                          cmdcat(cmd_to_cli,sizeof(cmd_to_cli)-1,config_flowc[subcmd]);
+                          exit(cmd_config_flowcontrol(cli,cmd_to_cli,NULL,0));
                    case 6: // storm-control
                           check_argc(argc,3+shift,NULL,&config_storm[0]);
-                          switch (compare_command(argv[4+shift],&config_storm[0])){
+                          subcmd=get_cmd_num(argv[4+shift],-1,NULL,&config_storm[0]);
+                          cmdcat(cmd_to_cli,sizeof(cmd_to_cli)-1,config_storm[subcmd]);
+                          switch (subcmd){
                                  case 0: // broadcast
-                                        check_argc(argc,4+shift,NULL,&config_storm_br[0]);
-                                        subcmd=get_cmd_num(argv[5+shift],-1,NULL,&config_storm_br[0]);
-                                        do_storm_control(1,(negate)?0:++subcmd);
-                                        exit(0);
+                                        if (!negate){
+                                          check_argc(argc,4+shift,NULL,&config_storm_br[0]);
+                                          subcmd=get_cmd_num(argv[5+shift],-1,NULL,&config_storm_br[0]);
+                                          cmdcat(cmd_to_cli,sizeof(cmd_to_cli)-1,config_storm_br[subcmd]);
+                                        }
                                  case 1: // multicast
-                                        do_storm_control(0,!negate);
-                                        exit(0);
+                                        exit(cmd_config_stormcontrol(cli,cmd_to_cli,NULL,0));
                                  default: 
-                                         print_unknown(argv[4+shift],&config_alt[0]);
+                                         print_unknown(argv[4+shift],&config_storm[0]);
                           }
                    case 7: // monitor
                           if (switchtypes[switchtype].chip_id==rtl8326){
@@ -1308,7 +1290,61 @@ int main(int argc, char **argv){
 	                  }
 		          do_reboot();
                           exit(0);
-
+                   case 9: // ip igmp snooping
+                          for(;;){
+                            check_argc(argc,3+shift,"No sub-command, allowed commands: [no] igmp snooping \n",NULL);
+                            subcmd=get_cmd_num(argv[4+shift],-1,"Incorrect sub-commands, allowed: [no] igmp snooping\n",&show_sub_cmd_l5[0]);
+                            cmdcat(cmd_to_cli,sizeof(cmd_to_cli)-1,config_ip_igmp[subcmd]);
+//                            printf("argc=%i, argv[%i]=%s, command=%s\n",argc-shift-4,4+shift,argv[4+shift],cmd_to_cli);
+                            shift++;
+                            if (argc == (4+shift)){ 
+                             if (subcmd) break;
+                             else{ 
+                               printf("No sub-command, allowed commands: [no] igmp snooping\n");
+                               exit(1);
+                             }
+                            }
+                          }
+                          exit(cmd_config_ip_igmp_snooping(cli,cmd_to_cli,NULL,0));
+                   case 10: // spanning-tree
+                          check_argc(argc,3+shift,NULL,&config_span_tree[0]);
+                          subcmd=get_cmd_num(argv[4+shift],-1,NULL,&config_span_tree[0]);
+                          cmdcat(cmd_to_cli,sizeof(cmd_to_cli)-1,config_span_tree[subcmd]);
+                          check_argc(argc,4+shift,"No sub-command, allowed commands: enable\n",NULL);
+                          subcmd=get_cmd_num(argv[5+shift],-1,NULL,&ena_only[0]);
+                          cmdcat(cmd_to_cli,sizeof(cmd_to_cli)-1,ena_only[subcmd]);
+                          exit(cmd_config_spanning_tree(cli,cmd_to_cli,NULL,0));
+                   case 11: // mls 
+                          for(;;){
+                            check_argc(argc,3+shift,"No sub-command, allowed commands: [no] qos trust cos|dscp\n",NULL);
+                            subcmd=get_cmd_num(argv[4+shift],-1,"Incorrect sub-commands, allowed: [no] qos trust cos|dscp\n",&config_mls[0]);
+                            cmdcat(cmd_to_cli,sizeof(cmd_to_cli)-1,config_mls[subcmd]);
+                            printf("argc=%i, argv[%i]=%s, command=%s\n",argc-shift-4,4+shift,argv[4+shift],cmd_to_cli);
+                            shift++;
+                            if (argc == (4+shift)){ 
+                             if (subcmd>1) break;
+                             else{ 
+                               printf("No sub-command, allowed commands: [no] qos trust cos|dscp\n");
+                               exit(1);
+                             }
+                            }
+                          }
+                          exit(cmd_config_qos(cli,cmd_to_cli,NULL,0));
+                   case 12: // wrr-queue
+                          check_argc(argc,3+shift,NULL,&config_wrr[0]);
+                          subcmd=get_cmd_num(argv[4+shift],-1,NULL,&config_wrr[0]);
+                          cmdcat(cmd_to_cli,sizeof(cmd_to_cli)-1,config_wrr[subcmd]);
+//                            printf("argc=%i, argv[%i]=%s, command=%s\n",argc-shift-4,4+shift,argv[4+shift],cmd_to_cli);
+                          if (negate) exit(cmd_config_qos(cli,cmd_to_cli,NULL,0));
+                          else{
+                           if (argc == (5+shift)){
+                            internal_argv[0]=qs;
+                            exit(cmd_config_qos_wrr_queue_ratio(cli,cmd_to_cli,&internal_argv[0],1));
+                           }else{
+                            cmdcat(cmd_to_cli,sizeof(cmd_to_cli)-1,argv[5+shift]);
+                            exit(cmd_config_qos_wrr_queue_ratio(cli,cmd_to_cli,&argv[5+shift],argc-5-shift));
+                           }
+                          }
                    default:
                           print_unknown(argv[3+shift],&config_sub_cmd_l1[0]);
                 }

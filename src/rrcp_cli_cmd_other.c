@@ -25,7 +25,11 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#ifdef RTL83XX
+#include "../lib/fake-libcli.h"
+#else
 #include "../lib/libcli.h"
+#endif
 #include "rrcp_cli.h"
 #include "rrcp_io.h"
 #include "rrcp_config.h"
@@ -34,7 +38,9 @@
 int cmd_write_terminal(struct cli_def *cli, char *command, char *argv[], int argc)
 {
     char text[32768];
-
+#ifdef RTL83XX
+    rrcp_config_read_from_switch();
+#endif
     cli_print(cli, "!");
     cli_print(cli, "! Config for %s %s switch at %02x:%02x:%02x:%02x:%02x:%02x@%s",
                     switchtypes[switchtype].vendor,
@@ -177,6 +183,7 @@ int cmd_copy_eeprom(struct cli_def *cli, char *command, char *argv[], int argc)
     }
 }
 
+#ifndef RTL83XX
 void cmd_other_register_commands(struct cli_def *cli)
 {
     struct cli_command *c;
@@ -190,3 +197,4 @@ void cmd_other_register_commands(struct cli_def *cli)
 	cli_register_command(cli, c, "eeprom", cmd_copy_eeprom, PRIVILEGE_UNPRIVILEGED, MODE_EXEC, "Copy from EEPROM as binary file");
     }
 }
+#endif

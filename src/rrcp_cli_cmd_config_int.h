@@ -22,6 +22,23 @@
     This would be appreciated, however not required.
 */
 
+#ifdef RTL83XX
+#include "../lib/fake-libcli.h"
+#else
 #include "../lib/libcli.h"
+#endif
 
+#ifdef RTL83XX
+int cmd_config_int_shutdown(struct cli_def *cli, char *command, char *argv[], int argc);
+int cmd_config_int_switchport(struct cli_def *cli, char *command, char *argv[], int argc);
+int cmd_config_int_switchport_access_vlan(struct cli_def *cli, char *command, char *argv[], int argc);
+int cmd_config_int_switchport_trunk_native_vlan(struct cli_def *cli, char *command, char *argv[], int argc);
+int cmd_config_int_switchport_trunk_allowed_vlan(struct cli_def *cli, char *command, char *argv[], int argc);
+int cmd_rate_limit(struct cli_def *cli, char *command, char *argv[], int argc);
+int cmd_config_int_mac_learning(struct cli_def *cli, char *command, char *argv[], int argc);
+int cmd_config_int_rrcp(struct cli_def *cli, char *command, char *argv[], int argc);
+int cmd_config_int_mls(struct cli_def *cli, char *command, char *argv[], int argc);
+int cmd_config_int_speed_duplex(struct cli_def *cli, char *command, char *argv[], int argc);
+#else
 void cmd_config_int_register_commands(struct cli_def *cli);
+#endif

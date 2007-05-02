@@ -44,8 +44,8 @@
 #include "../lib/fake-libcli.h"
 #include "rrcp_cli_cmd_show.h"
 #include "rrcp_cli_cmd_config.h"
-//#include "rrcp_cli_cmd_config_int.h"
-//#include "rrcp_cli_cmd_other.h"
+#include "rrcp_cli_cmd_config_int.h"
+#include "rrcp_cli_cmd_other.h"
 #include "rrcp_cli.h"
 
 int myPid = 0;
@@ -62,18 +62,6 @@ void engage_timeout(int seconds)
     myPid = getpid();
     signal( SIGALRM, sigHandler );
     alarm( seconds );
-}
-
-void dumpmem(void *ptr, int len){
-    int i;
-    unsigned char *p;
-    p=(unsigned char*)ptr;
-    printf("DUMPINMG... len=%d\n",len);
-    for (i=0;i<=len/8;i++){
-	printf("%04x - %02x:%02x:%02x:%02x:%02x:%02x:%02x:%02x\n",i*8,
-	    p[i*8+0],p[i*8+1],p[i*8+2],p[i*8+3],
-	    p[i*8+4],p[i*8+5],p[i*8+6],p[i*8+7]);
-    }
 }
 
 void print_port_link_status(int port_no, int enabled, unsigned char encoded_status, int loopdetect){
@@ -352,87 +340,6 @@ void do_vlan_tmpl(int mode){
  }
 }
 
-void do_write_memory(){
- int i,numreg;
-
- numreg=(switchtypes[switchtype].num_ports==16)?12:13;
- rrcp_config_read_from_switch();
- if (do_write_eeprom(0x0d,swconfig.rrcp_config.raw)) {printf("write eeprom\n");exit(1);}
- if (do_write_eeprom(0x0f,swconfig.rrcp_byport_disable.raw[0])) {printf("write eeprom\n");exit(1);}
- if (do_write_eeprom(0x11,swconfig.rrcp_byport_disable.raw[1])) {printf("write eeprom\n");exit(1);}
- if (do_write_eeprom(0x23,swconfig.alt_config.raw)) {printf("write eeprom\n");exit(1);}
- if (do_write_eeprom(0x29,swconfig.vlan.raw[0])) {printf("write eeprom\n");exit(1);}
- if (do_write_eeprom(0x2f,swconfig.qos_config.raw)) {printf("write eeprom\n");exit(1);}
- if (do_write_eeprom(0x31,swconfig.qos_port_priority.raw[0])) {printf("write eeprom\n");exit(1);}
- if (do_write_eeprom(0x33,swconfig.qos_port_priority.raw[1])) {printf("write eeprom\n");exit(1);}
- if (do_write_eeprom(0x39,swconfig.port_config_global.raw)) {printf("write eeprom\n");exit(1);}
- for(i=0;i<numreg;i++){
-    if (do_write_eeprom(0x3b+i*2,swconfig.port_config.raw[i])) {printf("write eeprom\n");exit(1);}
- }
-}
-
-void do_write_eeprom_defaults(){
- int i;
- uint16_t data;
-
- if (do_write_eeprom(0x01,0x0a80)) {printf("write eeprom\n");exit(1);}
- if (do_write_eeprom(0x03,0x0155)) {printf("write eeprom\n");exit(1);}
- if (do_write_eeprom(0x0d,0)) {printf("write eeprom\n");exit(1);}
- if (do_write_eeprom(0x0f,0)) {printf("write eeprom\n");exit(1);}
- if (do_write_eeprom(0x11,0)) {printf("write eeprom\n");exit(1);}
- if (do_write_eeprom(0x23,0x0004)) {printf("write eeprom\n");exit(1);}
- if (do_read_eeprom(0x25,&data) != 0) {printf("read eeprom\n");exit(1);}
- else if (do_write_eeprom(0x25,data&0xffe1)) {printf("write eeprom\n");exit(1);}
- if (do_read_eeprom(0x27,&data) != 0) {printf("read eeprom\n");exit(1);}
- else if (do_write_eeprom(0x27,data&0xfffe)) {printf("write eeprom\n");exit(1);}
- if (do_write_eeprom(0x29,0)) {printf("write eeprom\n");exit(1);}
- if (do_write_eeprom(0x2f,0x0010)) {printf("write eeprom\n");exit(1);}
- if (do_write_eeprom(0x31,0)) {printf("write eeprom\n");exit(1);}
- if (do_write_eeprom(0x33,0)) {printf("write eeprom\n");exit(1);}
- if (do_write_eeprom(0x39,0x0010)) {printf("write eeprom\n");exit(1);}
- for(i=0;i<12;i++){
-    if (do_write_eeprom(0x3b+i*2,0xafaf)) {printf("write eeprom\n");exit(1);}
- }
- if (switchtypes[switchtype].num_ports==26) {if (do_write_eeprom(0x53,0xbfbf)) {printf("write eeprom\n");exit(1);}}
-}
-
-#ifndef RTL83XX
-int str_portlist_to_array(char *list,unsigned short int *arr,unsigned int arrlen){
-short int i,k;
-char *s,*c,*n;
-char *d[16];
-unsigned int st,sp; 
-
- s=list;
- for (i=0;i<arrlen;i++) { *(arr+i)=0; }
- for (i=0;i<strlen(s);i++){  //check allowed symbols
-  if ( ((s[i] >= '0') && (s[i] <= '9')) || (s[i] == ',') || (s[i] == '-') ) continue; 
-  return(1);
- }
- while(*s){
-  bzero(d,sizeof(d));
-  // parsing
-  if ( (c=strchr(s,',')) != NULL ) { k=c-s; n=c+1; }
-  else { k=strlen(s); n=s+k; }
-  if (k >= sizeof(d)) return(1);
-  memcpy(d,s,k);s=n;
-  // range of ports or one port?
-  if (strchr((char *)d,'-')!=NULL){ 
-   // range
-   if (sscanf((char *)d,"%u-%u",&st,&sp) != 2) return(2);
-   if ( !st || !sp || (st > sp) || (st > arrlen) || (sp > arrlen) ) return(3);
-   for (i=st;i<=sp;i++) { *(arr+i-1)=1; }
-  }else{
-   // one port
-   st=(unsigned int)strtoul((char *)d, (char **)NULL, 10);
-   if ( !st || (st > arrlen) ) return(3);
-   *(arr+st-1)=1;
-  }
- }
- return(0);
-}
-#endif
-
 int compare_command(char *argv, char **command_list){
 /*
    found word from argv in command_list and return his number,
@@ -455,214 +362,6 @@ int compare_command(char *argv, char **command_list){
    exit(1);
  }
  return(res);
-}
-
-void do_32bit_reg_action(unsigned short int *arr, unsigned short int val, unsigned int base_reg){
-    int i;
-    uint32_t portmask;
-    union {
-        struct {
-            uint16_t low;
-            uint16_t high;
-        } doubleshort;
-        uint32_t singlelong;
-    } u;
-
-    portmask=u.singlelong=0;
-    for(i=0;i<switchtypes[switchtype].num_ports;i++){
-      portmask|=(((*(arr+map_port_number_from_physical_to_logical(i)-1))&0x1)<<i);
-    }
-    u.doubleshort.low=rtl83xx_readreg16(base_reg);
-    if (switchtypes[switchtype].num_ports > 16) u.doubleshort.high=rtl83xx_readreg16(base_reg+1);
-
-    if (val) u.singlelong&=~portmask; 
-    else u.singlelong|=portmask;
-
-    rtl83xx_setreg16(base_reg,u.doubleshort.low);
-    if (switchtypes[switchtype].num_ports > 16) rtl83xx_setreg16(base_reg+1,u.doubleshort.high);
-    return;
-}
-
-void do_restrict_rrcp(unsigned short int *arr, unsigned short int val){
-    do_32bit_reg_action(arr,val,0x201);
-}
-
-void do_port_qos(unsigned short int *arr,unsigned short int val){
-    do_32bit_reg_action(arr,val,0x401);
-}
-
-void do_port_disable(unsigned short int *arr,unsigned short int val){
-    do_32bit_reg_action(arr,val,0x608);
-    if (!val) printf ("Warning! This setting(s) can be saved and be forged after reboot\n");
-}
-
-void do_port_learning(int mode,unsigned short int *arr){
-    do_32bit_reg_action(arr,mode,0x301);
-    if (!mode) printf ("Warning! This setting(s) can be saved and be forged after reboot\n");
-}
-
-void do_port_config(int mode,unsigned short int *arr, int val){
-  int i;
-  int phys_port;
-  int log_port0;
-  int log_port1;
-
-/* 
- * mode = 0 - set speed
- * mode = 1 - set flow control
- */ 
-
-  for(i=0;i<switchtypes[switchtype].num_ports/2;i++){
-    swconfig.port_config.raw[i]=rtl83xx_readreg16(0x060a+i);
-  }
-
-  for(i=1;i<=switchtypes[switchtype].num_ports;i++){
-    if(*(arr+i-1)){
-      phys_port=map_port_number_from_logical_to_physical(i);
-      if (!mode){
-         if ( (val==0x10) && (phys_port!=24) && (phys_port!=25) ){ // Small protection against the fool ;)
-            printf("Port %i can't be set in 1000Mbit/s\n",i);
-            continue;
-         }
-         swconfig.port_config.config[phys_port].autoneg=0;
-         swconfig.port_config.config[phys_port].media_10half=0;
-         swconfig.port_config.config[phys_port].media_10full=0;
-         swconfig.port_config.config[phys_port].media_100half=0;
-         swconfig.port_config.config[phys_port].media_100full=0;
-         swconfig.port_config.config[phys_port].media_1000full=0;
-      }
-      switch (val){
-        case 0x1:
-               swconfig.port_config.config[phys_port].media_10half=0x1;
-               break;
-        case 0x2:
-               swconfig.port_config.config[phys_port].media_10full=0x1;
-               break;
-        case 0x4:
-               swconfig.port_config.config[phys_port].media_100half=0x1;
-               break;
-        case 0x8:
-               swconfig.port_config.config[phys_port].media_100full=0x1;
-               break;
-        case 0x10:
-               swconfig.port_config.config[phys_port].media_1000full=0x1;
-               break;
-        case 0x20:
-               swconfig.port_config.config[phys_port].pause=0x1;
-               swconfig.port_config.config[phys_port].pause_asy=0;
-               break;
-        case 0x40:
-               swconfig.port_config.config[phys_port].pause=0;
-               swconfig.port_config.config[phys_port].pause_asy=0x1;
-               break;
-        case 0x60:
-               swconfig.port_config.config[phys_port].pause=0x1;
-               swconfig.port_config.config[phys_port].pause_asy=0x1;
-               break;
-        default:
-               if (mode){
-                  swconfig.port_config.config[phys_port].pause=0;
-                  swconfig.port_config.config[phys_port].pause_asy=0;
-               }else{
-                  swconfig.port_config.config[phys_port].autoneg=1;
-                  swconfig.port_config.config[phys_port].media_10half=1;
-                  swconfig.port_config.config[phys_port].media_10full=1;
-                  swconfig.port_config.config[phys_port].media_100half=1;
-                  swconfig.port_config.config[phys_port].media_100full=1;
-                  if ( (phys_port==24) || (phys_port==25) ){
-                    swconfig.port_config.config[phys_port].media_1000full=1;
-                  }
-               }
-      }
-    }
-  }
-  for(i=0;i<switchtypes[switchtype].num_ports/2;i++){
-    log_port0=map_port_number_from_physical_to_logical(i*2);
-    log_port1=map_port_number_from_physical_to_logical(i*2+1);
-    if (*(arr+log_port0-1) || *(arr+log_port1-1)){ // write 2 switch only changed value
-      rtl83xx_setreg16(0x060a+i,swconfig.port_config.raw[i]);
-    }
-  }
-  printf("This operation requires a (soft) reset to force restart the auto-negotiation process\n");
-  printf("If used hard reset, don't forget make \"write memory\"\n");
-}
-
-void do_port_config_bandwidth(int dir,unsigned short int *arr, int val){
-  int i;
-  int phys_port;
-  int log_port0;
-  int log_port1;
-
-  for(i=0;i<switchtypes[switchtype].num_ports/2;i++){
-    swconfig.bandwidth.raw[i]=rtl83xx_readreg16(0x020a+i);
-  }
-
-  for(i=1;i<=switchtypes[switchtype].num_ports;i++){
-    if(*(arr+i-1)){
-      phys_port=map_port_number_from_logical_to_physical(i);
-      if ( !dir || (dir == 1)) swconfig.bandwidth.rxtx[phys_port].rx=val&0x7;
-      if ( !dir || (dir == 2)) swconfig.bandwidth.rxtx[phys_port].tx=val&0x7;
-    }
-  }
-
-  for(i=0;i<switchtypes[switchtype].num_ports/2;i++){
-    log_port0=map_port_number_from_physical_to_logical(i*2);
-    log_port1=map_port_number_from_physical_to_logical(i*2+1);
-    if (*(arr+log_port0-1) || *(arr+log_port1-1)){ // write 2 switch only changed value
-      rtl83xx_setreg16(0x020a+i,swconfig.bandwidth.raw[i]);
-    }
-  }
-  if (val) printf ("Warning! This setting(s) can be saved and be forged after hardware reset\n");
-}
-
-void do_alt_config(mode){
-  swconfig.alt_config.raw=rtl83xx_readreg16(0x0300);
-  switch (mode){
-    case 1:
-           swconfig.alt_config.s.config.mac_aging_disable=1;
-           swconfig.alt_config.s.config.mac_aging_fast=0;
-           break;
-    case 2:
-           swconfig.alt_config.s.config.mac_aging_disable=0;
-           swconfig.alt_config.s.config.mac_aging_fast=1;
-           break;
-    case 3:
-           swconfig.alt_config.s.config.mac_aging_disable=0;
-           swconfig.alt_config.s.config.mac_aging_fast=0;
-           break;
-    case 4:
-           swconfig.alt_config.s.config.mac_drop_unknown=1;
-           break;
-    case 5:
-           swconfig.alt_config.s.config.mac_drop_unknown=0;
-           break;
-    default:
-           return;
-  }
-  rtl83xx_setreg16(0x0300,swconfig.alt_config.raw);
-}
-
-void do_port_config_mirror(int dir,unsigned short int *arr, int dest_port ){
-  int i,step;
-  
-  swconfig.port_monitor.sniff.sniffer=0;
-  swconfig.port_monitor.sniff.sniffed_tx=0;
-  swconfig.port_monitor.sniff.sniffed_rx=0;
-
-  if (dir < 3){
-    swconfig.port_monitor.sniff.sniffer=0x1<<map_port_number_from_logical_to_physical(dest_port);
-    for(i=0;i<switchtypes[switchtype].num_ports;i++){
-      if ( !dir || (dir==1) ) 
-          swconfig.port_monitor.sniff.sniffed_rx|=(((*(arr+map_port_number_from_physical_to_logical(i)-1))&0x1)<<i);
-      if ( !dir || (dir==2) ) 
-          swconfig.port_monitor.sniff.sniffed_tx|=(((*(arr+map_port_number_from_physical_to_logical(i)-1))&0x1)<<i);
-    }
-  }
-
-  step=(switchtypes[switchtype].num_ports > 16)?1:2;
-  for (i=0;i<6;i+=step){
-    rtl83xx_setreg16(0x219+i, swconfig.port_monitor.raw[0+i]);
-  }
 }
 
 void print_allow_command(char **command_list){
@@ -795,11 +494,6 @@ int main(int argc, char **argv){
     int vid=-1;
     int duplex=0;
     int negate=0;
-    int t1=0;
-    int t2=0;
-    int exists_source=0;
-    int exists_destination=0;
-    int dest_port=0;
     unsigned short int *p_port_list=NULL;
     unsigned short int port_list[26];
     char qs[]="?";
@@ -809,7 +503,7 @@ int main(int argc, char **argv){
     char temp_cmd_to_cli[128];
     char *ena_disa[]={"disable","enable",""};
     char *ena_only[]={"enable",""};
-    char *cmd_level_1[]={"show","config","scan","reload","reboot","write","ping",""}; 
+    char *cmd_level_1[]={"show","config","scan","reload","reboot","write","ping","copy",""}; 
     char *show_sub_cmd[]={"running-config","startup-config","interface","vlan","version","switch-register","eeprom-register","phy-register","ip",""};
     char *scan_sub_cmd[]={"verbose",""};
     char *show_sub_cmd_l2[]={"full","verbose",""};
@@ -817,7 +511,8 @@ int main(int argc, char **argv){
     char *show_sub_cmd_l4[]={"id",""};
     char *show_sub_cmd_l5[]={"igmp","snooping","mrouter",""};
     char *reset_sub_cmd[]={"soft","hard",""};
-    char *write_sub_cmd[]={"memory","eeprom","defaults",""};
+    char *write_sub_cmd[]={"memory","eeprom","defaults","terminal",""};
+    char *copy_sub_cmd[]={"running-config","eeprom",""};
     char *config_sub_cmd_l1[]={"interface","rrcp","vlan","mac-address","mac-address-table","flowcontrol","storm-control","monitor","vendor-id","ip","spanning-tree","mls","wrr-queue",""};
     char *config_intf_sub_cmd_l1[]={"no","shutdown","speed","duplex","rate-limit","mac-address","rrcp","mls","flow-control",""};
     char *config_duplex[]={"half","full",""};
@@ -836,7 +531,6 @@ int main(int argc, char **argv){
     char *config_flowc[]={"dot3x","backpressure","ondemand-disable",""};
     char *config_storm[]={"broadcast","multicast",""};
     char *config_storm_br[]={"relaxed","strict",""};
-    char *config_monitor[]={"interface","source","destination","input","output",""};
     char *config_ip_igmp[]={"igmp","snooping",""};
     char *config_span_tree[]={"bpdufilter",""};
     char *config_mls[]={"qos","trust","cos","dscp",""};
@@ -908,6 +602,7 @@ int main(int argc, char **argv){
     rtl83xx_prepare();
 
     cli=cli_init();
+    cli->client=stdout;
     bzero(cmd_to_cli,sizeof(cmd_to_cli));
 
     cmd=compare_command(argv[2+shift],&cmd_level_1[0]);
@@ -1034,14 +729,22 @@ int main(int argc, char **argv){
                              exit(1);
                           }
                           check_argc(argc,4+shift,NULL,&config_intf_sub_cmd_l1[0]);
+                          bzero(temp_cmd_to_cli,sizeof(temp_cmd_to_cli));
+                          bzero(cmd_to_cli,sizeof(cmd_to_cli));
                           switch (compare_command(argv[5+shift],&config_intf_sub_cmd_l1[0])){
                                  case 0: // no
                                         check_argc(argc,5+shift,"No sub-command, allowed commands: shutdown\n",NULL);
                                         (void) get_cmd_num(argv[6+shift],1,"Incorrect sub-commands, allowed: shutdown\n",&config_intf_sub_cmd_l1[0]);
-                                        do_port_disable(&port_list[0],1);
-                                        exit(0);
+                                        cmdcat(cmd_to_cli,sizeof(cmd_to_cli)-1,"no");
                                  case 1: // shutdown
-                                        do_port_disable(&port_list[0],0);
+                                        cmdcat(cmd_to_cli,sizeof(cmd_to_cli)-1,"shutdown");
+                                        for(i=0;i<switchtypes[switchtype].num_ports;i++){
+                                          if (!port_list[i]) continue;
+                                          bzero(temp_str,10);
+                                          snprintf(temp_str,sizeof(temp_str)-1,"/%u",i+1);
+                                          cli->modestring=temp_str;
+                                          (void)cmd_config_int_shutdown(cli,cmd_to_cli,NULL,0);
+                                        }
                                         exit(0);
                                  case 2: // speed
                                         check_argc(argc,5+shift,"No sub-command, allowed commands: 10|100|1000|auto [duplex half|full]\n",NULL);
@@ -1049,13 +752,42 @@ int main(int argc, char **argv){
                                           printf("Incorect speed, valid are: 10|100|1000|auto\n");
                                           exit(1);
                                         }
-                                        if ( (argc > 6+shift+1) && (media_speed!=0) && (media_speed!=0x8) ){ //duplex
+                                        cmdcat(cmd_to_cli,sizeof(cmd_to_cli)-1,"speed");
+                                        switch(media_speed){
+                                              case 0x1:
+                                                       cmdcat(cmd_to_cli,sizeof(cmd_to_cli)-1,"10");
+                                                       break;
+                                              case 0x4:
+                                                       cmdcat(cmd_to_cli,sizeof(cmd_to_cli)-1,"100");
+                                                       break;
+                                              case 0x10:
+                                                       cmdcat(cmd_to_cli,sizeof(cmd_to_cli)-1,"1000");
+                                                       break;
+                                              default:
+                                                       cmdcat(cmd_to_cli,sizeof(cmd_to_cli)-1,"auto");
+                                        }
+                                        for(i=0;i<switchtypes[switchtype].num_ports;i++){
+                                          if (!port_list[i]) continue;
+                                          bzero(temp_str,10);
+                                          snprintf(temp_str,sizeof(temp_str)-1,"/%u",i+1);
+                                          cli->modestring=temp_str;
+                                          (void)cmd_config_int_speed_duplex(cli,cmd_to_cli,NULL,0);
+					}
+                                        if ( (argc > 6+shift+1) && (media_speed!=0x8) ){ //duplex
                                           (void)get_cmd_num(argv[7+shift],3,"Incorrect sub-command, allowed commands: duplex half|full\n",&config_intf_sub_cmd_l1[0]);
                                           check_argc(argc,7+shift,NULL,&config_duplex[0]);
                                           duplex=get_cmd_num(argv[8+shift],-1,NULL,&config_duplex[0]);
-                                          media_speed=media_speed<<duplex;
+                                          bzero(cmd_to_cli,sizeof(cmd_to_cli));
+                                          cmdcat(cmd_to_cli,sizeof(cmd_to_cli)-1,"duplex");
+                                          cmdcat(cmd_to_cli,sizeof(cmd_to_cli)-1,config_duplex[duplex]);
+                                          for(i=0;i<switchtypes[switchtype].num_ports;i++){
+                                            if (!port_list[i]) continue;
+                                            bzero(temp_str,10);
+                                            snprintf(temp_str,sizeof(temp_str)-1,"/%u",i+1);
+                                            cli->modestring=temp_str;
+                                            (void)cmd_config_int_speed_duplex(cli,cmd_to_cli,NULL,0);
+					  }
                                         }
-                                        do_port_config(0,&port_list[0],media_speed);
                                         exit(0);
                                  case 4:  //rate-limit
                                         for(;;){
@@ -1067,8 +799,16 @@ int main(int argc, char **argv){
                                              shift++;
                                              continue;
                                            }
-                                           do_port_config_bandwidth(direction,&port_list[0],bandw);
-                                           exit(0);
+                                           if (direction==1) cmdcat(cmd_to_cli,sizeof(cmd_to_cli)-1,"rate-limit input");
+                                           else cmdcat(cmd_to_cli,sizeof(cmd_to_cli)-1,"rate-limit output");
+                                           for(i=0;i<switchtypes[switchtype].num_ports;i++){
+                                            if (!port_list[i]) continue;
+                                             bzero(temp_str,10);
+                                             snprintf(temp_str,sizeof(temp_str)-1,"/%u",i+1);
+                                             cli->modestring=temp_str;
+                                             (void)cmd_rate_limit(cli,cmd_to_cli,&argv[6+shift],argc-6-shift);
+					    }
+                                            exit(0);
                                         };
                                  case 5:  //mac-address
                                         for(;;){
@@ -1078,13 +818,29 @@ int main(int argc, char **argv){
                                              shift++;
                                              continue;
                                            }
-                                           do_port_learning(subcmd-1,&port_list[0]);
+                                           if (subcmd==2) cmdcat(cmd_to_cli,sizeof(cmd_to_cli)-1,"mac-learn enable");
+                                           else cmdcat(cmd_to_cli,sizeof(cmd_to_cli)-1,"mac-learn disable");
+                                           for(i=0;i<switchtypes[switchtype].num_ports;i++){
+                                            if (!port_list[i]) continue;
+                                             bzero(temp_str,10);
+                                             snprintf(temp_str,sizeof(temp_str)-1,"/%u",i+1);
+                                             cli->modestring=temp_str;
+                                             (void)cmd_config_int_mac_learning(cli,cmd_to_cli,NULL,0);
+					    }
                                            exit(0);
                                         }
                                  case 6:  // rrcp
                                         check_argc(argc,5+shift,"No sub-command, allowed commands: enable|disable\n",NULL);
                                         subcmd=get_cmd_num(argv[6+shift],-1,"Incorrect sub-commands, allowed: enable|disable\n",&ena_disa[0]);
-                                        do_restrict_rrcp(&port_list[0],subcmd);
+                                        if (subcmd) cmdcat(cmd_to_cli,sizeof(cmd_to_cli)-1,"rrcp enable");
+                                        else cmdcat(cmd_to_cli,sizeof(cmd_to_cli)-1,"no rrcp enable");
+                                        for(i=0;i<switchtypes[switchtype].num_ports;i++){
+                                         if (!port_list[i]) continue;
+                                         bzero(temp_str,10);
+                                         snprintf(temp_str,sizeof(temp_str)-1,"/%u",i+1);
+                                         cli->modestring=temp_str;
+                                         (void)cmd_config_int_rrcp(cli,cmd_to_cli,NULL,0);
+					}
                                         exit(0);
                                  case 7: // mls qos
                                         for(;;){
@@ -1094,14 +850,21 @@ int main(int argc, char **argv){
                                              shift++;
                                              continue;
                                            }
-                                           do_port_qos(&port_list[0],subcmd);
+                                           cmdcat(cmd_to_cli,sizeof(cmd_to_cli)-1,"mls cos qos");
+                                           for(i=0;i<switchtypes[switchtype].num_ports;i++){
+                                             if (!port_list[i]) continue;
+                                             bzero(temp_str,10);
+                                             snprintf(temp_str,sizeof(temp_str)-1,"/%u",i+1);
+                                             cli->modestring=temp_str;
+                                             (void)cmd_config_int_mls(cli,cmd_to_cli,&argv[6+shift],argc-6-shift);
+                                           }
                                            exit(0);
                                         }
                                  case 8:  // flow control
                                         check_argc(argc,5+shift,NULL,&config_port_flow[0]);
                                         subcmd=get_cmd_num(argv[6+shift],-1,NULL,&config_port_flow[0]);
                                         if (subcmd) subcmd=subcmd<<5;
-                                        do_port_config(1,&port_list[0],subcmd);
+                                        printf("under construction\n");
                                         exit(0);
                                  default:
                                          print_unknown(argv[5+shift],&config_intf_sub_cmd_l1[0]);
@@ -1189,7 +952,7 @@ int main(int argc, char **argv){
                                  case 1: // unknown-destination
                                         check_argc(argc,4+shift,NULL,&config_alt_dest[0]);
                                         subcmd=get_cmd_num(argv[5+shift],-1,NULL,&config_alt_dest[0]);
-                                        do_alt_config(subcmd+4);
+                                        printf ("Under construction\n");
                                         exit(0);
                                  default: 
                                          print_unknown(argv[4+shift],&config_alt[0]);
@@ -1220,62 +983,8 @@ int main(int argc, char **argv){
                             printf("Port mirroring not working with hardware based on rtl8326/rtl8326s\n");
                             exit(1);
                           } 
-                          if (negate) {
-                            do_port_config_mirror(3,&port_list[0],1);
-                            exit(0);
-                          }
-                          direction=0;
-                          for (;;){
-                             if (exists_source && exists_destination){
-                               do_port_config_mirror(direction,&port_list[0],dest_port);
-                               exit(0);
-                             }
-                             check_argc(argc,3+shift,NULL,&config_monitor[0]);
-                             switch (compare_command(argv[4+shift],&config_monitor[0])){
-                                   case 1:
-                                          t1++;
-                                          shift++;
-                                          continue;
-                                   case 2:
-                                          t2++;
-                                          shift++;
-                                          continue;
-                                   case 3:
-                                          direction=1;
-                                          shift++;
-                                          continue;
-                                   case 4:
-                                          direction=2;
-                                          shift++;
-                                          continue;
-                                   case 0:
-                                          shift++;
-                                          if (t1){
-                                            check_argc(argc,3+shift,"No list of source ports\n",NULL);
-                                            if (str_portlist_to_array(argv[4+shift],&port_list[0],switchtypes[switchtype].num_ports)!=0){
-                                              printf("Incorrect list of ports: \"%s\"\n",argv[4+shift]);
-                                              exit(1);
-                                            }
-                                            t1=0; exists_source++;
-                                            shift++;
-                                            continue;
-                                          }
-                                          if (t2){
-                                            check_argc(argc,3+shift,"No destination port\n",NULL);
-                                            if (sscanf(argv[4+shift], "%i",&dest_port) != 1) { 
-                                              printf("Incorrect port: \"%s\"\n",argv[4+shift]);
-                                              exit(0); 
-                                            }
-                                            t2=0; exists_destination++;
-                                            shift++;
-                                            continue;
-                                          }
-                                          printf("Needed port(s)\n");
-                                          exit(0);
-                                   default: 
-                                           print_unknown(argv[4+shift],&config_monitor[0]);
-                             }
-                          }
+                          printf("Under construction\n");
+                          exit(0);
                    case 8: // vendor-id
                           check_argc(argc,3+shift,"vendor-id needed\n",NULL);
    	                  if (sscanf(argv[4+shift], "%02x%02x%02x%02x",x,x+1,x+2,x+3)!=4){
@@ -1334,7 +1043,6 @@ int main(int argc, char **argv){
                           check_argc(argc,3+shift,NULL,&config_wrr[0]);
                           subcmd=get_cmd_num(argv[4+shift],-1,NULL,&config_wrr[0]);
                           cmdcat(cmd_to_cli,sizeof(cmd_to_cli)-1,config_wrr[subcmd]);
-//                            printf("argc=%i, argv[%i]=%s, command=%s\n",argc-shift-4,4+shift,argv[4+shift],cmd_to_cli);
                           if (negate) exit(cmd_config_qos(cli,cmd_to_cli,NULL,0));
                           else{
                            if (argc == (5+shift)){
@@ -1371,13 +1079,18 @@ int main(int argc, char **argv){
                 exit(0);
          case 5: //write
                 check_argc(argc,2+shift,NULL,&write_sub_cmd[0]);
-                switch(compare_command(argv[3+shift],&write_sub_cmd[0])){
+                subcmd=compare_command(argv[3+shift],&write_sub_cmd[0]);
+                cmdcat(cmd_to_cli,sizeof(cmd_to_cli)-1,write_sub_cmd[subcmd]);
+                switch(subcmd){
                    case 0:
                    case 1:
-                          do_write_memory();
+                          cmd_write_memory(cli,cmd_to_cli,NULL,0);
                           exit(0);
                    case 2:
-                          do_write_eeprom_defaults();
+                          printf("Under constrution\n");
+                          exit(0);
+                   case 3:
+                          cmd_write_terminal(cli,cmd_to_cli,NULL,0);
                           exit(0);
                    default:
                           print_unknown(argv[3+shift],&write_sub_cmd[0]);
@@ -1385,6 +1098,31 @@ int main(int argc, char **argv){
          case 6: //ping
                 do_ping();
                 exit(0);
+         case 7: //copy
+                check_argc(argc,2+shift,NULL,&copy_sub_cmd[0]);
+                subcmd=compare_command(argv[3+shift],&copy_sub_cmd[0]);
+                cmdcat(cmd_to_cli,sizeof(cmd_to_cli)-1,copy_sub_cmd[subcmd]);
+                switch(subcmd){
+                   case 0:
+                          if (argc == (4+shift)){
+                            internal_argv[0]=qs;
+                            exit(cmd_copy_running_config(cli,cmd_to_cli,&internal_argv[0],1));
+                          }else{
+                            cmdcat(cmd_to_cli,sizeof(cmd_to_cli)-1,argv[4+shift]);
+                            exit(cmd_copy_running_config(cli,cmd_to_cli,&argv[4+shift],argc-shift-4));
+                          }
+                   case 1:
+                          cli->client=stdout;
+                          if (argc == (4+shift)){
+                            internal_argv[0]=qs;
+                            exit(cmd_copy_eeprom(cli,cmd_to_cli,&internal_argv[0],1));
+                          }else{
+                            cmdcat(cmd_to_cli,sizeof(cmd_to_cli)-1,argv[4+shift]);
+                            exit(cmd_copy_eeprom(cli,cmd_to_cli,&argv[4+shift],argc-shift-4));
+                          }
+                   default:
+                          print_unknown(argv[3+shift],&copy_sub_cmd[0]);
+                }
          default:
                 print_usage();
     }

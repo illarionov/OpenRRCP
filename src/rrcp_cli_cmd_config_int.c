@@ -25,7 +25,11 @@
 #define _GNU_SOURCE
 #include <string.h>
 #include <stdlib.h>
+#ifdef RTL83XX
+#include "../lib/fake-libcli.h"
+#else
 #include "../lib/libcli.h"
+#endif
 #include "rrcp_lib.h"
 #include "rrcp_io.h"
 #include "rrcp_config.h"
@@ -35,6 +39,7 @@
 
 #define MODE_CONFIG_INT		10
 
+#ifndef RTL83XX
 int cmd_config_int(struct cli_def *cli, char *command, char *argv[], int argc)
 {
     if (argc < 1){
@@ -67,6 +72,7 @@ int cmd_config_int(struct cli_def *cli, char *command, char *argv[], int argc)
     }
     return CLI_OK;
 }
+#endif
 
 int cmd_config_int_shutdown(struct cli_def *cli, char *command, char *argv[], int argc)
 {
@@ -78,6 +84,12 @@ int cmd_config_int_shutdown(struct cli_def *cli, char *command, char *argv[], in
 	}
     }else{
 	int port,port_phys;
+#ifdef RTL83XX
+        int i;
+        for(i=0;i<2;i++){
+           swconfig.port_disable.raw[i]=rtl83xx_readreg16(0x0608+i);
+        }
+#endif
 	port=atoi(strrchr(cli->modestring,'/')+1);
 	port_phys=map_port_number_from_logical_to_physical(port);
 	if (strcasecmp(command,"shutdown")==0)
@@ -86,6 +98,11 @@ int cmd_config_int_shutdown(struct cli_def *cli, char *command, char *argv[], in
 	    swconfig.port_disable.bitmap &= (~(1<<port_phys));
 	else
 	    cli_print(cli, "Internal error on command '%s'",command);
+#ifdef RTL83XX
+        for(i=0;i<2;i++){
+           rtl83xx_setreg16reg16(0x0608+i,swconfig.port_disable.raw[i]);
+        }
+#endif
     }
     return CLI_OK;
 }
@@ -244,11 +261,17 @@ int cmd_rate_limit(struct cli_def *cli, char *command, char *argv[], int argc)
 	int port,port_phys;
 	port=atoi(strrchr(cli->modestring,'/')+1);
 	port_phys=map_port_number_from_logical_to_physical(port);
+#ifdef RTL83XX
+        swconfig.bandwidth.raw[port_phys/2]=rtl83xx_readreg16(0x020a+(port_phys/2));
+#endif
 	if (strcasestr(command," input")){
 	    swconfig.bandwidth.rxtx[port_phys].rx=rate;
 	}else{
 	    swconfig.bandwidth.rxtx[port_phys].tx=rate;
 	}
+#ifdef RTL83XX
+        rtl83xx_setreg16reg16(0x020a+(port_phys/2),swconfig.bandwidth.raw[port_phys/2]);
+#endif
     }
     return CLI_OK;
 }
@@ -265,6 +288,9 @@ int cmd_config_int_mac_learning(struct cli_def *cli, char *command, char *argv[]
 	int port,port_phys;
 	port=atoi(strrchr(cli->modestring,'/')+1);
 	port_phys=map_port_number_from_logical_to_physical(port);
+#ifdef RTL83XX
+        swconfig.alt_mask.raw[port_phys/16]=rtl83xx_readreg16(0x301+(port_phys/16));
+#endif
 	if (strcasecmp(command,"mac-learn disable")==0)
 	    swconfig.alt_mask.mask |= (1<<port_phys);
 	else if ((strcasecmp(command,"mac-learn enable")==0)||
@@ -272,6 +298,9 @@ int cmd_config_int_mac_learning(struct cli_def *cli, char *command, char *argv[]
 	    swconfig.alt_mask.mask &= (~(1<<port_phys));
 	else
 	    cli_print(cli, "Internal error on command '%s'",command);
+#ifdef RTL83XX
+        rtl83xx_setreg16reg16(0x301+(port_phys/16),swconfig.alt_mask.raw[port_phys/16]);
+#endif
     }
     return CLI_OK;
 }
@@ -288,12 +317,18 @@ int cmd_config_int_rrcp(struct cli_def *cli, char *command, char *argv[], int ar
 	int port,port_phys;
 	port=atoi(strrchr(cli->modestring,'/')+1);
 	port_phys=map_port_number_from_logical_to_physical(port);
+#ifdef RTL83XX
+        swconfig.rrcp_byport_disable.raw[port_phys/16]=rtl83xx_readreg16(0x201+(port_phys/16));
+#endif
 	if (strcasecmp(command,"rrcp enable")==0)
 	    swconfig.rrcp_byport_disable.bitmap &= (~(1<<port_phys));
 	else if (strcasecmp(command,"no rrcp enable")==0)
 	    swconfig.rrcp_byport_disable.bitmap |= (1<<port_phys);
 	else
 	    cli_print(cli, "Internal error on command '%s'",command);
+#ifdef RTL83XX
+        rtl83xx_setreg16reg16(0x201+(port_phys/16),swconfig.rrcp_byport_disable.raw[port_phys/16]);
+#endif
     }
     return CLI_OK;
 }
@@ -303,6 +338,10 @@ int cmd_config_int_mls(struct cli_def *cli, char *command, char *argv[], int arg
     int port,port_phys;
     port=atoi(strrchr(cli->modestring,'/')+1);
     port_phys=map_port_number_from_logical_to_physical(port);
+#ifdef RTL83XX
+    swconfig.qos_port_priority.raw[0]=rtl83xx_readreg16(0x401);
+    swconfig.qos_port_priority.raw[1]=rtl83xx_readreg16(0x402);
+#endif
     if (argc>0){
 	if (strcmp(argv[0],"?")==0){
 	    cli_print(cli, "0 - Set CoS value in incoming packets to 0 (low prioriry)");
@@ -338,6 +377,9 @@ int cmd_config_int_speed_duplex(struct cli_def *cli, char *command, char *argv[]
 	    cli_print(cli, "%% Invalid input detected.");
 	}
     }else{
+#ifdef RTL83XX
+        swconfig.port_config.raw[port_phys/2]=rtl83xx_readreg16(0x060a+(port_phys/2));
+#endif
 	if (strcasecmp(command,"speed 10")==0){
 	    swconfig.port_config.config[port_phys].autoneg=0;
 	    swconfig.port_config.config[port_phys].media_10half=0;
@@ -405,10 +447,14 @@ int cmd_config_int_speed_duplex(struct cli_def *cli, char *command, char *argv[]
 	}else{
 	    cli_print(cli, "Internal error on command '%s'",command);
 	}
+#ifdef RTL83XX
+        rtl83xx_setreg16reg16(0x060a+(port_phys/2),swconfig.port_config.raw[port_phys/2]);
+#endif
     }
     return CLI_OK;
 }
 
+#ifndef RTL83XX
 int cmd_config_int_exit(struct cli_def *cli, char *command, char *argv[], int argc)
 {
 	cli_set_configmode(cli, MODE_CONFIG, NULL);
@@ -487,3 +533,4 @@ void cmd_config_int_register_commands(struct cli_def *cli)
     }
     cli_register_command(cli, NULL, "end", cmd_config_end, PRIVILEGE_PRIVILEGED, MODE_CONFIG_INT, "Exit from configure mode");
 }
+#endif

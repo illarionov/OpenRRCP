@@ -22,6 +22,19 @@
     This would be appreciated, however not required.
 */
 
+#ifdef RTL83XX
+#include "../lib/fake-libcli.h"
+#else
 #include "../lib/libcli.h"
+#endif
 
+#ifdef RTL83XX
+int cmd_write_terminal(struct cli_def *cli, char *command, char *argv[], int argc);
+int cmd_write_memory(struct cli_def *cli, char *command, char *argv[], int argc);
+int cmd_copy_running_config(struct cli_def *cli, char *command, char *argv[], int argc);
+int cmd_copy(struct cli_def *cli, char *command, char *argv[], int argc);
+int cmd_copy_eeprom(struct cli_def *cli, char *command, char *argv[], int argc);
+#else
 void cmd_other_register_commands(struct cli_def *cli);
+#endif
+

@@ -12,7 +12,7 @@ rrcpcli-debug: rrcp_cli.c rrcp_cli_cmd_show.c rrcp_cli_cmd_config.c rrcp_cli_cmd
 	gcc -Wall -ggdb rrcp_cli.c rrcp_cli_cmd_show.c rrcp_cli_cmd_config.c rrcp_cli_cmd_config_int.c rrcp_cli_cmd_other.c rrcp_config.c rrcp_io.c rrcp_lib.c rrcp_switches.c ../lib/libcli.c -lcrypt -o ../bin/rrcpcli-debug
 
 rtl83xx: rtl83xx.c 
-	gcc $(CFLAGS) -DRTL83XX rtl83xx.c rrcp_cli_cmd_show.c rrcp_cli_cmd_config.c rrcp_io.c rrcp_lib.c rrcp_switches.c rrcp_config.c ../lib/fake-libcli.c -o ../bin/rtl83xx
+	gcc $(CFLAGS) -DRTL83XX rtl83xx.c rrcp_cli_cmd_show.c rrcp_cli_cmd_config.c rrcp_cli_cmd_config_int.c rrcp_cli_cmd_other.c rrcp_io.c rrcp_lib.c rrcp_switches.c rrcp_config.c ../lib/fake-libcli.c -o ../bin/rtl83xx
 
 rtl8326: rtl83xx
 	ln -sf rtl83xx ../bin/rtl8326

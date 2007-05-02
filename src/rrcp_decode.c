@@ -38,64 +38,30 @@
 
 #define ETH_TYPE_RRCP   0x8899          /* Realtek RRCP Protocol */
 
-#define SET 1
-#define GET 0
+#define GET       0
+#define SET       1
+#define GET_REPLY 2
+#define SET_REPLY 3
 
 static pcap_t *handle;
 int unsigned   count,verbose,debug;
 char 	       progname[32];
+void         (*rrcp_decode[0x1000])(int, uint16_t, uint32_t);
+
+void init_decoder(void);
 
 static void usage(void){
- fprintf(stderr, "Usage: \"%s [-p] -r <file>\"\n",progname);
- fprintf(stderr, "       \"%s [-p] [xx:xx:xx:xx:xx:xx@]ifname\"\n",progname);
+ fprintf(stderr, "Usage: \"%s [-p] [-v] -r <file>\"\n",progname);
+ fprintf(stderr, "       \"%s [-p] [-v] [xx:xx:xx:xx:xx:xx@]ifname\"\n",progname);
  fprintf(stderr, " <file> - raw binary file, created by tcpdumpor windump. Look the description\n");
  fprintf(stderr, "          of an option \"-w\" in the documentation at the corresponding program.\n");
  fprintf(stderr, " ifname - interface to capture packets\n");
  fprintf(stderr, " xx:xx:xx:xx:xx:xx - MAC address\n");
  fprintf(stderr, " -p - put the interface into promiscuous mode.\n");
-// fprintf(stderr, " -v - enable verbose output\n");
+ fprintf(stderr, " -v - be verbose\n");
  exit(2);
 }
 
-void print_val_217(int mode, uint16_t data){
- union {
-   struct t_reg217{
-     uint16_t
-     address:8,
-     chip_select:3,
-     operation:1,
-     status:1,
-     fail:1,
-     reserved:2;
-   } value;
-     uint16_t raw;
- } reg217;
-
- reg217.raw=data;
- printf("      Address: 0x%02x, chip: %u, ", reg217.value.address, reg217.value.chip_select);
-
- if (mode==SET) { printf("set mode to %s\n",(reg217.value.operation)?"Read":"Write"); }
- else { printf("status: %s %s %s\n",
-               (reg217.value.operation)?"Read":"Write",
-               (reg217.value.status)?"Busy":"Idle",
-               (reg217.value.fail)?"Fail":"Success");
-      }
-}
-
-void print_val_218(int mode,uint16_t data){
- union {
-  struct t_reg218{
-    uint16_t
-    written:8,
-    read:8;
-  } data;
-    uint16_t raw;
- } reg218;
-
- reg218.raw=data;
- if (mode==SET) { printf("      Data written to device 0x%02x\n", reg218.data.written);}
- else { printf("      Data read from device 0x%02x\n", reg218.data.read);}
-}
 
 int main(int argc, char *argv[]){
  char *pTemp;
@@ -144,6 +110,7 @@ int main(int argc, char *argv[]){
   }
  }
 
+ init_decoder();
  bzero(ifname,sizeof(ifname));
  bzero(filter_app,sizeof(filter_app));
 
@@ -211,19 +178,19 @@ int main(int argc, char *argv[]){
          else printf(" Hello\n"); 
 	 break;
    case 1: // get
-         if (pktr.rrcp_isreply) { 
+         if (pktr.rrcp_isreply){ 
            printf(" Get reply reg(0x%04x)=0x%08x\n",pktr.rrcp_reg_addr, pktr.rrcp_reg_data); 
-           if (pktr.rrcp_reg_addr == 0x217) print_val_217(GET,(uint16_t)pktr.rrcp_reg_data);
-           if (pktr.rrcp_reg_addr == 0x218) print_val_218(GET,(uint16_t)pktr.rrcp_reg_data);
+           if (verbose) (rrcp_decode[pktr.rrcp_reg_addr])(GET_REPLY,pktr.rrcp_reg_addr, pktr.rrcp_reg_data);
+         }else{
+           printf(" Get reg 0x%04x\n",pktr.rrcp_reg_addr);
+           if (verbose) (rrcp_decode[pktr.rrcp_reg_addr])(GET,pktr.rrcp_reg_addr, pktr.rrcp_reg_data);
          }
-         else printf(" Get reg 0x%04x\n",pktr.rrcp_reg_addr);
          break;
    case 2: // set
          if (pktr.rrcp_isreply) printf(" Set reply reg(0x%04x)=0x%08x\n",pktr.rrcp_reg_addr, pktr.rrcp_reg_data);
          else { 
           printf(" Set reg(0x%04x)=0x%08x\n",pktr.rrcp_reg_addr, pktr.rrcp_reg_data);
-          if (pktr.rrcp_reg_addr == 0x217) print_val_217(SET,(u_int16_t)pktr.rrcp_reg_data);
-          if (pktr.rrcp_reg_addr == 0x218) print_val_218(SET,(u_int16_t)pktr.rrcp_reg_data);
+          if (verbose) (rrcp_decode[pktr.rrcp_reg_addr])(SET,pktr.rrcp_reg_addr, pktr.rrcp_reg_data);
          }
          break;
    default:
@@ -235,4 +202,88 @@ int main(int argc, char *argv[]){
  printf("Got %u packets\n",count);
  pcap_close(handle);
  exit(0);
+}
+
+void print_reg(int mode, uint16_t addr, uint32_t data){
+//  printf("\n");
+  return;
+}
+
+void print_val_000(int mode, uint16_t addr, uint16_t data){
+ switch(mode){
+   case SET: 
+            if (data==1) printf("      Software reboot\n");
+            else if (data==2) printf("      Hardware reboot\n");
+            else printf("Incorrect value\n");
+            return;
+   default:
+            printf ("Abnormal operation. This register is self-clearning\n");
+ }
+}
+
+void print_val_217(int mode, uint16_t addr, uint16_t data){
+ union {
+   struct t_reg217{
+     uint16_t
+     address:8,
+     chip_select:3,
+     operation:1,
+     status:1,
+     fail:1,
+     reserved:2;
+   } value;
+     uint16_t raw;
+ } reg217;
+
+ reg217.raw=(uint16_t)data;
+ switch(mode){
+   case SET: 
+            printf("      Address: 0x%02x, chip: %u", reg217.value.address, reg217.value.chip_select);
+            printf(", set mode to %s\n",(reg217.value.operation)?"Read":"Write");
+            return;
+   case GET_REPLY: 
+            printf("      Address: 0x%02x, chip: %u", reg217.value.address, reg217.value.chip_select);
+            printf(", status: %s %s %s\n",
+                  (reg217.value.operation)?"Read":"Write",
+                  (reg217.value.status)?"Busy":"Idle",
+                  (reg217.value.fail)?"Fail":"Success");
+            return;
+   default:
+           return;
+ }
+}
+
+void print_val_218(int mode, uint16_t addr, uint32_t data){
+ union {
+  struct t_reg218{
+    uint16_t
+    written:8,
+    read:8;
+  } data;
+    uint16_t raw;
+ } reg218;
+
+ reg218.raw=(uint16_t)data;
+ switch(mode){
+    case SET: 
+             printf("      Data written to device 0x%02x\n", reg218.data.written);
+             return;
+    case GET_REPLY:
+             printf("      Data read from device 0x%02x\n", reg218.data.read);
+             return;
+    default:
+             return;
+ }
+}
+
+void init_decoder(){
+ int i;
+ 
+ for (i=0;i<0x1000;i++){
+   rrcp_decode[i]=(void *)print_reg;
+ }
+ rrcp_decode[0x000]=(void*)print_val_000;
+ rrcp_decode[0x217]=(void*)print_val_217;
+ rrcp_decode[0x218]=(void*)print_val_218;
+ return;
 }

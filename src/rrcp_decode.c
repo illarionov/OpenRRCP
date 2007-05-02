@@ -31,6 +31,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <netinet/in.h>
+#include <unistd.h>
+#include <err.h>
 #include <pcap.h>
 #include "rrcp_packet.h"
 
@@ -39,13 +41,19 @@
 #define SET 1
 #define GET 0
 
-static pcap_t 			*handle;
-int unsigned 			 count,verbose;
-char 				 progname[32];
+static pcap_t *handle;
+int unsigned   count,verbose,debug;
+char 	       progname[32];
 
 static void usage(void){
- fprintf(stderr, "Usage: \"%s <file>\"",progname);
- fprintf(stderr, " where <file> - raw binary file, created by tcpdump\nor windump. Look the description of an option \"-w\" in the documentation at the\ncorresponding program.\n");
+ fprintf(stderr, "Usage: \"%s [-p] -r <file>\"\n",progname);
+ fprintf(stderr, "       \"%s [-p] [xx:xx:xx:xx:xx:xx@]ifname\"\n",progname);
+ fprintf(stderr, " <file> - raw binary file, created by tcpdumpor windump. Look the description\n");
+ fprintf(stderr, "          of an option \"-w\" in the documentation at the corresponding program.\n");
+ fprintf(stderr, " ifname - interface to capture packets\n");
+ fprintf(stderr, " xx:xx:xx:xx:xx:xx - MAC address\n");
+ fprintf(stderr, " -p - put the interface into promiscuous mode.\n");
+// fprintf(stderr, " -v - enable verbose output\n");
  exit(2);
 }
 
@@ -95,24 +103,92 @@ int main(int argc, char *argv[]){
  struct pcap_pkthdr pkt_h;
  struct rrcp_packet_t pktr;
  const  u_char *rcvbuf;
- 
+ int c;
+ char *file_name=NULL;
+ int promisc=0;
+ int switchtype=-1;
+ unsigned int x[6];
+ struct bpf_program filter;
+ bpf_u_int32 mask;
+ bpf_u_int32 net;
+ char filter_app[512];
+ char ifname[128];
+
  count=0;
  verbose=0;
+ debug=0;
 
  if ((pTemp=strrchr(argv[0],'/'))!=NULL) strncpy(progname,pTemp+1,sizeof(progname));
  else strncpy(progname,argv[0],sizeof(progname));
 
- if (argc == 1) usage();
- 
- if ((handle = pcap_open_offline(argv[1], errbuf))== NULL) {
-   fprintf(stderr, "pcap_open_offline: %s", errbuf);
-   exit(2);
+ while ((c = getopt(argc, argv, "dpvr:t:h?")) != -1) {
+  switch (c) {
+   case 'd':
+             debug++;
+             break;
+   case 'p':
+             promisc++;
+             break;
+   case 'v':
+             verbose++;
+             break;
+   case 'r':
+             file_name = optarg;
+             break;
+   case 't':
+             switchtype=atoi(optarg);
+             break;
+   default:
+             usage();
+             break;
+  }
  }
 
- while ((rcvbuf=pcap_next(handle, &pkt_h)) != NULL) {
+ bzero(ifname,sizeof(ifname));
+ bzero(filter_app,sizeof(filter_app));
+
+ if (file_name){
+   if ((handle = pcap_open_offline(file_name, errbuf))== NULL) {
+     errx(2, "pcap_open_offline: %s", errbuf);
+   }
+ }else{
+    if (optind < argc) {
+        if (sscanf(argv[optind], "%x:%x:%x:%x:%x:%x@%s",x,x+1,x+2,x+3,x+4,x+5,ifname)==7){
+            snprintf(filter_app, sizeof(filter_app)-1, "ether host %02x:%02x:%02x:%02x:%02x:%02x and ether proto 0x%x",*x,*(x+1),*(x+2),*(x+3),*(x+4),*(x+5),ETH_TYPE_RRCP); 
+        }else{
+            strncpy(ifname,argv[optind],sizeof(ifname)-1);
+            snprintf(filter_app, sizeof(filter_app), "ether proto 0x%x", ETH_TYPE_RRCP);
+        }
+        optind++;
+    }else 
+        usage();
+
+    if (debug) printf("Filter: %s\n",filter_app);
+    if (pcap_lookupnet(ifname, &net, &mask, errbuf) < 0) { net = 0; mask = 0; }
+    if ((handle = pcap_open_live(ifname, 128, promisc, 100, errbuf)) == NULL)
+      errx(2, "pcap_open_live: %s", errbuf);
+#if defined(BSD) && defined(BIOCIMMEDIATE)
+    {
+      int on = 1;
+      if (ioctl(pcap_fileno(handle), BIOCIMMEDIATE, &on) < 0) errx(2, "BIOCIMMEDIATE");
+    }
+#endif
+    if ( (pcap_compile(handle, &filter, filter_app, 1, mask) < 0) ||
+         (pcap_setfilter(handle, &filter) < 0)) 
+      errx(2, "bad pcap filter: %s", pcap_geterr(handle));
+  }
+
+ for(;;){
+
+  rcvbuf=pcap_next(handle, &pkt_h);
+  if (rcvbuf == NULL ){ 
+   if (file_name) break;
+   else { usleep(100000); continue;}
+  }
+
   memcpy(&pktr,rcvbuf,(pkt_h.caplen>sizeof(pktr)?sizeof(pktr):pkt_h.caplen));
-  count++;
   if (pktr.ether_type!=htons(ETH_TYPE_RRCP)) continue;
+  count++;
  
   if ((pktr.rrcp_reg_addr == 0x217)||(pktr.rrcp_reg_addr == 0x218)) printf (" ");
   else printf ("!");

@@ -42,4 +42,4 @@ mips_rtl83xx_dlink_des1024d: rtl83xx
 	/opt/hardhat/previewkit/mips/mipsel-linux-uclibc/bin/mipsel-uclibc-gcc -I /opt/hardhat/previewkit/mips/mipsel-linux-uclibc/include -s -Wall -O2 -fomit-frame-pointer rtl83xx.c rrcp_io.c rrcp_lib.c rrcp_switches.c rrcp_config.c -o ../bin/mips_rtl83xx_dlink_des1024d
 
 rrcp_decode:
-	gcc $(CFLAGS) -o ../bin/rrcp_decode rrcp_decode.c -lpcap
+	gcc $(CFLAGS) -o ../bin/rrcp_decode rrcp_switches.c rrcp_config.c rrcp_io.c rrcp_decode.c -lpcap

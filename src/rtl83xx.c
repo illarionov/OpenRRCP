@@ -355,6 +355,7 @@ void do_write_memory(){
  if (do_write_eeprom(0x0f,swconfig.rrcp_byport_disable.raw[0])) {printf("write eeprom\n");exit(1);}
  if (do_write_eeprom(0x11,swconfig.rrcp_byport_disable.raw[1])) {printf("write eeprom\n");exit(1);}
  if (do_write_eeprom(0x23,swconfig.alt_config.raw)) {printf("write eeprom\n");exit(1);}
+ if (do_write_eeprom(0x27,swconfig.alt_igmp_snooping.raw)) {printf("write eeprom\n");exit(1);}
  if (do_write_eeprom(0x29,swconfig.vlan.raw[0])) {printf("write eeprom\n");exit(1);}
  if (do_write_eeprom(0x2f,swconfig.qos_config.raw)) {printf("write eeprom\n");exit(1);}
  if (do_write_eeprom(0x31,swconfig.qos_port_priority.raw[0])) {printf("write eeprom\n");exit(1);}

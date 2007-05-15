@@ -798,6 +798,7 @@ void print_usage(void){
 	printf("       rtl83xx_compex_ps2216 ----\"\"----\n");
         printf("       rtl83xx_ovislink_fsh2402gt ----\"\"----\n");
 	printf("       rtl83xx_zyxel_es116p ----\"\"----\n");
+	printf("       rtl83xx_compex_sds1224 ----\"\"----\n");
 	printf(" where command may be:\n");
 	printf(" show running-config          - show current switch config\n");
 	printf(" show interface [<list ports>]- print link status for ports\n");
@@ -912,6 +913,8 @@ int main(int argc, char **argv){
 	switchtype=8;
     }else if (strstr(p,"rtl83xx_zyxel_es116p")==argv[0]+strlen(argv[0])-20){ 
         switchtype=9; 
+    }else if (strstr(p,"rtl83xx_compex_sds1224")==argv[0]+strlen(argv[0])-22){
+	switchtype=10;
     }else {
 	printf("%s: unknown switch/chip type\n",argv[0]);
 	exit(0);
@@ -945,7 +948,7 @@ int main(int argc, char **argv){
 	    switchtypes[switchtype].model,
 	    argv[1]);
 
-    engage_timeout(5);
+    engage_timeout(10);
     rtl83xx_prepare();
 
     cmd=compare_command(argv[2+shift],&cmd_level_1[0]);

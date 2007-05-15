@@ -39,9 +39,9 @@ char* chipnames [5] = {
 
 uint32_t switchtype;
 
-const uint32_t switchtype_n = 10;
+const uint32_t switchtype_n = 11;
 
-struct switchtype_t switchtypes[10] = {
+struct switchtype_t switchtypes[11] = {
     {
 	"generic",
 	"rtl8326",
@@ -131,6 +131,15 @@ struct switchtype_t switchtypes[10] = {
 	rtl8316b,
 	16,
 	{2,4,6,8,10,12,14,16,1,3,5,7,9,11,13,15,0,0,0,0,0,0,0,0,0,0,0}
+    },
+    {
+	"compex",
+	"sds1224",
+	"unknown",
+	"rtl8324",
+	rtl8324,
+	24,
+	{2,1,4,3,6,5,8,7,10,9,12,11,14,13,16,15,18,17,20,19,22,21,24,23,0,0,0}
     }
 };
 

@@ -168,7 +168,7 @@ uint16_t rrcp_switch_autodetect_chip(void){
     saved_reg=rtl83xx_readreg16(0x0218);
     for(i=0;i<4;i++){
       rtl83xx_setreg16(0x0218,test2[i]);
-      if (rtl83xx_readreg16(0x0218) != test2[i]) {
+      if ((uint8_t)rtl83xx_readreg16(0x0218) != test2[i]) {
         errcnt++; 
         break;
       }
@@ -211,7 +211,7 @@ int rrcp_autodetectchip_try_to_write_eeprom (uint16_t addr1, uint16_t addr2)
     eeprom_read(addr2,&tmp22);
     eeprom_write(addr1,tmp11);
     eeprom_write(addr2,tmp12);
-    return ((tmp21==tmp11+0x055)&&(tmp22==tmp11+0x0aa));
+    return ((tmp21==(uint8_t)(tmp11+0x055))&&(tmp22==(uint8_t)(tmp11+0x0aa)));
 }
 
 uint8_t rrcp_autodetectswitch_port_count(void){
@@ -249,15 +249,15 @@ uint16_t rrcp_autodetect_switch_chip_eeprom(uint8_t *switch_type, uint8_t *chip_
 	if ((errcnt=eeprom_read(0x12+i,&test1[i]))!=0){break;}
     }
     if (errcnt==0){
-	if (rrcp_autodetectchip_try_to_write_eeprom(0x07e,0x07f)){
+	if (!eeprom_read(0x7f,&test1[0])){
 	    detected_eeprom=EEPROM_2401;
-	    if (rrcp_autodetectchip_try_to_write_eeprom(0x07f,0x0ff)){
+	    if (!eeprom_read(0xff,&test1[0])){
 		detected_eeprom=EEPROM_2402;
-		if (rrcp_autodetectchip_try_to_write_eeprom(0x0ff,0x01ff)){
+		if (!eeprom_read(0x1ff,&test1[0])){
 		    detected_eeprom=EEPROM_2404;
-		    if (rrcp_autodetectchip_try_to_write_eeprom(0x01ff,0x03ff)){
+		    if (!eeprom_read(0x3ff,&test1[0])){
 			detected_eeprom=EEPROM_2408;
-			if (rrcp_autodetectchip_try_to_write_eeprom(0x03ff,0x07ff)){
+			if (!eeprom_read(0x7ff,&test1[0])){
 			    detected_eeprom=EEPROM_2416;
 			}
 		    }

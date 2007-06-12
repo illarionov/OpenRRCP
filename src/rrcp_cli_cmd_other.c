@@ -54,8 +54,8 @@ int cmd_write_terminal(struct cli_def *cli, char *command, char *argv[], int arg
 
 int cmd_write_memory(struct cli_def *cli, char *command, char *argv[], int argc)
 {
-    cli_print(cli, "%% Not implemented yet");
-    return CLI_ERROR;
+    do_write_memory();
+    return CLI_OK;
 }
 
 int cmd_copy_running_config(struct cli_def *cli, char *command, char *argv[], int argc)

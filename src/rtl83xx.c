@@ -346,26 +346,6 @@ void do_vlan_tmpl(int mode){
  }
 }
 
-void do_write_memory(){
- int i,numreg;
-
- numreg=(switchtypes[switchtype].num_ports==16)?12:13;
- rrcp_config_read_from_switch();
- if (do_write_eeprom(0x0d,swconfig.rrcp_config.raw)) {printf("write eeprom\n");exit(1);}
- if (do_write_eeprom(0x0f,swconfig.rrcp_byport_disable.raw[0])) {printf("write eeprom\n");exit(1);}
- if (do_write_eeprom(0x11,swconfig.rrcp_byport_disable.raw[1])) {printf("write eeprom\n");exit(1);}
- if (do_write_eeprom(0x23,swconfig.alt_config.raw)) {printf("write eeprom\n");exit(1);}
- if (do_write_eeprom(0x27,swconfig.alt_igmp_snooping.raw)) {printf("write eeprom\n");exit(1);}
- if (do_write_eeprom(0x29,swconfig.vlan.raw[0])) {printf("write eeprom\n");exit(1);}
- if (do_write_eeprom(0x2f,swconfig.qos_config.raw)) {printf("write eeprom\n");exit(1);}
- if (do_write_eeprom(0x31,swconfig.qos_port_priority.raw[0])) {printf("write eeprom\n");exit(1);}
- if (do_write_eeprom(0x33,swconfig.qos_port_priority.raw[1])) {printf("write eeprom\n");exit(1);}
- if (do_write_eeprom(0x39,swconfig.port_config_global.raw)) {printf("write eeprom\n");exit(1);}
- for(i=0;i<numreg;i++){
-    if (do_write_eeprom(0x3b+i*2,swconfig.port_config.raw[i])) {printf("write eeprom\n");exit(1);}
- }
-}
-
 void do_write_eeprom_defaults(){
  int i;
  uint16_t data;

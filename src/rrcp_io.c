@@ -555,15 +555,15 @@ void rtl83xx_setreg16reg16(uint16_t regno, uint16_t regval){
 }
 
 int wait_eeprom(){
-int i;
-uint16_t res;
+    int i;
+    uint16_t res;
 
- for(i=0;i<10;i++){
-  res=rtl83xx_readreg16(0x217);
-  if ((res&0x1000) == 0) return(res);
-  usleep(1000);
- }
- return(0xffff);
+    for(i=1;i<=10;i++){
+	res=rtl83xx_readreg16(0x217);
+	if ((res&0x1000) == 0) return(res);
+	usleep(1000*i);
+    }
+    return(0xffff);
 }
 
 /* 
@@ -595,6 +595,7 @@ int eeprom_write(uint16_t addr,uint8_t data){
 int eeprom_read(uint16_t addr,uint8_t *data){
     uint16_t tmp;
 
+    data[0]=0;
     rtl83xx_setreg16(0x217,(addr&0x7ff)|0x800);
     if ((wait_eeprom()&0x2000)!=0){
 	return 1;
@@ -676,4 +677,24 @@ uint32_t rtl83xx_ping(void){
 	}
     }
     return 0;
+}
+
+void do_write_memory(){
+ int i,numreg;
+
+ numreg=(switchtypes[switchtype].num_ports==16)?12:13;
+ rrcp_config_read_from_switch();
+ if (do_write_eeprom(0x0d,swconfig.rrcp_config.raw)) {printf("write eeprom\n");exit(1);}
+ if (do_write_eeprom(0x0f,swconfig.rrcp_byport_disable.raw[0])) {printf("write eeprom\n");exit(1);}
+ if (do_write_eeprom(0x11,swconfig.rrcp_byport_disable.raw[1])) {printf("write eeprom\n");exit(1);}
+ if (do_write_eeprom(0x23,swconfig.alt_config.raw)) {printf("write eeprom\n");exit(1);}
+ if (do_write_eeprom(0x27,swconfig.alt_igmp_snooping.raw)) {printf("write eeprom\n");exit(1);}
+ if (do_write_eeprom(0x29,swconfig.vlan.raw[0])) {printf("write eeprom\n");exit(1);}
+ if (do_write_eeprom(0x2f,swconfig.qos_config.raw)) {printf("write eeprom\n");exit(1);}
+ if (do_write_eeprom(0x31,swconfig.qos_port_priority.raw[0])) {printf("write eeprom\n");exit(1);}
+ if (do_write_eeprom(0x33,swconfig.qos_port_priority.raw[1])) {printf("write eeprom\n");exit(1);}
+ if (do_write_eeprom(0x39,swconfig.port_config_global.raw)) {printf("write eeprom\n");exit(1);}
+ for(i=0;i<numreg;i++){
+    if (do_write_eeprom(0x3b+i*2,swconfig.port_config.raw[i])) {printf("write eeprom\n");exit(1);}
+ }
 }

@@ -25,6 +25,3 @@
 int str_portlist_to_array(char *list,unsigned short int *arr,unsigned int arrlen);
 
 int str_portlist_to_array_by_value(char *list,int *arr,unsigned int arrlen);
-
-
-

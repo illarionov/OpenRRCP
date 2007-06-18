@@ -779,6 +779,7 @@ void print_usage(void){
         printf("       rtl83xx_ovislink_fsh2402gt ----\"\"----\n");
 	printf("       rtl83xx_zyxel_es116p ----\"\"----\n");
 	printf("       rtl83xx_compex_sds1224 ----\"\"----\n");
+	printf("       rtl83xx_signamax_065-7531a ----\"\"----\n");
 	printf(" where command may be:\n");
 	printf(" show running-config          - show current switch config\n");
 	printf(" show interface [<list ports>]- print link status for ports\n");
@@ -895,6 +896,8 @@ int main(int argc, char **argv){
         switchtype=9; 
     }else if (strstr(p,"rtl83xx_compex_sds1224")==argv[0]+strlen(argv[0])-22){
 	switchtype=10;
+    }else if (strstr(p,"rtl83xx_signamax_065-7531a")==argv[0]+strlen(argv[0])-26){
+	switchtype=11;
     }else {
 	printf("%s: unknown switch/chip type\n",argv[0]);
 	exit(0);

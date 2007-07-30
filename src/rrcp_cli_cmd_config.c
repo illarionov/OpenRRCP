@@ -107,6 +107,7 @@ int cmd_config_rrcp(struct cli_def *cli, char *command, char *argv[], int argc)
 	if (strcasecmp(command,"no rrcp echo enable")==0) swconfig.rrcp_config.config.echo_disable=1;
 	if (strcasecmp(command,"rrcp loop-detect enable")==0)    swconfig.rrcp_config.config.loop_enable=1;
 	if (strcasecmp(command,"no rrcp loop-detect enable")==0) swconfig.rrcp_config.config.loop_enable=0;
+	rtl83xx_setreg16reg16(0x0200,swconfig.rrcp_config.raw);
     }
     return CLI_OK;
 }

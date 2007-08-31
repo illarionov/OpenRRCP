@@ -80,11 +80,15 @@ int cmd_config_int_shutdown(struct cli_def *cli, char *command, char *argv[], in
 	int port,port_phys;
 	port=atoi(strrchr(cli->modestring,'/')+1);
 	port_phys=map_port_number_from_logical_to_physical(port);
-	if (strcasecmp(command,"shutdown")==0)
+	if (strcasecmp(command,"shutdown")==0){
 	    swconfig.port_disable.bitmap |= (1<<port_phys);
-	else if (strcasecmp(command,"no shutdown")==0)
+	    rtl83xx_setreg16(0x0608+0,swconfig.port_disable.raw[0]);
+	    rtl83xx_setreg16(0x0608+1,swconfig.port_disable.raw[1]);
+	}else if (strcasecmp(command,"no shutdown")==0){
 	    swconfig.port_disable.bitmap &= (~(1<<port_phys));
-	else
+	    rtl83xx_setreg16(0x0608+0,swconfig.port_disable.raw[0]);
+	    rtl83xx_setreg16(0x0608+1,swconfig.port_disable.raw[1]);
+	}else
 	    cli_print(cli, "Internal error on command '%s'",command);
     }
     return CLI_OK;
@@ -107,12 +111,14 @@ int cmd_config_int_switchport(struct cli_def *cli, char *command, char *argv[], 
                 swconfig.vlan_entry.bitmap[i]&=~(1<<port_phys);
             }
 	    swconfig.vlan_port_insert_vid.bitmap |= (1<<port_phys);
+	    swconfig.vlan_port_output_tag.bitmap |= (1<<port_phys);
 	    rrcp_config_commit_vlan_to_switch();
 	}else if (strcasecmp(command,"switchport mode access")==0){
 	    for(i=0;i<32;i++){
                 swconfig.vlan_entry.bitmap[i]&=~(1<<port_phys);
             }
 	    swconfig.vlan_port_insert_vid.bitmap &= (~(1<<port_phys));
+	    swconfig.vlan_port_output_tag.bitmap &= (~(1<<port_phys));
 	    rrcp_config_commit_vlan_to_switch();
 	}else{
 	    cli_print(cli, "Internal error on command '%s'",command);

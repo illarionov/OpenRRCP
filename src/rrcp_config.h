@@ -120,7 +120,7 @@
 	union {
 	    uint32_t bitmap;
 	    uint16_t raw[4];
-	} vlan_port_output_tag;
+	} vlan_port_output_tag; //0x0319
 	union {
 	    uint32_t bitmap[32];
 	    uint16_t raw[64];

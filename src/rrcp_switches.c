@@ -41,11 +41,17 @@ char* chipnames [7] = {
 
 uint32_t switchtype;
 
-int reg2eeprom_rtl8326_generic[3]={ // rtl8326 - compatibility only
+/* 
+  Internal register vs. EEPROM configuration mapping   
+  Format of the table: <internal register>, <EEPROM address (low)>, <quantity of registers in a chain>
+  Last value should be -1,0,0
+*/
+
+int reg2eeprom_rtl8326_generic[]={ // rtl8326 - compatibility only
     -1,0,0
 };
 
-int reg2eeprom_rtl8316b_generic[24]={ // generic rtl8316b
+int reg2eeprom_rtl8316b_generic[]={ // generic rtl8316b
     0x0200,0x00c,3,
     0x0300,0x022,1,
     0x0307,0x024,2,
@@ -56,7 +62,7 @@ int reg2eeprom_rtl8316b_generic[24]={ // generic rtl8316b
     -1,0,0
 };
 
-int reg2eeprom_rtl8324_generic[24]={ // generic rtl8324
+int reg2eeprom_rtl8324_generic[]={ // generic rtl8324
     0x0200,0x00c,3,
     0x0300,0x022,1,
     0x0307,0x024,2,
@@ -67,7 +73,7 @@ int reg2eeprom_rtl8324_generic[24]={ // generic rtl8324
     -1,0,0
 };
 
-int reg2eeprom_ps2216_6d[39]={ // Compex PS2216B 6D with CPU ( VendorId 0x11f67003 & 0x11f67004)
+int reg2eeprom_ps2216_6d[]={ // Compex PS2216B 6D with CPU ( VendorId 0x11f67003 & 0x11f67004)
     0x0200,0x00c,3,
     0x0209,0x06a,14,
     0x0219,0x19e,6,
@@ -83,7 +89,7 @@ int reg2eeprom_ps2216_6d[39]={ // Compex PS2216B 6D with CPU ( VendorId 0x11f670
     -1,0,0
 };
 
-int reg2eeprom_rtl8316bp_generic[51]={ // generic rtl8316bp
+int reg2eeprom_rtl8316bp_generic[]={ // generic rtl8316bp
     0x0200,0x00c,3,
     0x0209,0x070,1,
     0x020a,0x080,8,
@@ -103,7 +109,7 @@ int reg2eeprom_rtl8316bp_generic[51]={ // generic rtl8316bp
     -1,0,0
 };
 
-int reg2eeprom_rtl8324p_generic[48]={ // generic rtl8324p
+int reg2eeprom_rtl8324p_generic[]={ // generic rtl8324p
     0x0200,0x00c,3,
     0x0209,0x070,1,
     0x020a,0x080,12,
@@ -122,11 +128,23 @@ int reg2eeprom_rtl8324p_generic[48]={ // generic rtl8324p
     -1,0,0
 };
 
-int defregval_rtl8326_generic[3]={   // generic rtl8326
+/* 
+  Default values   
+  Format of the table: <internal register>, <default value>, <quantity of registers in a chain>
+  If the register here is not specified, its value is equal 0
+  Last value should be -1,0,0
+*/
+
+int defregval_rtl8326_generic[]={   // generic rtl8326
+     0x0300,0x4,1,
+     0x0400,0x10,1,
+     0x0607,0x10,1,
+     0x060a,0xafaf,12,
+     0x0616,0xbfbf,1
     -1,0,0
 };
 
-int defregval_rtl8316b_generic[96]={ // rtl8316b 
+int defregval_rtl8316b_generic[]={ // generic rtl8316b & rtl8316bp 
      0x0209,0x2379,1,
      0x0300,0x4,1,
      0x0307,0x8200,1,
@@ -161,7 +179,7 @@ int defregval_rtl8316b_generic[96]={ // rtl8316b
      -1,0,0
 };
 
-int defregval_rtl8324_generic[186]={   // generic rtl8324
+int defregval_rtl8324_generic[]={   // generic rtl8324 & rtl8324p
      0x0209,0x2379,1,
      0x0300,0x4,1,
      0x0307,0x8200,1,
@@ -364,7 +382,7 @@ struct switchtype_t switchtypes[14] = {
     {
 	"compex",
 	"ps2216",
-	"6D",
+	"6D", // vendorId 0x11f67003 & 0x11f67004
 	"rtl8316b",
 	rtl8316b,
 	16,
@@ -375,7 +393,7 @@ struct switchtype_t switchtypes[14] = {
     {
 	"compex",
 	"ps2216",
-	"6DP",
+	"6DP", // vendorId 0x11f67005
 	"rtl8316bp",
 	rtl8316bp,
 	16,

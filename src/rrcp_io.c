@@ -617,24 +617,6 @@ int phy_wait(){
     return(0xffff);
 }
 
-//old two-byte tweaked version - will be eventualy phased out
-int do_write_eeprom(uint16_t addr,uint16_t data){
-    if (eeprom_write(addr,data>>8)) return 1;
-    if (eeprom_write(addr-1,data&0x00ff)) return 1;
-    return 0;
-}
-
-//old two-byte tweaked version - will be eventualy phased out
-int do_read_eeprom(uint16_t addr,uint16_t *data){
-uint8_t temp_reg=0;
-
-    if (eeprom_read(addr|0x800, &temp_reg)) return 1;
-    *data=temp_reg<<8;
-    if (eeprom_read((addr-1)|0x800, &temp_reg)) return 1;
-    *data|=(uint16_t)temp_reg;
-    return 0;
-}
-
 int phy_read(uint16_t phy_number,uint8_t phy_reg, uint16_t *data){
     uint16_t tmp;
 
@@ -680,21 +662,42 @@ uint32_t rtl83xx_ping(void){
 }
 
 void do_write_memory(){
- int i,numreg;
+ do_write_eeprom_all(1);
+}
 
- numreg=(switchtypes[switchtype].num_ports==16)?12:13;
- rrcp_config_read_from_switch();
- if (do_write_eeprom(0x0d,swconfig.rrcp_config.raw)) {printf("write eeprom\n");exit(1);}
- if (do_write_eeprom(0x0f,swconfig.rrcp_byport_disable.raw[0])) {printf("write eeprom\n");exit(1);}
- if (do_write_eeprom(0x11,swconfig.rrcp_byport_disable.raw[1])) {printf("write eeprom\n");exit(1);}
- if (do_write_eeprom(0x23,swconfig.alt_config.raw)) {printf("write eeprom\n");exit(1);}
- if (do_write_eeprom(0x27,swconfig.alt_igmp_snooping.raw)) {printf("write eeprom\n");exit(1);}
- if (do_write_eeprom(0x29,swconfig.vlan.raw[0])) {printf("write eeprom\n");exit(1);}
- if (do_write_eeprom(0x2f,swconfig.qos_config.raw)) {printf("write eeprom\n");exit(1);}
- if (do_write_eeprom(0x31,swconfig.qos_port_priority.raw[0])) {printf("write eeprom\n");exit(1);}
- if (do_write_eeprom(0x33,swconfig.qos_port_priority.raw[1])) {printf("write eeprom\n");exit(1);}
- if (do_write_eeprom(0x39,swconfig.port_config_global.raw)) {printf("write eeprom\n");exit(1);}
- for(i=0;i<numreg;i++){
-    if (do_write_eeprom(0x3b+i*2,swconfig.port_config.raw[i])) {printf("write eeprom\n");exit(1);}
+void do_write_eeprom_defaults(){
+ do_write_eeprom_all(0);
+}
+
+void do_write_eeprom_all(int mode){
+ int i=0;
+ int k=0;
+ int regnum,l;
+ uint16_t addr,data;
+
+ while (switchtypes[switchtype].reg2eeprom[i] > -1){
+   for (k=0;k<switchtypes[switchtype].reg2eeprom[i+2];k++){
+     if (mode) { data=rtl83xx_readreg16(switchtypes[switchtype].reg2eeprom[i]+k);}
+     else{
+       regnum=switchtypes[switchtype].reg2eeprom[i]+k;
+       l=data=0;
+       while (switchtypes[switchtype].regdefval[l] > -1){
+         if ( (regnum >= switchtypes[switchtype].regdefval[l]) && (regnum < (switchtypes[switchtype].regdefval[l]+switchtypes[switchtype].regdefval[l+2]))){
+           data=switchtypes[switchtype].regdefval[l+1];
+           break;
+         }
+         l+=3;
+       }
+     }
+     addr=(uint16_t)switchtypes[switchtype].reg2eeprom[i+1]+k*2;
+     if ( eeprom_write(addr,(uint8_t)(data&0x00ff)) ||
+          eeprom_write(++addr,(uint8_t)(data>>8))  ) {
+       printf("Can't write register N0x%04x to EEPROM 0x%03x\n",switchtypes[switchtype].reg2eeprom[i]+k,addr);
+       exit(1);
+     }
+     else printf("Success write register N0x%04x to EEPROM 0x%03x-0x%03x value 0x%04x\n",switchtypes[switchtype].reg2eeprom[i]+k,addr-1,addr,data);
+   }
+   i+=3;
  }
 }
+

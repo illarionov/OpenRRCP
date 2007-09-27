@@ -1,6 +1,6 @@
 CFLAGS=`/bin/sh Makefile-helper.sh`
 
-all: rtl8326 rtl8316b rtl83xx_dlink_des1016d rtl83xx_dlink_des1024d_b1 rtl83xx_dlink_des1024d_c1 rtl83xx_compex_ps2216 rtl83xx_ovislink_fsh2402gt rtl83xx_zyxel_es116p rtl83xx_compex_sds1224 rtl83xx_signamax_065-7531a rrcpcli
+all: rtl8326 rtl8316b rtl83xx_dlink_des1016d rtl83xx_dlink_des1024d_b1 rtl83xx_dlink_des1024d_c1 rtl83xx_compex_ps2216 rtl83xx_ovislink_fsh2402gt rtl83xx_zyxel_es116p rtl83xx_compex_sds1224 rtl83xx_signamax_065-7531a rtl83xx_compex_ps2216_6d rtl83xx_compex_ps2216_6dp rrcpcli
 
 clean:
 	rm -f ../bin/*
@@ -31,6 +31,12 @@ rtl83xx_dlink_des1016d: rtl83xx
 
 rtl83xx_compex_ps2216: rtl83xx
 	ln -sf rtl83xx ../bin/rtl83xx_compex_ps2216
+
+rtl83xx_compex_ps2216_6d: rtl83xx
+	ln -sf rtl83xx ../bin/rtl83xx_compex_ps2216_6d
+
+rtl83xx_compex_ps2216_6dp: rtl83xx
+	ln -sf rtl83xx ../bin/rtl83xx_compex_ps2216_6dp
 
 rtl83xx_ovislink_fsh2402gt: rtl83xx
 	ln -sf rtl83xx ../bin/rtl83xx_ovislink_fsh2402gt

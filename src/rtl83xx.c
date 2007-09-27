@@ -346,31 +346,6 @@ void do_vlan_tmpl(int mode){
  }
 }
 
-void do_write_eeprom_defaults(){
- int i;
- uint16_t data;
-
- if (do_write_eeprom(0x01,0x0a80)) {printf("write eeprom\n");exit(1);}
- if (do_write_eeprom(0x03,0x0155)) {printf("write eeprom\n");exit(1);}
- if (do_write_eeprom(0x0d,0)) {printf("write eeprom\n");exit(1);}
- if (do_write_eeprom(0x0f,0)) {printf("write eeprom\n");exit(1);}
- if (do_write_eeprom(0x11,0)) {printf("write eeprom\n");exit(1);}
- if (do_write_eeprom(0x23,0x0004)) {printf("write eeprom\n");exit(1);}
- if (do_read_eeprom(0x25,&data) != 0) {printf("read eeprom\n");exit(1);}
- else if (do_write_eeprom(0x25,data&0xffe1)) {printf("write eeprom\n");exit(1);}
- if (do_read_eeprom(0x27,&data) != 0) {printf("read eeprom\n");exit(1);}
- else if (do_write_eeprom(0x27,data&0xfffe)) {printf("write eeprom\n");exit(1);}
- if (do_write_eeprom(0x29,0)) {printf("write eeprom\n");exit(1);}
- if (do_write_eeprom(0x2f,0x0010)) {printf("write eeprom\n");exit(1);}
- if (do_write_eeprom(0x31,0)) {printf("write eeprom\n");exit(1);}
- if (do_write_eeprom(0x33,0)) {printf("write eeprom\n");exit(1);}
- if (do_write_eeprom(0x39,0x0010)) {printf("write eeprom\n");exit(1);}
- for(i=0;i<12;i++){
-    if (do_write_eeprom(0x3b+i*2,0xafaf)) {printf("write eeprom\n");exit(1);}
- }
- if (switchtypes[switchtype].num_ports==26) {if (do_write_eeprom(0x53,0xbfbf)) {printf("write eeprom\n");exit(1);}}
-}
-
 int str_portlist_to_array(char *list,unsigned short int *arr,unsigned int arrlen){
 short int i,k;
 char *s,*c,*n;
@@ -776,6 +751,8 @@ void print_usage(void){
 	printf("       rtl83xx_dlink_des1024d_c1 ----\"\"----\n");
 	printf("       rtl83xx_dlink_des1024d_d1 ----\"\"----\n");
 	printf("       rtl83xx_compex_ps2216 ----\"\"----\n");
+	printf("       rtl83xx_compex_ps2216_6d ----\"\"----\n");
+	printf("       rtl83xx_compex_ps2216_6dp ----\"\"----\n");
         printf("       rtl83xx_ovislink_fsh2402gt ----\"\"----\n");
 	printf("       rtl83xx_zyxel_es116p ----\"\"----\n");
 	printf("       rtl83xx_compex_sds1224 ----\"\"----\n");
@@ -898,6 +875,10 @@ int main(int argc, char **argv){
 	switchtype=10;
     }else if (strstr(p,"rtl83xx_signamax_065-7531a")==argv[0]+strlen(argv[0])-26){
 	switchtype=11;
+    }else if (strstr(p,"rtl83xx_compex_ps2216_6d")==argv[0]+strlen(argv[0])-24){
+	switchtype=12;
+    }else if (strstr(p,"rtl83xx_compex_ps2216_6dp")==argv[0]+strlen(argv[0])-25){
+	switchtype=13;
     }else {
 	printf("%s: unknown switch/chip type\n",argv[0]);
 	exit(0);
@@ -931,7 +912,7 @@ int main(int argc, char **argv){
 	    switchtypes[switchtype].model,
 	    argv[1]);
 
-    engage_timeout(10);
+    engage_timeout(30);
     rtl83xx_prepare();
 
     cmd=compare_command(argv[2+shift],&cmd_level_1[0]);

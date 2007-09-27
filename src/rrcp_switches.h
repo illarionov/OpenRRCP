@@ -31,6 +31,8 @@
 #define rtl8316b 2
 #define rtl8318 3
 #define rtl8324 4
+#define rtl8316bp 5
+#define rtl8324p 6
 
 struct switchtype_t {
 	char		*vendor;
@@ -40,6 +42,8 @@ struct switchtype_t {
 	unsigned int	chip_id;
 	unsigned int	num_ports;
 	unsigned int	port_order[27];
+        int		*reg2eeprom;
+        int		*regdefval;
 };
 
 struct t_rtl83xx_port_link_status {
@@ -73,11 +77,11 @@ union t_vlan_port_insert_vid {
 };
 
 extern const uint32_t chipname_n;
-extern char* chipnames [5];
+extern char* chipnames [7];
 
 extern uint32_t switchtype;
 extern const uint32_t switchtype_n;
-extern struct switchtype_t switchtypes[12];
+extern struct switchtype_t switchtypes[14];
 
 //uint16_t rrcp_switch_autodetect_chip(void);
 

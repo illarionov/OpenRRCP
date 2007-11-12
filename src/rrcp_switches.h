@@ -81,7 +81,7 @@ extern char* chipnames [7];
 
 extern uint32_t switchtype;
 extern const uint32_t switchtype_n;
-extern struct switchtype_t switchtypes[14];
+extern struct switchtype_t switchtypes[];
 
 //uint16_t rrcp_switch_autodetect_chip(void);
 

@@ -244,9 +244,9 @@ int defregval_rtl8324_generic[]={   // generic rtl8324 & rtl8324p
      -1,0,0
 };
 
-const uint32_t switchtype_n = 14;
+const uint32_t switchtype_n = 15;
 
-struct switchtype_t switchtypes[14] = {
+struct switchtype_t switchtypes[] = {
     {
 	"generic",
 	"rtl8326",
@@ -400,7 +400,18 @@ struct switchtype_t switchtypes[14] = {
 	{16,13,11,9,7,5,3,1,15,14,12,10,8,6,4,2,0,0,0,0,0,0,0,0,0,0,0},
         &reg2eeprom_rtl8316b_generic[0],
         &defregval_rtl8316b_generic[0]
-    }
+    },
+    {
+	"asus",
+	"gigax_1024p",
+	"unknown",
+	"rtl8326",
+	rtl8326,
+	26,
+	{2,1,4,3,6,5,8,7,10,9,12,11,14,13,16,15,18,17,20,19,22,21,24,23,26,25,0},
+        &reg2eeprom_rtl8326_generic[0],
+        &defregval_rtl8326_generic[0]
+    },
 };
 
 uint16_t rrcp_switch_autodetect_chip(void){

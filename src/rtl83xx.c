@@ -879,6 +879,8 @@ int main(int argc, char **argv){
 	switchtype=12;
     }else if (strstr(p,"rtl83xx_compex_ps2216_6dp")==argv[0]+strlen(argv[0])-25){
 	switchtype=13;
+    }else if (strstr(p,"rtl83xx_asus_gigax_1024p")==argv[0]+strlen(argv[0])-24){
+	switchtype=14;
     }else {
 	printf("%s: unknown switch/chip type\n",argv[0]);
 	exit(0);

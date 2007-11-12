@@ -25,6 +25,7 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/ioctl.h>
+#include <sys/time.h>
 
 #ifdef __linux__
 #include <linux/if.h>
@@ -98,6 +99,13 @@ int map_port_number_from_physical_to_logical(int port){
 #ifdef __linux__
 void rtl83xx_prepare(){
     struct ifreq ifr;
+    struct timeval time;
+    struct timezone timez;
+
+    timez.tz_minuteswest=0;
+    timez.tz_dsttime=0;
+    gettimeofday(&time, &timez);
+    srand(time.tv_sec+time.tv_usec);
 
     s_rec = socket(PF_PACKET, SOCK_RAW, htons(0x8899));
     if (s_rec == -1) { printf("can't create raw socket for recieve!\nAre we are running as root (uid=0)?\n"); exit(0); }
@@ -151,6 +159,13 @@ int sock_rec_(void *ptr, int size, int waittick){
 
 #else
 void rtl83xx_prepare(){
+    struct timeval time;
+    struct timezone timez;
+
+    timez.tz_minuteswest=0;
+    timez.tz_dsttime=0;
+    gettimeofday(&time, &timez);
+    srand(time.tv_sec+time.tv_usec);
 
  intf_mac.addr_type=ADDR_TYPE_ETH;
  intf_mac.addr_bits=ETH_ADDR_BITS;
@@ -205,10 +220,6 @@ int sock_rec_(void *ptr, int size, int waittick){
 int sock_rec(void *ptr, int size, int waittick){
     int len=0;
     len=sock_rec_(ptr, size, waittick);
-    if (!len) {
-       printf("can't recvfrom!\n");
-       exit(1);
-    }
     return len;
 }
 
@@ -485,6 +496,7 @@ int rrcp_io_probe_switch_for_facing_switch_port(uint8_t *switch_mac_address, uin
 
 uint32_t rtl83xx_readreg32(uint16_t regno){
     int len = 0;
+    int i;
     struct rrcp_packet_t pkt,pktr;
 
     memcpy(pkt.ether_dhost,dest_mac,6);
@@ -496,11 +508,12 @@ uint32_t rtl83xx_readreg32(uint16_t regno){
     pkt.rrcp_authkey=htons(authkey);
     pkt.rrcp_reg_addr=regno;
     pkt.rrcp_reg_data=0;
+    pkt.cookie1=rand();
+    pkt.cookie2=rand();
 
-    sock_send(&pkt, sizeof(pkt));
-
-    usleep(100);
-    while(1){
+    for(i=0;i<4;i++){
+	sock_send(&pkt, sizeof(pkt));
+	usleep(100);
 	memset(&pktr,0,sizeof(pktr));
 	len=sock_rec(&pktr, sizeof(pktr),100);
 	if (len >14 &&
@@ -514,6 +527,9 @@ uint32_t rtl83xx_readreg32(uint16_t regno){
 	        return(pktr.rrcp_reg_data);
 	}
     }
+    printf("can't read register 0x%04x! Switch is down?\n",regno);
+    exit(1);
+    return -1;
 }
 
 uint16_t rtl83xx_readreg16(uint16_t regno){
@@ -524,6 +540,7 @@ void rtl83xx_setreg16(uint16_t regno, uint32_t regval){
     int cnt = 0;
     struct rrcp_packet_t pkt;
     uint16_t prev_auth=0;
+    uint32_t mask=0xffff;
 
     memcpy(pkt.ether_dhost,dest_mac,6);
     memcpy(pkt.ether_shost,my_mac,6);
@@ -534,19 +551,26 @@ void rtl83xx_setreg16(uint16_t regno, uint32_t regval){
     pkt.rrcp_authkey=htons(authkey);
     pkt.rrcp_reg_addr=regno;
     pkt.rrcp_reg_data=regval;
+    pkt.cookie1=rand();
+    pkt.cookie2=rand();
 
+    if (regno==0x0500){
+	mask=0x7fff;
+    }else if (regno==0x0217){
+	mask=0x0fff;
+    }
     for (cnt=0;cnt<3;cnt++){
 	sock_send(&pkt, sizeof(pkt));
         if (!regno) return; // because register 0 self clearing 
         if (regno == 0x209) { // special hack for new authkey
            prev_auth=authkey; authkey=(uint16_t)regval; 
         } 
-	if (rtl83xx_readreg32(regno)==regval){
+	if ((rtl83xx_readreg32(regno) & mask)==(regval & mask)){
 	    return;
 	}
         if (regno == 0x209) { authkey=prev_auth; } // revert authkey if unfinished change 
     }
-//    printf("can't set register 0x%04x to value 0x%04lu (read value is 0x%04lu)\n",regno,regval,rtl83xx_readreg32(regno));
+    printf("can't set register 0x%04x to value 0x%04x (read value is 0x%04x)\n",regno,regval,rtl83xx_readreg32(regno));
 //    _exit(0);
 }
 
@@ -700,4 +724,3 @@ void do_write_eeprom_all(int mode){
    i+=3;
  }
 }
-

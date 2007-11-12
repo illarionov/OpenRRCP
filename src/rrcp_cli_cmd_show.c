@@ -66,7 +66,23 @@ int cmd_show_version(struct cli_def *cli, char *command, char *argv[], int argc)
 
 int cmd_show_config(struct cli_def *cli, char *command, char *argv[], int argc)
 {
+    cli_print(cli, "! Sorry, permanent config saving not available yet.");
+    cli_print(cli, "! Use \"show running-config\" to get running config.");
+    return CLI_OK;
+}
+
+int cmd_show_running_config(struct cli_def *cli, char *command, char *argv[], int argc)
+{
     char text[32768];
+
+    if (argc==1){
+	if (strcmp(argv[0],"?")==0){
+	    return CLI_OK;
+	}else if (strcmp(argv[0],"full")!=0){
+	    cli_print(cli, "%% Invalid input detected.");
+	    return CLI_ERROR;
+	}
+    }
 
     cli_print(cli, "!");
     cli_print(cli, "! Config for %s %s switch at %02x:%02x:%02x:%02x:%02x:%02x@%s",
@@ -271,16 +287,16 @@ void cmd_show_register_commands(struct cli_def *cli)
     struct cli_command *c;
     c = cli_register_command(cli, NULL, "show", NULL,  PRIVILEGE_UNPRIVILEGED, MODE_EXEC, "Show running system information");
     cli_register_command(cli, c, "version", cmd_show_version, PRIVILEGE_UNPRIVILEGED, MODE_EXEC, "System hardware and software status");
-    cli_register_command(cli, c, "configuration", cmd_test, PRIVILEGE_PRIVILEGED, MODE_EXEC, "Contents of Non-Volatile memory");
+    cli_register_command(cli, c, "configuration", cmd_show_config, PRIVILEGE_PRIVILEGED, MODE_EXEC, "Contents of Non-Volatile memory");
     cli_register_command(cli, c, "switch-register", cmd_show_switch_register, PRIVILEGE_PRIVILEGED, MODE_EXEC, "Contents of internal switch controller register");
     cli_register_command(cli, c, "eeprom-register", cmd_show_eeprom_register, PRIVILEGE_PRIVILEGED, MODE_EXEC, "Contents of internal switch EEPROM register");
     cli_register_command(cli, c, "phy-register", cmd_show_phy_register, PRIVILEGE_PRIVILEGED, MODE_EXEC, "Contents of internal switch PHY register");
     {//show running-config
 	struct cli_command *show_runningconfig;
-	show_runningconfig = cli_register_command(cli, c, "running-config", cmd_show_config, PRIVILEGE_PRIVILEGED, MODE_EXEC, "Current operating configuration");
-	cli_register_command(cli, show_runningconfig, "full", cmd_show_config, PRIVILEGE_PRIVILEGED, MODE_EXEC, "Current operating configuration including default statements");
+	show_runningconfig = cli_register_command(cli, c, "running-config", cmd_show_running_config, PRIVILEGE_PRIVILEGED, MODE_EXEC, "Current operating configuration");
+	cli_register_command(cli, show_runningconfig, "full", cmd_show_running_config, PRIVILEGE_PRIVILEGED, MODE_EXEC, "Current operating configuration including default statements");
     }
-    cli_register_command(cli, c, "startup-config", cmd_test, PRIVILEGE_PRIVILEGED, MODE_EXEC, "Contents of startup configuration");
+    cli_register_command(cli, c, "startup-config", cmd_show_config, PRIVILEGE_PRIVILEGED, MODE_EXEC, "Contents of startup configuration");
     cli_register_command(cli, c, "interfaces", cmd_show_interfaces, PRIVILEGE_UNPRIVILEGED, MODE_EXEC, "Interface status and configuration");
     {//show ip igmp snooping
 	struct cli_command *show_ip,*show_ip_igmp,*show_ip_igmp_snooping;

@@ -39,7 +39,8 @@ struct rrcp_packet_t
   uint16_t rrcp_authkey;		/* 0x2379 by default */
   uint16_t rrcp_reg_addr;		/* register address */
   uint32_t rrcp_reg_data;		/* register data */
-  uint32_t stub;
+  uint32_t cookie1;
+  uint32_t cookie2;
 };
 
 struct rrcp_helloreply_packet_t

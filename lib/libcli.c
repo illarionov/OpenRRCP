@@ -898,7 +898,9 @@ int cli_loop(struct cli_def *cli, int sockfd)
 	cli->state = STATE_LOGIN;
 
 	memset(cli->history, 0, MAX_HISTORY);
-	write(sockfd, negotiate, strlen(negotiate));
+	if (sockfd>0){
+		write(sockfd, negotiate, strlen(negotiate));
+	}
 
 	if ((cmd = malloc(4096)) == NULL)
 		return CLI_ERROR;

@@ -681,6 +681,12 @@ void do_glob_flowctrl(int mode, int state){
  else rtl83xx_setreg16(0x0400,swconfig.qos_config.raw);
 }
 
+void do_igmp_snooping(int is_enabled){
+    swconfig.alt_igmp_snooping.raw=rtl83xx_readreg16(0x0308);
+    swconfig.alt_igmp_snooping.config.en_igmp_snooping=(is_enabled!=0)&0x1;
+    rtl83xx_setreg16(0x0308,swconfig.alt_igmp_snooping.raw);
+}
+
 void print_allow_command(char **command_list){
  int i=0;
 
@@ -824,7 +830,7 @@ int main(int argc, char **argv){
     char *show_sub_cmd_l4[]={"id",""};
     char *reset_sub_cmd[]={"soft","hard",""};
     char *write_sub_cmd[]={"memory","eeprom","defaults",""};
-    char *config_sub_cmd_l1[]={"interface","rrcp","vlan","mac-address","mac-address-table","flowcontrol","storm-control","monitor","vendor-id",""};
+    char *config_sub_cmd_l1[]={"interface","rrcp","vlan","mac-address","mac-address-table","flowcontrol","storm-control","monitor","vendor-id","igmp-snooping",""};
     char *config_intf_sub_cmd_l1[]={"no","shutdown","speed","duplex","rate-limit","mac-address","rrcp","mls","flow-control",""};
     char *config_duplex[]={"half","full",""};
     char *config_rate[]={"100m","128k","256k","512k","1m","2m","4m","8m","input","output",""};
@@ -1234,6 +1240,11 @@ int main(int argc, char **argv){
 		            }
 	                  }
 		          do_reboot();
+                          exit(0);
+
+                   case 9: // igmp-snooping
+                          check_argc(argc,3+shift,NULL,&ena_disa[0]);
+                          do_igmp_snooping(get_cmd_num(argv[4+shift],-1,NULL,&ena_disa[0]));
                           exit(0);
 
                    default:

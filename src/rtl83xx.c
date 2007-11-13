@@ -794,6 +794,7 @@ void print_usage(void){
 	printf(" config [no] storm-control broadcast relaxed|strict - broadcast storm control\n"); 
 	printf(" config [no] storm-control multicast - multicast storm control\n"); 
         printf(" config [no] monitor [input|output] source interface <list ports> destination interface <port>\n");
+        printf(" config [no] igmp-snooping\n");
 	printf(" ping                         - test if switch is responding\n");
 	printf(" write memory                 - save current config to EEPROM\n");
 	printf(" write defaults               - save to EEPROM chip-default values\n");
@@ -1243,8 +1244,7 @@ int main(int argc, char **argv){
                           exit(0);
 
                    case 9: // igmp-snooping
-                          check_argc(argc,3+shift,NULL,&ena_disa[0]);
-                          do_igmp_snooping(get_cmd_num(argv[4+shift],-1,NULL,&ena_disa[0]));
+                          do_igmp_snooping(!negate);
                           exit(0);
 
                    default:

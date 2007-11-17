@@ -239,6 +239,7 @@ void rtl83xx_scan(int verbose){
     int len = 0;
     int cnt_h_replies = 0;
     int cnt_r_replies = 0;
+    int f_cnt = 0;
     int rep;
     int uplink = 0;
     int i;
@@ -262,25 +263,52 @@ void rtl83xx_scan(int verbose){
     pkt.rrcp_isreply=0;
     pkt.rrcp_authkey=htons(authkey);
 
-    sock_send(&pkt, sizeof(pkt));
+    for (i=1;i<=3;i++){
+	sock_send(&pkt, sizeof(pkt));
+	usleep(700*i);
+    }
 
-    usleep(1000);
+    f_cnt=0;
     while(1){
 	memset(&pktr,0,sizeof(pktr));
 	len=sock_rec_(&pktr, sizeof(pktr),5000);
-	if (len >14 &&
-	    (memcmp(pktr.ether_dhost,my_mac,6)==0)&&
-	    pktr.ether_type==htons(0x8899) &&
-	    pktr.rrcp_proto==0x01 &&
-	    pktr.rrcp_opcode==0x00 &&
-	    pktr.rrcp_isreply==1 &&
-	    pktr.rrcp_authkey==htons(authkey)){
-              if ( (hello_reply=malloc(sizeof(SW_REPLY))) == NULL ) { printf("malloc\n"); _exit(1); }
-              memcpy(&hello_reply->pktr,&pktr,sizeof(pktr));
-              hello_reply->prev=current;
-              current=hello_reply;
-	      cnt_h_replies++;
-	} else break;
+	if (len>14 && (memcmp(pktr.ether_dhost,my_mac,6)==0) &&
+		pktr.ether_type==htons(0x8899) &&
+		pktr.rrcp_proto==0x01 &&
+		pktr.rrcp_opcode==0x00 &&
+		pktr.rrcp_isreply==1 &&
+		pktr.rrcp_authkey==htons(authkey)){
+	    // do we already know this switch?
+	    reply4up=hello_reply;
+	    while (reply4up != NULL){
+        	if (memcmp(pktr.ether_shost,reply4up->pktr.ether_shost,6)==0){
+            	    break;
+                }
+                current=reply4up->prev;
+                reply4up=current;
+            }
+	    // only if we don't know this switch
+	    if (reply4up == NULL){
+        	if ((hello_reply=malloc(sizeof(SW_REPLY)))==NULL) {
+		    printf("Out of memory!\n");
+		    _exit(1);
+		}
+		memcpy(&hello_reply->pktr,&pktr,sizeof(pktr));
+        	hello_reply->prev=current;
+		current=hello_reply;
+		cnt_h_replies++;
+		f_cnt=0;
+	    }
+	}else{
+	    if (len==0){
+		f_cnt+=20; //for no traffic age counter fast
+	    }else{
+		f_cnt++; //for foreigh traffic age slowly
+	    }
+	}
+	if (f_cnt>50){
+	    break;
+	}
     }
 
 /* scan based on REP packets */
@@ -290,24 +318,51 @@ void rtl83xx_scan(int verbose){
     pkt.rrcp_isreply=0;
     pkt.rrcp_authkey=0x0000;
 
-    sock_send(&pkt, sizeof(pkt));
+    for (i=1;i<=3;i++){
+	sock_send(&pkt, sizeof(pkt));
+	usleep(700*i);
+    }
 
-    usleep(1000);
+    f_cnt=0;
     while(1){
 	memset(&pktr,0,sizeof(pktr));
 	len=sock_rec_(&pktr, sizeof(pktr),5000);
-	if (len >14 &&
-	    (memcmp(pktr.ether_dhost,my_mac,6)==0)&&
-	    pktr.ether_type==htons(0x8899) &&
-	    pktr.rrcp_proto==0x02 &&
-	    pktr.rrcp_opcode==0x00 &&
-	    pktr.rrcp_isreply==1 ){
-              if ( (rep_reply=malloc(sizeof(SW_REPLY))) == NULL ) { printf("malloc\n"); _exit(1); }
-              memcpy(&rep_reply->pktr,&pktr,sizeof(pktr));
-              rep_reply->prev=current;
-              current=rep_reply;
-	      cnt_r_replies++;
-	} else break;
+	if (len>14 && (memcmp(pktr.ether_dhost,my_mac,6)==0) &&
+		pktr.ether_type==htons(0x8899) &&
+		pktr.rrcp_proto==0x02 &&
+		pktr.rrcp_opcode==0x00 &&
+		pktr.rrcp_isreply==1) {
+	    // do we already know this switch?
+	    reply4up=rep_reply;
+	    while (reply4up != NULL){
+        	if (memcmp(pktr.ether_shost,reply4up->pktr.ether_shost,6)==0){
+            	    break;
+                }
+                current=reply4up->prev;
+                reply4up=current;
+            }
+	    // only if we don't know this switch
+	    if (reply4up == NULL){
+		if ((rep_reply=malloc(sizeof(SW_REPLY)))==NULL) {
+		    printf("Out of memory!\n");
+		    _exit(1);
+		}
+		memcpy(&rep_reply->pktr,&pktr,sizeof(pktr));
+		rep_reply->prev=current;
+		current=rep_reply;
+		cnt_r_replies++;
+		f_cnt=0;
+	    }
+	}else{
+	    if (len==0){
+		f_cnt+=20; //for no traffic age counter fast
+	    }else{
+		f_cnt++; //for foreigh traffic age slowly
+	    }
+	}
+	if (f_cnt>50){
+	    break;
+	}
     }
 
 /* print result */

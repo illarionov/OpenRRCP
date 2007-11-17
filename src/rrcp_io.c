@@ -558,6 +558,8 @@ void rtl83xx_setreg16(uint16_t regno, uint32_t regval){
 	mask=0x7fff;
     }else if (regno==0x0217){
 	mask=0x0fff;
+    }else if (regno==0x0218){
+	mask=0x00ff;
     }
     for (cnt=0;cnt<3;cnt++){
 	sock_send(&pkt, sizeof(pkt));

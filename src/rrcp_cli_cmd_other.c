@@ -25,6 +25,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 #include "../lib/libcli.h"
 #include "rrcp_cli.h"
 #include "rrcp_io.h"
@@ -62,7 +63,7 @@ int cmd_copy_running_config(struct cli_def *cli, char *command, char *argv[], in
 {
     if (argc>0){
 	if (argv[0][strlen(argv[0])-1]=='?'){
-	    cli_print(cli, "  file:<filename>  Copy EEPROM to a specified binary file");
+	    cli_print(cli, "  file:<filename>  Copy running config into a specified text file");
 	}else{
 	    cli_print(cli, "%% Not implemented yet");
 	    return CLI_ERROR;
@@ -88,7 +89,7 @@ int cmd_copy(struct cli_def *cli, char *command, char *argv[], int argc)
 	}else{
 	    char *s;
 	    uint8_t buf[2049];
-	    int i,l;
+	    int i,j,l;
 	    FILE *f;
 
 	    if (strncmp(argv[0], "file:",5)==0){
@@ -106,8 +107,16 @@ int cmd_copy(struct cli_def *cli, char *command, char *argv[], int argc)
 			    if ((i % 32)==0){
 				fprintf(cli->client, "%% %4d bytes writen to EEPROM.\r", i);
 			    }
-			    if (eeprom_write(i,buf[i])){
-			    	break;
+			    for (j=0;j<3;j++){
+				if (!eeprom_write(i,buf[i])){
+			    	    j=0;
+				    break;
+				}
+				usleep(1000);
+			    }
+			    if (j!=0){
+				cli_print(cli, "%% ERROR: Can't write EEPROM byte # %d (0x%03x)",i,i);
+				return CLI_ERROR;
 			    }
 		    	}
 			fprintf(cli->client, "%% %4d bytes writen to EEPROM.\r\n", i);

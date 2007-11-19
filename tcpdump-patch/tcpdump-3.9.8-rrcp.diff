@@ -181,6 +181,8 @@ diff -urP tcpdump-3.9.8/print-rrcp.c tcpdump-3.9.8-my/print-rrcp.c
 +	    strcpy(proto_str,"RRCP");
 +	}else if ( rrcp->rrcp_proto==2 ){
 +	    strcpy(proto_str,"RRCP-REP");
++	}else if ( rrcp->rrcp_proto==3 ){
++	    strcpy(proto_str,"RRCP loop detect");
 +	}else{
 +	    sprintf(proto_str,"RRCP-0x%02d",rrcp->rrcp_proto);
 +	}

@@ -41,7 +41,7 @@ int map_port_number_from_logical_to_physical(int port);
 
 int map_port_number_from_physical_to_logical(int port);
 
-void rtl83xx_prepare();
+int rtl83xx_prepare();
 
 //send to wire
 //ssize_t sock_send(void *ptr, int size);

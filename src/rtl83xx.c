@@ -42,6 +42,7 @@
 #include "rrcp_switches.h"
 
 int myPid = 0;
+extern char ErrIOMsg[];
 
 void sigHandler(int sig)
 {
@@ -922,7 +923,7 @@ int main(int argc, char **argv){
 	    argv[1]);
 
     engage_timeout(30);
-    rtl83xx_prepare();
+    if (rtl83xx_prepare()){ printf("%s\n",ErrIOMsg); exit(1);}
 
     cmd=compare_command(argv[2+shift],&cmd_level_1[0]);
     switch (cmd){

@@ -54,6 +54,7 @@
 #include "rrcp_cli.h"
 
 int myPid = 0;
+extern char ErrIOMsg[];
 
 void sigHandler(int sig)
 {
@@ -197,7 +198,10 @@ int main(int argc, char *argv[])
     if (authkey_tmp>=0){
 	authkey=authkey_tmp;
     }
-    rtl83xx_prepare();
+    if (rtl83xx_prepare()){ 
+        printf("%s\n",ErrIOMsg); 
+        exit(1);
+    }
     rrcp_autodetect_switch_chip_eeprom(&swconfig.switch_type, &swconfig.chip_type, &swconfig.eeprom_type);
 
     if (switchtype==-1){

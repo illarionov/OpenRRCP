@@ -79,6 +79,7 @@ bpf_u_int32 mask;
 bpf_u_int32 net;
 char filter_app[512];
 #endif
+char ErrIOMsg[512];
 
 // takes logical port number as printed on switch' case (1,2,3...)
 // returns physical port number (0,1,2...) or -1 if this device has no such logical port
@@ -97,7 +98,7 @@ int map_port_number_from_physical_to_logical(int port){
 }
 
 #ifdef __linux__
-void rtl83xx_prepare(){
+int rtl83xx_prepare(){
     struct ifreq ifr;
     struct timeval time;
     struct timezone timez;
@@ -106,11 +107,22 @@ void rtl83xx_prepare(){
     timez.tz_dsttime=0;
     gettimeofday(&time, &timez);
     srand(time.tv_sec+time.tv_usec);
-
+    
+    memset(&ErrIOMsg, 0x00, sizeof(ErrIOMsg)); 
     s_rec = socket(PF_PACKET, SOCK_RAW, htons(0x8899));
-    if (s_rec == -1) { printf("can't create raw socket for recieve!\nAre we are running as root (uid=0)?\n"); exit(0); }
+    if (s_rec == -1) {
+       strncpy(ErrIOMsg,"Can't create raw socket for recieve! ",sizeof(ErrIOMsg));
+       if (errno) 
+           snprintf(ErrIOMsg+strlen(ErrIOMsg),sizeof(ErrIOMsg),"%s.",strerror(errno));
+       return(1);
+    }
     s_send = socket(PF_PACKET, SOCK_RAW, htons(0x8899));
-    if (s_send == -1) { printf("can't create raw socket for send!\nAre we are running as root (uid=0)?\n"); exit(0); }
+    if (s_send == -1) { 
+       strncpy(ErrIOMsg,"Can't create raw socket for send! ",sizeof(ErrIOMsg));
+       if (errno)
+           snprintf(ErrIOMsg+strlen(ErrIOMsg),sizeof(ErrIOMsg),"%s.",strerror(errno));
+       return(1);
+    }
 
     sockaddr_send.sll_family   = PF_PACKET;	
     sockaddr_send.sll_protocol = htons(0x8899);
@@ -125,10 +137,13 @@ void rtl83xx_prepare(){
     memset(&ifr, 0x00, sizeof(ifr));
     strncpy(ifr.ifr_name, ifname, sizeof(ifr.ifr_name));
     if(ioctl(s_rec, SIOCGIFHWADDR, &ifr) < 0){
-	printf("Fail to get hw addr\nAre we are running as root (uid=0)?\n");
-	exit(0);
+       strncpy(ErrIOMsg,"Fail to get hw addr! ",sizeof(ErrIOMsg));
+       if (errno) 
+           snprintf(ErrIOMsg+strlen(ErrIOMsg),sizeof(ErrIOMsg),"%s.",strerror(errno));
+       return(1);
     }
     memcpy(my_mac,ifr.ifr_hwaddr.sa_data,6);
+    return(0);
 }
 
 //send to wire
@@ -144,7 +159,7 @@ ssize_t sock_send(void *ptr, int size){
 }
 
 //recieve from wire, returns length
-int sock_rec_(void *ptr, int size, int waittick){
+int sock_rec(void *ptr, int size, int waittick){
     int i,res=0,len=0;
     for (i=0;i<10;i++){
 	res=recvfrom(s_rec, ptr, size, MSG_DONTWAIT, (struct sockaddr*)&sockaddr_rec, (unsigned int *)&len);
@@ -158,7 +173,7 @@ int sock_rec_(void *ptr, int size, int waittick){
 }
 
 #else
-void rtl83xx_prepare(){
+int rtl83xx_prepare(){
     struct timeval time;
     struct timezone timez;
 
@@ -167,23 +182,43 @@ void rtl83xx_prepare(){
     gettimeofday(&time, &timez);
     srand(time.tv_sec+time.tv_usec);
 
- intf_mac.addr_type=ADDR_TYPE_ETH;
- intf_mac.addr_bits=ETH_ADDR_BITS;
- if ((p_eth = eth_open(ifname)) == NULL) errx(2, "eth_open");
- if (eth_get(p_eth,&intf_mac.addr_eth) < 0) errx(2, "get intf MAC");
- memcpy(my_mac,&intf_mac.addr_eth,ETH_ADDR_LEN);
- memset(filter_app,0,sizeof(filter_app));
- snprintf(filter_app, sizeof(filter_app), "ether proto 0x8899 and not ether src %s", addr_ntoa(&intf_mac));
- if (pcap_lookupnet(ifname, &net, &mask, errbuf) < 0){ net = 0;mask = 0;}
- if ((handle = pcap_open_live(ifname, 128, 0, 3, errbuf))== NULL) errx(2, "pcap_open_live: %s", errbuf);
+    intf_mac.addr_type=ADDR_TYPE_ETH;
+    intf_mac.addr_bits=ETH_ADDR_BITS;
+    if ((p_eth = eth_open(ifname)) == NULL) {
+       snprintf(ErrIOMsg,sizeof(ErrIOMsg),"Can't open interface %s.",ifname);
+       return(1);
+    }
+    if (eth_get(p_eth,&intf_mac.addr_eth) < 0) {
+       snprintf(ErrIOMsg,sizeof(ErrIOMsg),"Fail to get hw addr");
+       return(1);
+    }
+    memcpy(my_mac,&intf_mac.addr_eth,ETH_ADDR_LEN);
+    memset(filter_app,0,sizeof(filter_app));
+    snprintf(filter_app, sizeof(filter_app), "ether proto 0x8899 and not ether src %s", addr_ntoa(&intf_mac));
+    if (pcap_lookupnet(ifname, &net, &mask, errbuf) < 0){ net = 0;mask = 0;}
+    if ((handle = pcap_open_live(ifname, 128, 0, 3, errbuf))== NULL) {
+       snprintf(ErrIOMsg,sizeof(ErrIOMsg),"pcap_open_live get error: %s", errbuf); 
+       return(1);
+    }
 #if defined(BSD) && defined(BIOCIMMEDIATE)
- {
-  int on = 1;
-  if (ioctl(pcap_fileno(handle), BIOCIMMEDIATE, &on) < 0) errx(2, "BIOCIMMEDIATE");
- }
+    {
+       int on = 1;
+       if (ioctl(pcap_fileno(handle), BIOCIMMEDIATE, &on) < 0) {
+          snprintf(ErrIOMsg,sizeof(ErrIOMsg),"Can't enable immediate mode on BPF device");
+          return(1);
+       }
+    }
 #endif
- if (pcap_compile(handle, &filter, filter_app, 1, mask) < 0) errx(2, "bad pcap filter: %s", pcap_geterr(handle));
- if (pcap_setfilter(handle, &filter) < 0) errx(2, "bad pcap filter: %s", pcap_geterr(handle));
+    if (pcap_compile(handle, &filter, filter_app, 1, mask) < 0) {
+       snprintf(ErrIOMsg,sizeof(ErrIOMsg), "Bad pcap filter: %s", pcap_geterr(handle));
+       return(1);
+    }
+
+    if (pcap_setfilter(handle, &filter) < 0) {
+       snprintf(ErrIOMsg,sizeof(ErrIOMsg), "Bad pcap filter: %s", pcap_geterr(handle));
+       return(1);
+    }
+    return(0);
 }
 
 //send to wire
@@ -198,7 +233,7 @@ ssize_t sock_send(void *ptr, int size){
 }
 
 //recieve from wire, returns length
-int sock_rec_(void *ptr, int size, int waittick){
+int sock_rec(void *ptr, int size, int waittick){
     int len=0;
     int i=0;
     struct pcap_pkthdr pkt_h;
@@ -216,12 +251,6 @@ int sock_rec_(void *ptr, int size, int waittick){
     return len;
 }
 #endif
-
-int sock_rec(void *ptr, int size, int waittick){
-    int len=0;
-    len=sock_rec_(ptr, size, waittick);
-    return len;
-}
 
 int istr00mac(const unsigned char *buf){
 int i,res;
@@ -271,7 +300,7 @@ void rtl83xx_scan(int verbose){
     f_cnt=0;
     while(1){
 	memset(&pktr,0,sizeof(pktr));
-	len=sock_rec_(&pktr, sizeof(pktr),5000);
+	len=sock_rec(&pktr, sizeof(pktr),5000);
 	if (len>14 && (memcmp(pktr.ether_dhost,my_mac,6)==0) &&
 		pktr.ether_type==htons(0x8899) &&
 		pktr.rrcp_proto==0x01 &&
@@ -326,7 +355,7 @@ void rtl83xx_scan(int verbose){
     f_cnt=0;
     while(1){
 	memset(&pktr,0,sizeof(pktr));
-	len=sock_rec_(&pktr, sizeof(pktr),5000);
+	len=sock_rec(&pktr, sizeof(pktr),5000);
 	if (len>14 && (memcmp(pktr.ether_dhost,my_mac,6)==0) &&
 		pktr.ether_type==htons(0x8899) &&
 		pktr.rrcp_proto==0x02 &&
@@ -530,7 +559,7 @@ int rrcp_io_probe_switch_for_facing_switch_port(uint8_t *switch_mac_address, uin
     for (i=0;i<10;i++){
 	usleep(10);
 	memset(&pktr,0,sizeof(pktr));
-	len=sock_rec_(&pktr, sizeof(pktr),5000);
+	len=sock_rec(&pktr, sizeof(pktr),5000);
 	if (len >14 &&
     	    (memcmp(pktr.ether_dhost,my_mac,6)==0)&&
 	    pktr.ether_type==htons(0x8899) &&

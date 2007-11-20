@@ -620,7 +620,7 @@ uint16_t rtl83xx_readreg16(uint16_t regno){
     return (uint16_t)rtl83xx_readreg32(regno);
 }
 
-void rtl83xx_setreg16(uint16_t regno, uint32_t regval){
+void rtl83xx_setreg32(uint16_t regno, uint32_t regval){
     int cnt = 0;
     struct rrcp_packet_t pkt;
     uint16_t prev_auth=0;
@@ -660,8 +660,8 @@ void rtl83xx_setreg16(uint16_t regno, uint32_t regval){
 //    _exit(0);
 }
 
-void rtl83xx_setreg16reg16(uint16_t regno, uint16_t regval){
-    rtl83xx_setreg16(regno, (uint32_t) regval);
+void rtl83xx_setreg16(uint16_t regno, uint16_t regval){
+    rtl83xx_setreg32(regno, (uint32_t) regval);
 }
 
 int wait_eeprom(){

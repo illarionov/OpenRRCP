@@ -381,7 +381,7 @@ struct switchtype_t switchtypes[] = {
     },
     {
 	"compex",
-	"ps2216",
+	"ps2216-6d",
 	"6D", // vendorId 0x11f67003 & 0x11f67004
 	"rtl8316b",
 	rtl8316b,
@@ -392,7 +392,7 @@ struct switchtype_t switchtypes[] = {
     },
     {
 	"compex",
-	"ps2216",
+	"ps2216-6dp",
 	"6DP", // vendorId 0x11f67005
 	"rtl8316bp",
 	rtl8316bp,

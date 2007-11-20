@@ -57,9 +57,9 @@ uint32_t rtl83xx_readreg32(uint16_t regno);
 
 uint16_t rtl83xx_readreg16(uint16_t regno);
 
-void rtl83xx_setreg16(uint16_t regno, uint32_t regval);
+void rtl83xx_setreg32(uint16_t regno, uint32_t regval);
 
-void rtl83xx_setreg16reg16(uint16_t regno, uint16_t regval);
+void rtl83xx_setreg16(uint16_t regno, uint16_t regval);
 
 int wait_eeprom();
 

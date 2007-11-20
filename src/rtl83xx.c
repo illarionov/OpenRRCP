@@ -304,7 +304,7 @@ void do_vlan_enable_vlan(int is_8021q, int do_clear){
 
     //write all relevant config to switch from our data structures    
     for(i=0;i<13;i++){
-	rtl83xx_setreg16reg16(0x030c+i,vlan_port_vlan.raw[i]);
+	rtl83xx_setreg16(0x030c+i,vlan_port_vlan.raw[i]);
     }
     for(i=0;i<4;i++){
 	rtl83xx_setreg16(0x0319+i,vlan_port_output_tag.raw[i]);

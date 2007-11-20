@@ -303,19 +303,22 @@ void do_vlan_enable_vlan(int is_8021q, int do_clear){
     }
 
     //write all relevant config to switch from our data structures    
-    for(i=0;i<13;i++){
+    for(i=0;i<switchtypes[switchtype].num_ports/2;i++){
 	rtl83xx_setreg16(0x030c+i,vlan_port_vlan.raw[i]);
     }
-    for(i=0;i<4;i++){
-	rtl83xx_setreg16(0x0319+i,vlan_port_output_tag.raw[i]);
+    rtl83xx_setreg16(0x0319,vlan_port_output_tag.raw[0]);
+    rtl83xx_setreg16(0x031a,vlan_port_output_tag.raw[1]);
+    if (switchtypes[switchtype].num_ports > 16){
+       rtl83xx_setreg16(0x031b,vlan_port_output_tag.raw[2]);
+       rtl83xx_setreg16(0x031c,vlan_port_output_tag.raw[3]);
     }
     for(i=0;i<32;i++){
 	rtl83xx_setreg16(0x031d+i*3+0,vlan_entry.raw[i*2]);
-	rtl83xx_setreg16(0x031d+i*3+1,vlan_entry.raw[i*2+1]);
+	if (switchtypes[switchtype].num_ports > 16){ rtl83xx_setreg16(0x031d+i*3+1,vlan_entry.raw[i*2+1]);}
 	rtl83xx_setreg16(0x031d+i*3+2,vlan_vid[i]);
     }
     rtl83xx_setreg16(0x037d,vlan_port_insert_vid.raw[0]);
-    rtl83xx_setreg16(0x037e,vlan_port_insert_vid.raw[1]);
+    if (switchtypes[switchtype].num_ports > 16){ rtl83xx_setreg16(0x037e,vlan_port_insert_vid.raw[1]);}
 }
 
 void do_vlan(int mode){

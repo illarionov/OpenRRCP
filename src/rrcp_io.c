@@ -56,7 +56,7 @@
 #include "rrcp_config.h"
 #include "rrcp_switches.h"
 
-extern int *register_mask[];
+extern uint32_t *register_mask[];
 char ifname[128] = "";
 uint16_t authkey = 0x2379;
 unsigned char my_mac[6] = {0x00, 0x00, 0x11, 0x22, 0x33, 0x44};
@@ -620,17 +620,13 @@ uint16_t rtl83xx_readreg16(uint16_t regno){
     return (uint16_t)rtl83xx_readreg32(regno);
 }
 
-int get_write_mask(uint16_t regnum){
+uint32_t get_register_mask(uint16_t regnum,int mode){
  int i=0;
 
- while ( register_mask[switchtypes[switchtype].chip_id][i] > -1){
+ while ( register_mask[switchtypes[switchtype].chip_id][i] < 0x10000){
     if ( (regnum >= register_mask[switchtypes[switchtype].chip_id][i]) && 
          (regnum < (register_mask[switchtypes[switchtype].chip_id][i]+register_mask[switchtypes[switchtype].chip_id][i+3]))){
-       if (register_mask[switchtypes[switchtype].chip_id][i+2]) { 
-           return(register_mask[switchtypes[switchtype].chip_id][i+1]);
-       }else{
-           return(0);
-       }
+           return(register_mask[switchtypes[switchtype].chip_id][i+1+mode]);
     }
     if (regnum < register_mask[switchtypes[switchtype].chip_id][i]) {
       return(0);
@@ -666,8 +662,8 @@ void rtl83xx_setreg32(uint16_t regno, uint32_t regval){
 	mask=0x00ff;
     }
 /*
-    mask=(uint16_t)get_write_mask(regno);
-    printf("regnum: 0x%03x mask: 0x%04x\n",regno,mask);
+    mask=get_register_mask(regno,GetWriteMask);
+    printf("regnum: 0x%03x mask: 0x%08x\n",regno,mask);
     if (!mask) { printf("Register %03x not exists or read-only\n",regno); exit(1);}
 */
     for (cnt=0;cnt<3;cnt++){

@@ -27,6 +27,9 @@
 
 #define do_write_eeprom_byte eeprom_write
 
+#define GetWriteMask 0
+#define GetReadMask  1
+
 extern char ifname[128];
 extern uint16_t authkey;
 extern unsigned char my_mac[6];

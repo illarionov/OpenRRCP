@@ -653,7 +653,7 @@ void rtl83xx_setreg32(uint16_t regno, uint32_t regval){
     pkt.rrcp_reg_data=regval;
     pkt.cookie1=rand();
     pkt.cookie2=rand();
-
+/*
     if (regno==0x0500){
 	mask=0x7fff;
     }else if (regno==0x0217){
@@ -661,11 +661,10 @@ void rtl83xx_setreg32(uint16_t regno, uint32_t regval){
     }else if (regno==0x0218){
 	mask=0x00ff;
     }
-/*
-    mask=get_register_mask(regno,GetWriteMask);
-    printf("regnum: 0x%03x mask: 0x%08x\n",regno,mask);
-    if (!mask) { printf("Register %03x not exists or read-only\n",regno); exit(1);}
 */
+    mask=get_register_mask(regno,GetWriteMask);
+    if (!mask) { printf("Register %03x not exists or read-only\n",regno); return;}
+
     for (cnt=0;cnt<3;cnt++){
 	sock_send(&pkt, sizeof(pkt));
         if (!regno) return; // because register 0 self clearing 

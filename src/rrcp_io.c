@@ -147,15 +147,14 @@ int rtl83xx_prepare(){
 }
 
 //send to wire
-ssize_t sock_send(void *ptr, int size){
+ssize_t sock_send_(void *ptr, int size){
     int i,res;
     for (i=0;i<3;i++){
 	res=sendto(s_send, ptr, size, 0, (struct sockaddr*)&sockaddr_send, sizeof(sockaddr_send));
-	if (res!=-1) return res;
+	if (res!=-1) return(res);
 	usleep(50000);
     }
-    printf("can't sendto!");
-    _exit(1);
+    return(res);
 }
 
 //recieve from wire, returns length
@@ -222,14 +221,14 @@ int rtl83xx_prepare(){
 }
 
 //send to wire
-ssize_t sock_send(void *ptr, int size){
+ssize_t sock_send_(void *ptr, int size){
     int i,res;
     for (i=0;i<3;i++){
         res=eth_send(p_eth,ptr,size);
-	if (res!=-1) return res;
+	if (res!=-1) return(res);
 	usleep(50000);
     }
-    errx(2,"can't sendto!");
+    return(res);
 }
 
 //recieve from wire, returns length
@@ -251,6 +250,15 @@ int sock_rec(void *ptr, int size, int waittick){
     return len;
 }
 #endif
+
+ssize_t sock_send(void *ptr, int size){
+ssize_t res;
+    if ((res=sock_send_(ptr,size)) < 0){
+        printf("can't sendto!");
+        _exit(1);
+    }
+    return(res);
+}
 
 int istr00mac(const unsigned char *buf){
 int i,res;
@@ -578,7 +586,13 @@ int rrcp_io_probe_switch_for_facing_switch_port(uint8_t *switch_mac_address, uin
     return 0;
 }
 
-uint32_t rtl83xx_readreg32(uint16_t regno){
+/*
+ * read a register and return status of operation
+ * 0 - no error
+ * 1 - send error
+ * 2 - receive error
+ */
+int rtl83xx_readreg32_(uint16_t regno,uint32_t *regval){
     int len = 0;
     int i;
     struct rrcp_packet_t pkt,pktr;
@@ -596,7 +610,7 @@ uint32_t rtl83xx_readreg32(uint16_t regno){
     pkt.cookie2=rand();
 
     for(i=0;i<4;i++){
-	sock_send(&pkt, sizeof(pkt));
+        if (sock_send_(&pkt, sizeof(pkt)) < 0) return(1);
 	usleep(100);
 	memset(&pktr,0,sizeof(pktr));
 	len=sock_rec(&pktr, sizeof(pktr),100);
@@ -608,12 +622,33 @@ uint32_t rtl83xx_readreg32(uint16_t regno){
 	    pktr.rrcp_isreply==1 &&
 	    pktr.rrcp_authkey==htons(authkey)&&
 	    pktr.rrcp_reg_addr==regno){
-	        return(pktr.rrcp_reg_data);
+                *regval=pktr.rrcp_reg_data;
+                return(0);
 	}
     }
-    printf("can't read register 0x%04x! Switch is down?\n",regno);
-    exit(1);
-    return -1;
+    return(2);
+}
+
+/*
+ *  wrapper for compatibility with previously writed code
+ */
+uint32_t rtl83xx_readreg32(uint16_t regno){
+uint32_t regvalue;
+int res;
+  res=rtl83xx_readreg32_(regno,&regvalue);
+  switch (res){
+        case 1:
+              printf("Can't send\n");
+              exit(1);
+              ;;
+        case 2:
+              printf("can't read register 0x%04x! Switch is down?\n",regno);
+              exit(1);
+              ;;
+        default:
+              ;;
+  }
+  return(regvalue);
 }
 
 uint16_t rtl83xx_readreg16(uint16_t regno){

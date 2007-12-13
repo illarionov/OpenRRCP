@@ -56,6 +56,8 @@ void rtl83xx_scan(int verbose);
 
 int rrcp_io_probe_switch_for_facing_switch_port(uint8_t *mac_address, uint8_t *facing_switch_port_phys);
 
+int rtl83xx_readreg32_(uint16_t regno,uint32_t *regval);
+
 uint32_t rtl83xx_readreg32(uint16_t regno);
 
 uint16_t rtl83xx_readreg16(uint16_t regno);

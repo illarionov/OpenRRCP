@@ -62,3 +62,6 @@ rtl83xx_signamax_065-7531a: rtl83xx
 
 rrcp_decode:
 	gcc $(CFLAGS) -o ../bin/rrcp_decode rrcp_switches.c rrcp_config.c rrcp_io.c rrcp_decode.c -lpcap
+
+check_rrcp:
+	gcc $(CFLAGS) check_rrcp.c rrcp_io.c rrcp_switches.c rrcp_config.c rrcp_lib.c -o ../bin/check_rrcp

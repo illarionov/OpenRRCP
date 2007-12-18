@@ -222,10 +222,12 @@ void print_vlan_status(int show_vid){
     vlan_port_insert_vid.bitmap &= 0xffffffff>>(32-switchtypes[switchtype].num_ports);
 
     //display
-    printf("VLAN Status reg=0x%04x VLAN enabled: %s, 802.1Q enabled: %s\n",
+    printf( "VLAN status register: 0x%04x\n"
+	    "VLAN enabled: %s\n"
+	    "VLAN mode: %s\n",
 	    vlan_status & 0x7f,
 	    (vlan_status & 1<<0) ? "yes" : "no",
-	    (vlan_status & 1<<4) ? "yes" : "no");
+	    (vlan_status & 1<<4) ? "802.1Q" : "port-based");
     for (port=1;port<=switchtypes[switchtype].num_ports;port++){
 	port_phys=map_port_number_from_logical_to_physical(port);
 	//insert_vid option is available only in rtl8316b/rtl8324
@@ -345,7 +347,7 @@ void do_vlan_tmpl(int mode){
    do_vlan_enable_vlan(mode-1,0);
  }else{
    swconfig.vlan.raw[0]=rtl83xx_readreg16(0x030b);
-   if (!swconfig.vlan.s.config.enable) { printf("WARNING: vlan mode not enable\n"); } 
+   if (!swconfig.vlan.s.config.enable) { printf("WARNING: vlan mode not enabled\n"); } 
    do_vlan_enable_vlan(swconfig.vlan.s.config.dot1q,1);
  }
 }
@@ -451,6 +453,79 @@ void do_port_disable(unsigned short int *arr,unsigned short int val){
 void do_port_learning(int mode,unsigned short int *arr){
     do_32bit_reg_action(arr,mode,0x301);
     if (!mode) printf ("Warning! This setting(s) can be saved and be forged after reboot\n");
+}
+
+void do_insert_vid(unsigned short int *arr, unsigned short int val){
+    swconfig.vlan.raw[0]=rtl83xx_readreg16(0x030b);
+    if (!swconfig.vlan.s.config.dot1q) { printf("WARNING: vlan dot1q mode not enabled\n"); }
+    do_32bit_reg_action(arr,val,0x37D);
+}
+
+void do_tag_command(unsigned short int *arr, unsigned short int val){
+	swconfig.vlan.raw[0]=rtl83xx_readreg16(0x030b);
+	if (!swconfig.vlan.s.config.dot1q) { printf("WARNING: vlan dot1q mode not enabled\n"); }
+	
+	int i;
+	int phys_port;
+	union t_vlan_port_output_tag vlan_port_output_tag;
+	
+	for(i=0;i<4;i++){
+		vlan_port_output_tag.raw[i]=rtl83xx_readreg16(0x0319+i);
+	}
+	
+	for(i=1;i<=switchtypes[switchtype].num_ports;i++){
+		if(*(arr+i-1)){
+			phys_port=map_port_number_from_logical_to_physical(i);
+			
+			vlan_port_output_tag.bitmap&=~(3<<phys_port*2);
+			vlan_port_output_tag.bitmap|=val<<phys_port*2;
+		}
+	}
+	
+	rtl83xx_setreg16(0x0319,vlan_port_output_tag.raw[0]);
+	rtl83xx_setreg16(0x031a,vlan_port_output_tag.raw[1]);
+	if (switchtypes[switchtype].num_ports > 16) {
+		rtl83xx_setreg16(0x031b,vlan_port_output_tag.raw[2]);
+		rtl83xx_setreg16(0x031c,vlan_port_output_tag.raw[3]);
+	}
+}
+
+void do_vlan_table_config(unsigned short int *arr, unsigned int idx, unsigned short int val){
+	swconfig.vlan.raw[0]=rtl83xx_readreg16(0x030b);
+	if (!swconfig.vlan.s.config.dot1q) { printf("WARNING: vlan dot1q mode not enabled\n"); }
+	
+	do_32bit_reg_action(arr,val,0x31d+3*idx);
+}
+
+void do_vlan_index_ctrl(unsigned short int *arr, unsigned short int val){
+	swconfig.vlan.raw[0]=rtl83xx_readreg16(0x030b);
+	if (!swconfig.vlan.s.config.enable) { printf("WARNING: vlan mode not enabled\n"); }
+	
+	int i;
+	int phys_port;
+	union t_vlan_port_vlan vlan_port_vlan;
+	
+	for(i=0;i<13;i++){
+		vlan_port_vlan.raw[i]=rtl83xx_readreg16(0x030c+i);
+	}
+	
+	for(i=1;i<=switchtypes[switchtype].num_ports;i++){
+		if(*(arr+i-1)){
+			phys_port=map_port_number_from_logical_to_physical(i);
+			vlan_port_vlan.index[phys_port]=val;
+		}
+	}
+	
+	for(i=0;i<switchtypes[switchtype].num_ports/2;i++){
+		rtl83xx_setreg16(0x030c+i,vlan_port_vlan.raw[i]);
+    }
+}
+
+void do_vlan_index_config(unsigned int idx, unsigned int val){
+	swconfig.vlan.raw[0]=rtl83xx_readreg16(0x030b);
+	if (!swconfig.vlan.s.config.dot1q) { printf("WARNING: vlan dot1q mode not enabled\n"); }
+	
+	rtl83xx_setreg16(0x031d+3*idx+2,val & 0xfff);
 }
 
 void do_rrcp_ctrl(int state){
@@ -782,6 +857,9 @@ void print_usage(void){
 	printf(" --\"\"-- mac-address learning enable|disable - enable/disable MAC-learning on port(s)\n");
 	printf(" --\"\"-- rrcp enable|disable - enable/disable rrcp on specified ports\n");
 	printf(" --\"\"-- mls qos cos 0|7 - set port priority\n");
+	printf(" --\"\"-- trunk enable|disable - enable/disable per-port VID inserting\n");
+	printf(" --\"\"-- tag remove|insert-high|insert-all|none - VLAN output port priority-tagging control\n");
+	printf(" --\"\"-- index <idx> - set port VLAN table index assignment\n");
 	printf(" config rrcp enable|disable - global rrcp enable|disable\n");
 	printf(" config rrcp echo enable|disable - rrcp echo (REP) enable|disable\n");
 	printf(" config rrcp loop-detect enable|disable - network loop detect enable|disable\n"); 
@@ -790,6 +868,9 @@ void print_usage(void){
 	printf(" config vlan mode portbased|dot1q - enable specified VLAN support\n");
 	printf(" config vlan template-load portbased|dot1qtree - load specified template\n");
 	printf(" config vlan clear - clear vlan table (all ports bind to one vlan)\n");
+	printf(" config vlan add port <port-list> index <idx> - add port(s) in VLAN table on index\n");
+	printf(" config vlan delete port <port-list> index <idx> - delete port(s) from VLAN table on index\n");
+	printf(" config vlan index <idx> vid <vid> - set VLAN ID for index in VLAN table\n");
 	printf(" config mac-address <mac> - set <mac> as new switch MAC address and reboots\n");
 	printf(" config mac-address-table aging-time|drop-unknown <arg>  - address lookup table control\n");
         printf(" config flowcontrol dot3x enable|disable - globally disable full duplex flow control (802.3x pause)\n");
@@ -836,7 +917,7 @@ int main(int argc, char **argv){
     char *reset_sub_cmd[]={"soft","hard",""};
     char *write_sub_cmd[]={"memory","eeprom","defaults",""};
     char *config_sub_cmd_l1[]={"interface","rrcp","vlan","mac-address","mac-address-table","flowcontrol","storm-control","monitor","vendor-id","igmp-snooping",""};
-    char *config_intf_sub_cmd_l1[]={"no","shutdown","speed","duplex","rate-limit","mac-address","rrcp","mls","flow-control",""};
+    char *config_intf_sub_cmd_l1[]={"no","shutdown","speed","duplex","rate-limit","mac-address","rrcp","mls","flow-control","trunk","tag","index",""};
     char *config_duplex[]={"half","full",""};
     char *config_rate[]={"100m","128k","256k","512k","1m","2m","4m","8m","input","output",""};
     char *config_mac_learn[]={"learning","disable","enable",""};
@@ -846,14 +927,17 @@ int main(int argc, char **argv){
     char *config_alt[]={"aging-time","unknown-destination",""};
     char *config_alt_time[]={"0","12","300",""};
     char *config_alt_dest[]={"drop","pass",""};
-    char *config_vlan[]={"disable","transparent","clear","mode","template-load",""};
+    char *config_vlan[]={"disable","transparent","clear","mode","template-load","add","delete","index",""};
     char *config_vlan_mode[]={"portbased","dot1q",""};
     char *config_vlan_tmpl[]={"portbased","dot1qtree",""};
+    char *config_vlan_port[]={"port","index",""};
+    char *config_vlan_idx[]={"vid",""};
     char *config_flowc[]={"dot3x","backpressure","ondemand-disable",""};
     char *config_storm[]={"broadcast","multicast",""};
     char *config_storm_br[]={"relaxed","strict",""};
     char *config_monitor[]={"interface","source","destination","input","output",""};
-
+    char *config_tagcontrol[]={"remove","insert-high","insert-all","none",""};
+    
     if (argc<3){
         print_usage();
 	exit(0);
@@ -1060,6 +1144,31 @@ int main(int argc, char **argv){
                                         if (subcmd) subcmd=subcmd<<5;
                                         do_port_config(1,&port_list[0],subcmd);
                                         exit(0);
+                                 case 9:  // trunk
+                                        check_argc(argc,5+shift,"No sub-command, allowed commands: enable|disable\n",NULL);
+                                        subcmd=get_cmd_num(argv[6+shift],-1,"Incorrect sub-commands, allowed: enable|disable\n",&ena_disa[0]);
+                                        do_insert_vid(&port_list[0],!subcmd);
+                                        exit(0);
+                                 case 10: // tag
+                                        check_argc(argc,5+shift,"No sub-command, allowed commands: remove|insert-high|insert-all|none\n",NULL);
+                                        subcmd=get_cmd_num(argv[6+shift],-1,"Incorrect sub-commands, allowed: remove|insert-high|insert-all|none\n",&config_tagcontrol[0]);
+                                        do_tag_command(&port_list[0],subcmd);
+                                        exit(0);
+                                 case 11: // index
+										check_argc(argc,5+shift,"Incorrect VLAN index.\n",NULL);
+										
+										if(!sscanf(argv[6+shift], "%d", &subcmd)){
+											printf("Incorrect VLAN index: \"%s\"\n",argv[6+shift]);
+											exit(1);
+										} else if(subcmd < 0 || subcmd > 31) {
+											printf("Incorrect VLAN index: \"%s\"\n",argv[6+shift]);
+											printf("This hardware can store only 32 indexes (0-31).\n");
+											exit(1);
+										}
+										
+										do_vlan_index_ctrl(&port_list[0],subcmd);
+										
+										exit(0);
                                  default:
                                          print_unknown(argv[5+shift],&config_intf_sub_cmd_l1[0]);
                           }
@@ -1116,6 +1225,72 @@ int main(int argc, char **argv){
                                         check_argc(argc,4+shift,NULL,&config_vlan_tmpl[0]);
                                         subcmd=get_cmd_num(argv[5+shift],-1,NULL,&config_vlan_tmpl[0]);
                                         do_vlan_tmpl(subcmd+1);
+                                        exit(0);
+                                 case 5: // add
+										for(i=4;i<=7;i++) check_argc(argc,i+shift,NULL,&config_vlan_port[0]);
+										if(strcmp(argv[5+shift],config_vlan_port[0])) print_unknown(argv[5+shift],&config_vlan_port[0]);
+										if (str_portlist_to_array(argv[6+shift],&port_list[0],switchtypes[switchtype].num_ports)!=0){
+											printf("Incorrect list of ports: \"%s\"\n",argv[6+shift]);
+											exit(1);
+										}
+										if(strcmp(argv[7+shift],config_vlan_port[1])) print_unknown(argv[7+shift],&config_vlan_port[0]);
+										
+										if(!sscanf(argv[8+shift], "%d", &subcmd)){
+											printf("Incorrect VLAN index: \"%s\"\n",argv[8+shift]);
+											exit(1);
+										} else if(subcmd < 0 || subcmd > 31) {
+											printf("Incorrect VLAN index: \"%s\"\n",argv[8+shift]);
+											printf("This hardware can store only 32 indexes (0-31).\n");
+											exit(1);
+										}
+										do_vlan_table_config(&port_list[0],subcmd,0);
+										exit(0);
+                                 case 6: // delete
+										for(i=4;i<=7;i++) check_argc(argc,i+shift,NULL,&config_vlan_port[0]);
+										if(strcmp(argv[5+shift],config_vlan_port[0])) print_unknown(argv[5+shift],&config_vlan_port[0]);
+										if (str_portlist_to_array(argv[6+shift],&port_list[0],switchtypes[switchtype].num_ports)!=0){
+											printf("Incorrect list of ports: \"%s\"\n",argv[6+shift]);
+											exit(1);
+										}
+										if(strcmp(argv[7+shift],config_vlan_port[1])) print_unknown(argv[7+shift],&config_vlan_port[0]);
+										
+										if(!sscanf(argv[8+shift], "%d", &subcmd)){
+											printf("Incorrect VLAN index: \"%s\"\n",argv[8+shift]);
+											exit(1);
+										} else if(subcmd < 0 || subcmd > 31) {
+											printf("Incorrect VLAN index: \"%s\"\n",argv[8+shift]);
+											printf("This hardware can store only 32 indexes (0-31).\n");
+											exit(1);
+										}
+										do_vlan_table_config(&port_list[0],subcmd,1);
+										exit(0);
+                                 case 7: // index
+                                        for(i=4;i<=6;i++) check_argc(argc,i+shift,NULL,&config_vlan_idx[0]);
+										
+										if(!sscanf(argv[5+shift], "%d", &vid)){
+											printf("Incorrect VLAN index: \"%s\"\n",argv[5+shift]);
+											exit(1);
+										} else if(vid < 0 || vid > 31) {
+											printf("Incorrect VLAN index: \"%s\"\n",argv[5+shift]);
+											printf("This hardware can store only 32 indexes (0-31).\n");
+											exit(1);
+										}
+										
+										if(strcmp(argv[6+shift],config_vlan_idx[0])) print_unknown(argv[6+shift],&config_vlan_idx[0]);
+										
+										if(!sscanf(argv[7+shift], "%d", &subcmd)){
+											printf("Incorrect VID: \"%s\"\n",argv[7+shift]);
+											exit(1);
+										} else if(subcmd == 0 || subcmd == 1 || subcmd == 4095) {
+											printf("WARNING: VID %d is not recommended.\n", subcmd);
+										} else if(subcmd < 0 || subcmd > 4095) {
+											printf("Incorrect VID: \"%s\"\n",argv[7+shift]);
+											printf("VID can be only between 0-4095. Values 0, 1 and 4095 are not recommended.\n");
+											exit(1);
+										}
+										
+										do_vlan_index_config(vid,subcmd);
+										
                                         exit(0);
                                  default: 
                                          print_unknown(argv[4+shift],&config_vlan[0]);

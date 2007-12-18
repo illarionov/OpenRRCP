@@ -1,5 +1,5 @@
 #This patch allows to decode RRCP packets with tcpdump
-#To build, run "sh ./README"
+#To build, copy-paste to console all below, or run "sh ./README"
 
 wget -c http://www.tcpdump.org/release/tcpdump-3.9.8.tar.gz
 tar zxf tcpdump-3.9.8.tar.gz

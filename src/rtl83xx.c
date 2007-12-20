@@ -831,6 +831,7 @@ void print_unknown(char *argv, char **command_list){
 
 void print_usage(void){
 	printf("Usage: rtl8316b [[authkey-]xx:xx:xx:xx:xx:xx@]if-name <command> [<argument>]\n");
+	printf("       rtl8324 ----\"\"----\n");
 	printf("       rtl8326 ----\"\"----\n");
 	printf("       rtl83xx_dlink_des1016d ----\"\"----\n");
 	printf("       rtl83xx_dlink_des1024d_c1 ----\"\"----\n");

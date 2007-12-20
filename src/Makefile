@@ -1,6 +1,6 @@
 CFLAGS=`/bin/sh Makefile-helper.sh`
 
-all: rtl8326 rtl8316b rtl83xx_dlink_des1016d rtl83xx_dlink_des1024d_b1 \
+all: rtl8316b rtl8324 rtl8326 rtl83xx_dlink_des1016d rtl83xx_dlink_des1024d_b1 \
 rtl83xx_dlink_des1024d_c1 rtl83xx_compex_ps2216 rtl83xx_ovislink_fsh2402gt \
 rtl83xx_zyxel_es116p rtl83xx_compex_sds1224 rtl83xx_signamax_065-7531a \
 rtl83xx_compex_ps2216_6d rtl83xx_compex_ps2216_6dp rtl83xx_asus_gigax_1024p \
@@ -18,11 +18,14 @@ rrcpcli-debug: rrcp_cli.c rrcp_cli_cmd_show.c rrcp_cli_cmd_config.c rrcp_cli_cmd
 rtl83xx: rtl83xx.c
 	gcc $(CFLAGS) rtl83xx.c rrcp_io.c rrcp_switches.c rrcp_config.c -o ../bin/rtl83xx
 
-rtl8326: rtl83xx
-	ln -sf rtl83xx ../bin/rtl8326
-
 rtl8316b: rtl83xx
 	ln -sf rtl83xx ../bin/rtl8316b
+
+rtl8324: rtl83xx
+	ln -sf rtl83xx ../bin/rtl8324
+
+rtl8326: rtl83xx
+	ln -sf rtl83xx ../bin/rtl8326
 
 rtl83xx_dlink_des1024d_b1: rtl83xx
 	ln -sf rtl83xx ../bin/rtl83xx_dlink_des1024d_b1

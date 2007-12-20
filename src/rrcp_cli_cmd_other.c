@@ -186,6 +186,18 @@ int cmd_copy_eeprom(struct cli_def *cli, char *command, char *argv[], int argc)
     }
 }
 
+int cmd_reload(struct cli_def *cli, char *command, char *argv[], int argc)
+{
+    rtl83xx_setreg16(0x0000,0x0002);
+    return CLI_OK;
+}
+
+int cmd_reload_soft(struct cli_def *cli, char *command, char *argv[], int argc)
+{
+    rtl83xx_setreg16(0x0000,0x0001);
+    return CLI_OK;
+}
+
 void cmd_other_register_commands(struct cli_def *cli)
 {
     struct cli_command *c;
@@ -197,5 +209,10 @@ void cmd_other_register_commands(struct cli_def *cli)
 	c = cli_register_command(cli, NULL, "copy", cmd_copy,  PRIVILEGE_UNPRIVILEGED, MODE_EXEC, "Copy from one file to another");
 	cli_register_command(cli, c, "running-config", cmd_copy_running_config, PRIVILEGE_UNPRIVILEGED, MODE_EXEC, "Copy from current system configuration");
 	cli_register_command(cli, c, "eeprom", cmd_copy_eeprom, PRIVILEGE_UNPRIVILEGED, MODE_EXEC, "Copy from EEPROM as binary file");
+    }
+
+    {
+	c = cli_register_command(cli, NULL, "reload", cmd_reload,  PRIVILEGE_UNPRIVILEGED, MODE_EXEC, "Halt and perform a cold restart");
+	cli_register_command(cli, c, "soft", cmd_reload_soft, PRIVILEGE_UNPRIVILEGED, MODE_EXEC, "Perform software-only reload of switch");
     }
 }

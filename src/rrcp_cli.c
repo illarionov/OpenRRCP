@@ -204,6 +204,14 @@ int main(int argc, char *argv[])
     }
     rrcp_autodetect_switch_chip_eeprom(&swconfig.switch_type, &swconfig.chip_type, &swconfig.eeprom_type);
 
+    // preset counters types
+    {
+	int i;
+	for (i=0;i<=0x0c;i++){
+	    rtl83xx_setreg16(0x0700+i,0x0000); // read rx byte, tx byte, drop byte
+	}
+    }
+
     if (switchtype==-1){
 	switchtype=swconfig.switch_type;
 	printf("detected %s %s\n",

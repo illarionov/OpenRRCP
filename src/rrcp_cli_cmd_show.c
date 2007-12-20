@@ -154,7 +154,6 @@ int cmd_show_interfaces(struct cli_def *cli, char *command, char *argv[], int ar
 		swconfig.port_config.config[port_phys].media_1000full ? " 1000FD" : "",
 		swconfig.port_config.config[port_phys].pause ? " PAUSE" : "",
 		swconfig.port_config.config[port_phys].pause_asy ? " PAUSE_ASY" : "");
-	    rtl83xx_setreg16(0x0700+(port_phys/2),0x0000);//read rx byte, tx byte, drop byte
 	    cli_print(cli, "     %lu input bytes",(unsigned long)rtl83xx_readreg32(0x070d+port_phys));
 	    cli_print(cli, "     %lu output bytes",(unsigned long)rtl83xx_readreg32(0x0727+port_phys));
 	    cli_print(cli, "     %lu dropped bytes",(unsigned long)rtl83xx_readreg32(0x0741+port_phys));

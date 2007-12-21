@@ -81,3 +81,6 @@ void do_write_memory(void);
 void do_write_eeprom_defaults(void);
 
 void do_write_eeprom_all(int mode);
+
+//hardware-specific register mappings
+void map_reg_to_eeprom(int switch_reg_no);

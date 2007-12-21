@@ -411,6 +411,8 @@ int compare_command(char *argv, char **command_list){
  return(res);
 }
 
+// set (val==1) or reset (val==0) port bits in register with base address "base_reg",
+//     for the ports listed in "arr"
 void do_32bit_reg_action(unsigned short int *arr, unsigned short int val, unsigned int base_reg){
     int i;
     uint32_t portmask;
@@ -447,12 +449,12 @@ void do_port_qos(unsigned short int *arr,unsigned short int val){
 
 void do_port_disable(unsigned short int *arr,unsigned short int val){
     do_32bit_reg_action(arr,val,0x608);
-    if (!val) printf ("Warning! This setting(s) can be saved and be forged after reboot\n");
+//    if (!val) printf ("Warning! This setting(s) can be saved and be forged after reboot\n");
 }
 
 void do_port_learning(int mode,unsigned short int *arr){
     do_32bit_reg_action(arr,mode,0x301);
-    if (!mode) printf ("Warning! This setting(s) can be saved and be forged after reboot\n");
+//    if (!mode) printf ("Warning! This setting(s) can be saved and be forged after reboot\n");
 }
 
 void do_insert_vid(unsigned short int *arr, unsigned short int val){

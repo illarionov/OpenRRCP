@@ -815,7 +815,7 @@ int reg2eeprom_ps2216_6d[]={ // Compex PS2216B 6D with CPU ( VendorId 0x11f67003
     0x037d,0x19a,2,
     0x0400,0x02e,3,
     0x0607,0x038,1,
-    0x0608,0x17c,2,
+    0x0608,0x17c,1,
     0x060a,0x03a,8,
     -1,0,0
 };
@@ -906,6 +906,7 @@ int defregval_rtl8316b_generic[]={ // generic rtl8316b & rtl8316bp
      0x034a,0x0ffff,1,
      0x0400,0x10,1,
      0x0607,0x10,1,
+     0x0608,0x00,1,
      0x060a,0xafaf,8,
      -1,0,0
 };
@@ -971,6 +972,7 @@ int defregval_rtl8324_generic[]={   // generic rtl8324 & rtl8324p
      0x0363,0x000ff,1,
      0x0400,0x10,1,
      0x0607,0x10,1,
+     0x0608,0x00,2,
      0x060a,0xafaf,12,
      -1,0,0
 };

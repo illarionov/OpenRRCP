@@ -154,7 +154,7 @@ void do_softreboot(void){
 
 void print_counters(unsigned short int *arr){
     int i,port_tr;
-    for (i=0;i<=0x0c;i++){
+    for (i=0;i<switchtypes[switchtype].num_ports/2;i++){
 	rtl83xx_setreg16(0x0700+i,0x0000);//read rx byte, tx byte, drop byte
     }
     printf("port              RX          TX        drop\n");
@@ -977,6 +977,8 @@ int main(int argc, char **argv){
 	switchtype=13;
     }else if (strstr(p,"rtl83xx_asus_gigax_1024p")==argv[0]+strlen(argv[0])-24){
 	switchtype=14;
+    }else if (strcmp(argv[2],"scan")==0){ //allow scan command to be runt without specifying chip/switch
+	switchtype=0;
     }else {
 	printf("%s: unknown switch/chip type\n",argv[0]);
 	exit(0);

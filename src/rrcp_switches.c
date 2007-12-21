@@ -1276,7 +1276,7 @@ uint16_t rrcp_autodetect_switch_chip_eeprom(uint8_t *switch_type, uint8_t *chip_
     saved_reg=rtl83xx_readreg16(0x0218);
     for(i=0;i<4;i++){
 	rtl83xx_setreg16(0x0218,test2[i]);
-	if (rtl83xx_readreg16(0x0218) != test2[i]) {
+	if ((rtl83xx_readreg16(0x0218) & 0xff) != test2[i]) {
 	    errcnt++; 
 	    break;
 	}

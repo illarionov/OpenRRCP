@@ -346,7 +346,7 @@ void rtl83xx_scan(int verbose, int retries){
 		f_cnt++; //for foreigh traffic age slowly
 	    }
 	}
-	if (f_cnt>1000){
+	if (f_cnt>50){
 	    break;
 	}
     }

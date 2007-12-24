@@ -52,7 +52,7 @@ int rtl83xx_prepare();
 //recieve from wire, returns length
 //int sock_rec(void *ptr, int size, int waittick);
 
-void rtl83xx_scan(int verbose);
+void rtl83xx_scan(int verbose, int retries);
 
 int rrcp_io_probe_switch_for_facing_switch_port(uint8_t *mac_address, uint8_t *facing_switch_port_phys);
 

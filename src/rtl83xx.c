@@ -854,15 +854,15 @@ void print_usage(void){
 	printf(" reboot [soft|hard]                    - initiate switch reboot\n");
 	printf(" config interface [<list ports>] ...   - port(s) configuration\n");
 	printf(" --\"\"-- [no] shutdown                - enable/disable specified port(s)\n");
-	printf(" --\"\"-- speed <arg> [duplex <arg>]   - set speed/duplex on specified port(s)\n");
-	printf(" --\"\"-- flow-control <arg>           - set flow-control on specified port(s)\n");
+	printf(" --\"\"-- speed <arg> [duplex <arg>]     - set speed/duplex on specified port(s)\n");
+	printf(" --\"\"-- flow-control <arg>             - set flow-control on specified port(s)\n");
 	printf(" --\"\"-- rate-limit [input|output] <arg> - set bandwidth on specified port(s)\n");
 	printf(" --\"\"-- mac-address learning enable|disable - enable/disable MAC-learning on port(s)\n");
-	printf(" --\"\"-- rrcp enable|disable          - enable/disable rrcp on specified ports\n");
-	printf(" --\"\"-- mls qos cos 0|7              - set port priority\n");
-	printf(" --\"\"-- trunk enable|disable         - enable/disable per-port VID inserting\n");
+	printf(" --\"\"-- rrcp enable|disable            - enable/disable rrcp on specified ports\n");
+	printf(" --\"\"-- mls qos cos 0|7                - set port priority\n");
+	printf(" --\"\"-- trunk enable|disable           - enable/disable per-port VID inserting\n");
 	printf(" --\"\"-- tag remove|insert-high|insert-all|none - VLAN output port priority-tagging control\n");
-	printf(" --\"\"-- index <idx>                  - set port VLAN table index assignment\n");
+	printf(" --\"\"-- index <idx>                    - set port VLAN table index assignment\n");
 	printf(" config rrcp enable|disable            - global rrcp enable|disable\n");
 	printf(" config rrcp echo enable|disable       - rrcp echo (REP) enable|disable\n");
 	printf(" config rrcp loop-detect enable|disable - network loop detect enable|disable\n"); 
@@ -913,7 +913,7 @@ int main(int argc, char **argv){
     char *ena_disa[]={"disable","enable",""};
     char *cmd_level_1[]={"show","config","scan","reload","reboot","write","ping",""}; 
     char *show_sub_cmd[]={"running-config","startup-config","interface","vlan",""};
-    char *scan_sub_cmd[]={"verbose",""};
+    char *scan_sub_cmd[]={"verbose","retries",""};
     char *show_sub_cmd_l2[]={"full","verbose",""};
     char *show_sub_cmd_l3[]={"summary",""};
     char *show_sub_cmd_l4[]={"id",""};
@@ -1436,13 +1436,37 @@ int main(int argc, char **argv){
                 }
                 break;
          case 2: //scan
-  	        if (argc == (2+shift+1)){
-	           rtl83xx_scan(0);
-                   exit(0);
-                }
-                (void)get_cmd_num(argv[3+shift],0,NULL,&scan_sub_cmd[0]);
-	        rtl83xx_scan(1);
-                exit(0);
+		{
+		    int verbose=0;
+		    int retries=5;
+		    while (1){
+			if (argc==shift+3){
+			    printf("! rtl83xx: scannig. is_verbose=%d, retries=%d\n",verbose,retries);
+			    rtl83xx_scan(verbose,retries);
+			    exit(0);
+			}else{
+        		    check_argc(argc,2+shift,NULL,&scan_sub_cmd[0]);
+            		    switch (compare_command(argv[3+shift],&scan_sub_cmd[0])){
+				case 0: //verbose
+				    verbose=1;
+				    shift++;
+				    continue;
+        			case 1: //retries
+        			    if (argc<shift+5 || atoi(argv[4+shift])<=0 || atoi(argv[4+shift])>100 ){
+					printf("retries number not specified or out of range (1..100)!\n");
+					exit(0);
+        			    }else{
+        				retries=atoi(argv[4+shift]);
+					shift+=2;
+					continue;
+        			    }
+				default:
+				    print_unknown(argv[3+shift],&scan_sub_cmd[0]);
+				    exit(0);
+			    }
+			}
+		    }
+		}
          case 3: //reload
          case 4: //reboot
   	        if (argc == (2+shift+1)){

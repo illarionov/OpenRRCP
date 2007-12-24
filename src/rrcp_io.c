@@ -267,7 +267,7 @@ int i,res;
  return(res);
 }
 
-void rtl83xx_scan(int verbose){
+void rtl83xx_scan(int verbose, int retries){
     typedef struct sw_reply SW_REPLY;
     struct sw_reply { 
      struct rrcp_helloreply_packet_t pktr;
@@ -300,7 +300,7 @@ void rtl83xx_scan(int verbose){
     pkt.rrcp_isreply=0;
     pkt.rrcp_authkey=htons(authkey);
 
-    for (i=1;i<=5;i++){
+    for (i=1;i<=retries;i++){
 	sock_send(&pkt, sizeof(pkt));
 	usleep(1700*i);
     }
@@ -355,7 +355,7 @@ void rtl83xx_scan(int verbose){
     pkt.rrcp_isreply=0;
     pkt.rrcp_authkey=0x0000;
 
-    for (i=1;i<=5;i++){
+    for (i=1;i<=retries;i++){
 	sock_send(&pkt, sizeof(pkt));
 	usleep(1700*i);
     }

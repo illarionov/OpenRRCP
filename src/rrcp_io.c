@@ -867,7 +867,9 @@ void do_write_eeprom_all(int mode){
 }
 
 //hardware-specific register mappings
-void map_reg_to_eeprom(int switch_reg_no){
+int map_reg_to_eeprom(int switch_reg_no){
+    int i;
+
     for (i=0;switchtypes[switchtype].reg2eeprom[i] > -1;i+=3){
 	if ((switchtypes[switchtype].reg2eeprom[i]<=switch_reg_no) &&
 	    (switchtypes[switchtype].reg2eeprom[i]+

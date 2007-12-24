@@ -152,7 +152,7 @@ ssize_t sock_send_(void *ptr, int size){
     for (i=0;i<3;i++){
 	res=sendto(s_send, ptr, size, 0, (struct sockaddr*)&sockaddr_send, sizeof(sockaddr_send));
 	if (res!=-1) return(res);
-	usleep(50000);
+	usleep(10000+40000*i);
     }
     return(res);
 }
@@ -226,7 +226,7 @@ ssize_t sock_send_(void *ptr, int size){
     for (i=0;i<3;i++){
         res=eth_send(p_eth,ptr,size);
 	if (res!=-1) return(res);
-	usleep(50000);
+	usleep(10000+40000*i);
     }
     return(res);
 }
@@ -318,7 +318,10 @@ void rtl83xx_scan(int verbose, int retries){
 	    // do we already know this switch?
 	    reply4up=hello_reply;
 	    while (reply4up != NULL){
-        	if (memcmp(pktr.ether_shost,reply4up->pktr.ether_shost,6)==0){
+        	if ((memcmp(pktr.ether_shost,reply4up->pktr.ether_shost,6)==0) &&
+        	    (memcmp(pktr.rrcp_uplink_mac,reply4up->pktr.rrcp_uplink_mac,6)==0) &&
+        	    pktr.rrcp_downlink_port==reply4up->pktr.rrcp_downlink_port &&
+        	    pktr.rrcp_uplink_port==reply4up->pktr.rrcp_uplink_port ){
             	    break;
                 }
                 current=reply4up->prev;
@@ -343,7 +346,7 @@ void rtl83xx_scan(int verbose, int retries){
 		f_cnt++; //for foreigh traffic age slowly
 	    }
 	}
-	if (f_cnt>50){
+	if (f_cnt>1000){
 	    break;
 	}
     }
@@ -565,7 +568,7 @@ int rrcp_io_probe_switch_for_facing_switch_port(uint8_t *switch_mac_address, uin
     sock_send(&pkt, sizeof(pkt));
 
     for (i=0;i<10;i++){
-	usleep(10);
+	usleep(100+5000*i);
 	memset(&pktr,0,sizeof(pktr));
 	len=sock_rec(&pktr, sizeof(pktr),5000);
 	if (len >14 &&
@@ -609,9 +612,9 @@ int rtl83xx_readreg32_(uint16_t regno,uint32_t *regval){
     pkt.cookie1=rand();
     pkt.cookie2=rand();
 
-    for(i=0;i<4;i++){
+    for(i=0;i<7;i++){
         if (sock_send_(&pkt, sizeof(pkt)) < 0) return(1);
-	usleep(100);
+	usleep(100+5000*i);
 	memset(&pktr,0,sizeof(pktr));
 	len=sock_rec(&pktr, sizeof(pktr),100);
 	if (len >14 &&
@@ -723,10 +726,10 @@ int wait_eeprom(){
     int i;
     uint16_t res;
 
-    for(i=1;i<=10;i++){
+    for(i=0;i<=15;i++){
 	res=rtl83xx_readreg16(0x217);
 	if ((res&0x1000) == 0) return(res);
-	usleep(1000*i);
+	usleep(1000+2000*i);
     }
     return(0xffff);
 }
@@ -777,7 +780,7 @@ int phy_wait(){
     for(i=0;i<10;i++){
     res=rtl83xx_readreg16(0x500);
     if ((res&0x8000) == 0) return(res);
-	usleep(1000);
+	usleep(5000);
     }
     return(0xffff);
 }
@@ -809,8 +812,8 @@ uint32_t rtl83xx_ping(void){
 
     sock_send(&pkt, sizeof(pkt));
 
-    for(i=1;i<20;i++){
-	usleep(100*i);
+    for(i=0;i<20;i++){
+	usleep(100+1000*i);
 	memset(&pktr,0,sizeof(pktr));
 	len=sock_rec(&pktr, sizeof(pktr),100);
 	if (len >14 &&

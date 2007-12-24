@@ -144,6 +144,12 @@ int cmd_show_interfaces(struct cli_def *cli, char *command, char *argv[], int ar
 		    link_status.struc.duplex ? "Full-duplex" : "Half-duplex",
 		    sp[link_status.struc.speed]);
 	    }
+	    {
+		int i;
+		for(i=0;i<2;i++)
+	        swconfig.alt_mask.raw[i]=rtl83xx_readreg16(0x0301+i);
+	    }                
+	    cli_print(cli, "  MAC learning: %s",(swconfig.alt_mask.mask&(1<<port_phys)) ? "disabled":"enabled");
 	    cli_print(cli, "  PHY auto-negotiation %s",
 		swconfig.port_config.config[port_phys].autoneg ? "on" : "off");
 	    cli_print(cli, "  PHY capability:%s%s%s%s%s%s%s",

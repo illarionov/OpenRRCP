@@ -300,9 +300,9 @@ void rtl83xx_scan(int verbose){
     pkt.rrcp_isreply=0;
     pkt.rrcp_authkey=htons(authkey);
 
-    for (i=1;i<=3;i++){
+    for (i=1;i<=5;i++){
 	sock_send(&pkt, sizeof(pkt));
-	usleep(700*i);
+	usleep(1700*i);
     }
 
     f_cnt=0;
@@ -326,13 +326,13 @@ void rtl83xx_scan(int verbose){
             }
 	    // only if we don't know this switch
 	    if (reply4up == NULL){
+		current=hello_reply;
         	if ((hello_reply=malloc(sizeof(SW_REPLY)))==NULL) {
 		    printf("Out of memory!\n");
 		    _exit(1);
 		}
-		memcpy(&hello_reply->pktr,&pktr,sizeof(pktr));
         	hello_reply->prev=current;
-		current=hello_reply;
+		memcpy(&hello_reply->pktr,&pktr,sizeof(pktr));
 		cnt_h_replies++;
 		f_cnt=0;
 	    }
@@ -355,9 +355,9 @@ void rtl83xx_scan(int verbose){
     pkt.rrcp_isreply=0;
     pkt.rrcp_authkey=0x0000;
 
-    for (i=1;i<=3;i++){
+    for (i=1;i<=5;i++){
 	sock_send(&pkt, sizeof(pkt));
-	usleep(700*i);
+	usleep(1700*i);
     }
 
     f_cnt=0;
@@ -380,13 +380,13 @@ void rtl83xx_scan(int verbose){
             }
 	    // only if we don't know this switch
 	    if (reply4up == NULL){
+		current=rep_reply;
 		if ((rep_reply=malloc(sizeof(SW_REPLY)))==NULL) {
 		    printf("Out of memory!\n");
 		    _exit(1);
 		}
-		memcpy(&rep_reply->pktr,&pktr,sizeof(pktr));
 		rep_reply->prev=current;
-		current=rep_reply;
+		memcpy(&rep_reply->pktr,&pktr,sizeof(pktr));
 		cnt_r_replies++;
 		f_cnt=0;
 	    }
@@ -410,7 +410,7 @@ void rtl83xx_scan(int verbose){
            printf("  switch MAC      Hello REP\n");
        }
     }else{
-       printf("No switch found.\n");
+       printf("No switch(es) found.\n");
        return;
     }
     if (cnt_h_replies){

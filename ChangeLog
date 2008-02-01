@@ -1,3 +1,27 @@
+Fri Feb  1 10:37:05 CET 2008
+        * Fix gigabit port order for Asus GigaX 1024P
+
+Fri Feb  1 10:34:18 CET 2008
+        * Add explicit support for Repotec g3224 and Edimax ES-3116P switches (contributed by Petr Sindylek)
+
+------------------------ OpenRRCP 0.2 ---------------------------------------
+
+Thu Dec 20 12:47:49 CET 2007
+        * Lots of small fixes and enchancements
+
+12/18/07 20:26
+    Add more rtl83xx VLAN commands (contributed by Alex Merny)
+
+12/13/07 21:00
+    added check_rrcp - plugin for Nagios http://www.nagios.org (contributed by amelnik)
+
+11/13/07 16:51
+    added 'config [no] igmp-snooping' command to rtl83xx
+
+11/12/07 03:36
+    add explicit support for Asus GigaX 1024P
+
+    
 Mon Jun 18 17:45:42 MSD 2007
         * add explicit support for SIGNAMAX 065-7531A. Contributed by Jan Bubik
 
@@ -30,9 +54,6 @@ Wed Apr 11 15:38:14 MSD 2007
 
 Wed Mar  7 00:41:19 MSK 2007
         * rtl83xx: Changeset [37] by amelnik - "show ..." added
-
-Tue Mar  6 01:29:31 MSK 2007
-        * rtl83xx: Changeset [36] by amelnik - work started
 
 ------------------------ OpenRRCP 0.1.93 ---------------------------------------
 Tue Feb 20 23:27:19 MSK 2007

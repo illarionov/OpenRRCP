@@ -845,6 +845,8 @@ void print_usage(void){
 	printf("       rtl83xx_zyxel_es116p ----\"\"----\n");
 	printf("       rtl83xx_compex_sds1224 ----\"\"----\n");
 	printf("       rtl83xx_signamax_065-7531a ----\"\"----\n");
+	printf("       rtl83xx_repotec_g3224x ----\"\"----\n");
+	printf("       rtl83xx_edimax_es-3116p ----\"\"----\n");
 	printf(" where command may be:\n");
 	printf(" show running-config                   - show current switch config\n");
 	printf(" show interface [<list ports>]         - print link status for ports\n");
@@ -979,6 +981,10 @@ int main(int argc, char **argv){
 	switchtype=13;
     }else if (strstr(p,"rtl83xx_asus_gigax_1024p")==argv[0]+strlen(argv[0])-24){
 	switchtype=14;
+    }else if (strstr(p,"rtl83xx_repotec_g3224x")==argv[0]+strlen(argv[0])-22){
+	switchtype=15;
+    }else if (strstr(p,"rtl83xx_edimax_es-3116p")==argv[0]+strlen(argv[0])-23){
+	switchtype=16;
     }else if (strcmp(argv[2],"scan")==0){ //allow scan command to be runt without specifying chip/switch
 	switchtype=0;
     }else {

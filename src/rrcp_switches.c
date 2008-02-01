@@ -977,7 +977,7 @@ int defregval_rtl8324_generic[]={   // generic rtl8324 & rtl8324p
      -1,0,0
 };
 
-const uint32_t switchtype_n = 15;
+const uint32_t switchtype_n = 17;
 
 struct switchtype_t switchtypes[] = {
     {
@@ -1141,9 +1141,31 @@ struct switchtype_t switchtypes[] = {
 	"rtl8326",
 	rtl8326,
 	26,
-	{2,1,4,3,6,5,8,7,10,9,12,11,14,13,16,15,18,17,20,19,22,21,24,23,26,25,0},
+	{2,1,4,3,6,5,8,7,10,9,12,11,14,13,16,15,18,17,20,19,22,21,24,23,25,26,0},
         &reg2eeprom_rtl8326_generic[0],
         &defregval_rtl8326_generic[0]
+    },
+    {
+	"repotec",
+	"g3224x",
+	"unknown",
+	"rtl8326",
+	rtl8326,
+	26,
+	{2,4,6,8,10,12,14,16,18,20,22,24,1,3,5,7,9,11,13,15,17,19,21,23,25,26,0},
+	&reg2eeprom_rtl8326_generic[0],
+	&defregval_rtl8326_generic[0]
+    },
+    {
+	"edimax",
+	"es-3116p",
+	"unknown",
+	"rtl8316b",
+	rtl8316b,
+	16,
+	{16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0,0,0,0,0,0,0,0,0,0,0},
+	&reg2eeprom_rtl8316b_generic[0],
+	&defregval_rtl8316b_generic[0]
     },
 };
 

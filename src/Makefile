@@ -74,3 +74,7 @@ rrcp_decode:
 
 check_rrcp:
 	gcc $(CFLAGS) check_rrcp.c rrcp_io.c rrcp_switches.c rrcp_config.c rrcp_lib.c -o ../bin/check_rrcp
+
+install:
+	mkdir -p $(DESTDIR)$(PREFIX)/bin 2>/dev/null
+	cp -p ../bin/* $(DESTDIR)$(PREFIX)/bin

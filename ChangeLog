@@ -1,3 +1,8 @@
+------------------------ OpenRRCP 0.2.1 -------------------------------------
+
+Thu Mar  6 14:28:59 CET 2008
+        * Add "install" make target
+
 Fri Feb  1 10:37:05 CET 2008
         * Fix gigabit port order for Asus GigaX 1024P
 

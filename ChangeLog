@@ -1,4 +1,8 @@
------------------------- OpenRRCP 0.2.1 -------------------------------------
+------------------------ OpenRRCP 0.2.1 ---------------------------------------
+Tue Jun  3 04:14:46 CEST 2008
+        * Fix switch/chip autodetection
+        * Don't touch registers, not present on current chip in order to not issue warnings
+        * Add extra check for dot1q vlan mode in switchport commands
 
 Thu Mar  6 14:28:59 CET 2008
         * Add "install" make target

@@ -1,0 +1,102 @@
+------------------------ OpenRRCP 0.2 ---------------------------------------
+
+Thu Dec 20 12:47:49 CET 2007
+        * Lots of small fixes and enchancements
+
+12/18/07 20:26
+    Add more rtl83xx VLAN commands (contributed by Alex Merny)
+
+12/13/07 21:00
+    added check_rrcp - plugin for Nagios http://www.nagios.org (contributed by amelnik)
+
+11/13/07 16:51
+    added 'config [no] igmp-snooping' command to rtl83xx
+
+11/12/07 03:36
+    add explicit support for Asus GigaX 1024P
+
+    
+Mon Jun 18 17:45:42 MSD 2007
+        * add explicit support for SIGNAMAX 065-7531A. Contributed by Jan Bubik
+
+Fri Apr 27 16:01:15 MSD 2007
+        * Merge commandset-ng branch - a whole new commandset for rtl83xx tool [amelnik]
+
+        * fix BSD make system - now single Makefile for both Linux and *BSD [nording]
+
+        * Fixed port order for "DLink DES1024D HW.rev.C1" [timshin oleg]
+
+        * Added explicit support for "DLink DES1024D HW.rev.C1 [nording]
+
+        * Improve switch/chip autodetection; add support for RTL8324 chip [nording]
+
+        * added config vendor-id [amelnik]
+
+        * fix port mirroring [amelnik]
+
+        * added vlan clear, rm Makefile.bsd [amelnik]
+
+	* rrcpcli: add low-lever diagnostic commands: show switch-register, show eeprom-register, show phy-register [nording]
+
+	* rrcpcli: add 'copy file: eeprom' and 'copy eeprom file:' commands [nording]
+
+        * rrcpcli: A log to fixes, mainly with 802.1Q handling [nording]
+
+
+Wed Apr 11 15:38:14 MSD 2007
+        * Added explicit support for "Zyxel ES116P" (contributed by Oleg Timshin)
+
+Wed Mar  7 00:41:19 MSK 2007
+        * rtl83xx: Changeset [37] by amelnik - "show ..." added
+
+------------------------ OpenRRCP 0.1.93 ---------------------------------------
+Tue Feb 20 23:27:19 MSK 2007
+        * rtl83xx: Added explicit support for Ovislink FSH2402GT
+        * rtl83xx: Added support for variable RRCP authentification key
+        * Reworked EEPROM access routines
+        * rtl83xx: Added support for "loopdetect" feature
+        * rtl83xx: add "eeprom default" command to set factory defaults to EEPROM
+        * rtl83xx: add "vlan disable" command to set default trasparent-vlan mode
+        * rtl83xx: add "port" commandset to manage individual port speed,duplex and bandwidth
+        * rtl83xx: add "set-mac-address" command to change switch's MAC address
+
+------------------------ OpenRRCP 0.1.92 ---------------------------------------
+Tue Nov 28 18:36:28 MSK 2006
+	* much work on rrcp_cli applcation - however still not fully functional
+	* code cleanup
+	* fixed some 64-bit platform-related issues
+	* REP (Realtek Echo Protocol) imlementation - greately improves 'scan' mode
+	* new homepage including hardware compatilibity list and brief chip description
+	  http://openrrcp.org.ru/
+	* too much small fixes and improvement to name all
+
+------------------------ OpenRRCP 0.1.91 ---------------------------------------
+Mon Nov 13 12:47:22 MSK 2006
+	* Initial *BSD (libdnet) port by amelnik
+	* new developers arena (svn and trac-based)
+	  http://dev.openrrcp.org.ru/
+	* new developers/contributors (amelnik,alex001). Thanks, guys!
+
+------------------------ OpenRRCP 0.1.90 ---------------------------------------
+Tue Sep 21 15:12:10 MSD 2006
+	* added rrcp_cli applcation to configure switch in cisco CLI-like fashion
+	  (not yet functional)
+	* code cleanup
+
+------------------------ OpenRRCP 0.1 ------------------------------------------
+Wed Sep 20 13:01:58 MSD 2006
+	* added "show config" command - a first step in ongoing effort to make
+	  rrcp-enabled switches configurable in cisco catalyst-like fashion
+	  (see des1016d.config.txt file)
+	* added vlan command with subcommands status, enable_hvlan,
+	  enable_8021q sub-commands
+	* added specific support for switches:
+	    - D-Link DES-1024D
+	    - D-Link DES-1016D h/w rev. D1
+	    - Compex PS2216
+        * code cleanup
+	* added copyright clauses to each file and LICENCE file
+
+---------------------- OpenRRCP 0.0 --------------------------------------------
+Oct 7 2005
+	* first publuc release

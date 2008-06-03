@@ -92,25 +92,27 @@ void rrcp_config_read_from_switch(void)
 
 void rrcp_config_commit_vlan_to_switch(void)
 {
-    int i;
+    int i,j;
 
-    for(i=0;i<14;i++){
+    for(i=0;i<1+(switchtypes[switchtype].num_ports+1)/2;i++){
 	rtl83xx_setreg16(0x030b+i,swconfig.vlan.raw[i]);
     }
-    for(i=0;i<4;i++){
+    for(i=0;i<(switchtypes[switchtype].num_ports+7)/8;i++){
 	rtl83xx_setreg16(0x0319+i,swconfig.vlan_port_output_tag.raw[i]);
     }
     for(i=0;i<32;i++){
 	//mask out ports absent on this switch
 	swconfig.vlan_entry.bitmap[i] &= 0xffffffff>>(32-switchtypes[switchtype].num_ports);
-	rtl83xx_setreg16(0x031d+i*3,  swconfig.vlan_entry.raw[i*2]);
-	rtl83xx_setreg16(0x031d+i*3+1,swconfig.vlan_entry.raw[i*2+1]);
+	for(j=0;j<(switchtypes[switchtype].num_ports+15)/16;j++){
+	    rtl83xx_setreg16(0x031d+i*3+j,  swconfig.vlan_entry.raw[i*2+j]);
+	}
 	rtl83xx_setreg16(0x031d+i*3+2,swconfig.vlan_vid[i]);
     }
     //mask out ports absent on this switch
     swconfig.vlan_port_insert_vid.bitmap &= 0xffffffff>>(32-switchtypes[switchtype].num_ports);
-    rtl83xx_setreg16(0x037d,swconfig.vlan_port_insert_vid.raw[0]);
-    rtl83xx_setreg16(0x037e,swconfig.vlan_port_insert_vid.raw[1]);
+    for(i=0;i<switchtypes[switchtype].num_ports/16;i++){
+	rtl83xx_setreg16(0x037d+i,swconfig.vlan_port_insert_vid.raw[i]);
+    }
 }
 
 void sncprintf(char *str, size_t size, const char *format, ...) {

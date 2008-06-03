@@ -194,7 +194,7 @@ int main(int argc, char *argv[])
     }
 
 
-    engage_timeout(10);
+    engage_timeout(100);
     if (authkey_tmp>=0){
 	authkey=authkey_tmp;
     }
@@ -207,7 +207,7 @@ int main(int argc, char *argv[])
     // preset counters types
     {
 	int i;
-	for (i=0;i<=0x0c;i++){
+	for (i=0;i<switchtypes[switchtype].num_ports/2;i++){
 	    rtl83xx_setreg16(0x0700+i,0x0000); // read rx byte, tx byte, drop byte
 	}
     }

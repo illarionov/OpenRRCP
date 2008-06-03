@@ -1268,30 +1268,42 @@ uint16_t rrcp_autodetect_switch_chip_eeprom(uint8_t *switch_type, uint8_t *chip_
     uint8_t port_count;
 
     // step 1: detect number of ports
-    port_count=rrcp_autodetectswitch_port_count();    
+    port_count=rrcp_autodetectswitch_port_count();
+
+    // temporarily arrangement, allowing eeprom scan
+    switchtype=0;
+    if (port_count==16){
+	switchtype=1; // generic rtl8316b
+    }else if (port_count==24){
+	switchtype=3; // generic rtl8324
+    }
 
     // step 2: detect EEPROM presence and size
-    for(i=0;i<6;i++){
-	if ((errcnt=eeprom_read(0x12+i,&test1[i]))!=0){break;}
-    }
-    if (errcnt==0){
-	if (!eeprom_read(0x7f,&test1[0])){
-	    detected_eeprom=EEPROM_2401;
-	    if (!eeprom_read(0xff,&test1[0])){
-		detected_eeprom=EEPROM_2402;
-		if (!eeprom_read(0x1ff,&test1[0])){
-		    detected_eeprom=EEPROM_2404;
-		    if (!eeprom_read(0x3ff,&test1[0])){
-			detected_eeprom=EEPROM_2408;
-			if (!eeprom_read(0x7ff,&test1[0])){
-			    detected_eeprom=EEPROM_2416;
+    if (switchtype>0){
+	for(i=0;i<6;i++){
+	    if ((errcnt=eeprom_read(0x12+i,&test1[i]))!=0){break;}
+	}
+	if (errcnt==0){
+	    if (!eeprom_read(0x7f,&test1[0])){
+		detected_eeprom=EEPROM_2401;
+		if (!eeprom_read(0xff,&test1[0])){
+		    detected_eeprom=EEPROM_2402;
+		    if (!eeprom_read(0x1ff,&test1[0])){
+			detected_eeprom=EEPROM_2404;
+			if (!eeprom_read(0x3ff,&test1[0])){
+			    detected_eeprom=EEPROM_2408;
+			    if (!eeprom_read(0x7ff,&test1[0])){
+				detected_eeprom=EEPROM_2416;
+			    }
 			}
 		    }
 		}
+	    }else{
+		detected_eeprom=EEPROM_WRITEPOTECTED;
 	    }
-	}else{
-	    detected_eeprom=EEPROM_WRITEPOTECTED;
 	}
+    }else{
+	detected_eeprom=EEPROM_NONE;
     }
 
     // step 3: check for registers, absent on rtl8326

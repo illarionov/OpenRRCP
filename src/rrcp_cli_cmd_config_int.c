@@ -104,6 +104,10 @@ int cmd_config_int_switchport(struct cli_def *cli, char *command, char *argv[], 
 	}
     }else{
 	int i,port,port_phys;
+	if (!swconfig.vlan.s.config.dot1q){
+	    cli_print(cli, "%% Cannot set up switchport properties in current vlan mode.");
+	    cli_print(cli, "%% Please, issue 'vlan dot1q' in global config mode first.");
+	}
 	port=atoi(strrchr(cli->modestring,'/')+1);
 	port_phys=map_port_number_from_logical_to_physical(port);
 	if (strcasecmp(command,"switchport mode trunk")==0){
@@ -125,7 +129,6 @@ int cmd_config_int_switchport(struct cli_def *cli, char *command, char *argv[], 
 	}
 	return CLI_OK;
     }
-    cli_print(cli, "%% Not implemented yet.");
     return CLI_OK;
 }
 
@@ -136,6 +139,10 @@ int cmd_config_int_switchport_access_vlan(struct cli_def *cli, char *command, ch
 	    cli_print(cli, "  <1-4094>  VLAN ID of the VLAN when this port is in access mode");
 	}else{
 	    int port,port_phys;
+	    if (!swconfig.vlan.s.config.dot1q){
+		cli_print(cli, "%% Cannot set up switchport properties in current vlan mode.");
+		cli_print(cli, "%% Please, issue 'vlan dot1q' in global config mode first.");
+	    }
 	    port=atoi(strrchr(cli->modestring,'/')+1);
 	    port_phys=map_port_number_from_logical_to_physical(port);
 	    int vi=0;
@@ -167,6 +174,10 @@ int cmd_config_int_switchport_trunk_native_vlan(struct cli_def *cli, char *comma
 	    cli_print(cli, "  <1-4094>  VLAN ID of the native VLAN when this port is in trunking mode");
 	}else{
 	    int port,port_phys;
+	    if (!swconfig.vlan.s.config.dot1q){
+		cli_print(cli, "%% Cannot set up switchport properties in current vlan mode.");
+		cli_print(cli, "%% Please, issue 'vlan dot1q' in global config mode first.");
+	    }
 	    port=atoi(strrchr(cli->modestring,'/')+1);
 	    port_phys=map_port_number_from_logical_to_physical(port);
 	    int vi=0;
@@ -196,6 +207,10 @@ int cmd_config_int_switchport_trunk_allowed_vlan(struct cli_def *cli, char *comm
 	    cli_print(cli, "  none    no VLANs");
 	}else{
 	    int port,port_phys;
+	    if (!swconfig.vlan.s.config.dot1q){
+		cli_print(cli, "%% Cannot set up switchport properties in current vlan mode.");
+		cli_print(cli, "%% Please, issue 'vlan dot1q' in global config mode first.");
+	    }
 	    port=atoi(strrchr(cli->modestring,'/')+1);
 	    port_phys=map_port_number_from_logical_to_physical(port);
 	    int vidlist[32];
@@ -300,6 +315,7 @@ int cmd_config_int_rrcp(struct cli_def *cli, char *command, char *argv[], int ar
 	    swconfig.rrcp_byport_disable.bitmap |= (1<<port_phys);
 	else
 	    cli_print(cli, "Internal error on command '%s'",command);
+	rtl83xx_setreg16(0x0201+((port_phys/16)&3),swconfig.rrcp_byport_disable.raw[((port_phys/16)&3)]);
     }
     return CLI_OK;
 }

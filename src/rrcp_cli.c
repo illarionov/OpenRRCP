@@ -194,7 +194,7 @@ int main(int argc, char *argv[])
     }
 
 
-    engage_timeout(100);
+    engage_timeout(10);
     if (authkey_tmp>=0){
 	authkey=authkey_tmp;
     }

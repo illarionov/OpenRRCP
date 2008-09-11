@@ -840,7 +840,7 @@ void print_usage(void){
 	printf("       rtl83xx_dlink_des1024d_d1 ----\"\"----\n");
 	printf("       rtl83xx_compex_ps2216 ----\"\"----\n");
 	printf("       rtl83xx_compex_ps2216_6d ----\"\"----\n");
-	printf("       rtl83xx_compex_ps2216_6dp ----\"\"----\n");
+	printf("       rtl83xx_compex_ps2216_6e ----\"\"----\n");
         printf("       rtl83xx_ovislink_fsh2402gt ----\"\"----\n");
 	printf("       rtl83xx_zyxel_es116p ----\"\"----\n");
 	printf("       rtl83xx_compex_sds1224 ----\"\"----\n");
@@ -977,7 +977,7 @@ int main(int argc, char **argv){
 	switchtype=11;
     }else if (strstr(p,"rtl83xx_compex_ps2216_6d")==argv[0]+strlen(argv[0])-24){
 	switchtype=12;
-    }else if (strstr(p,"rtl83xx_compex_ps2216_6dp")==argv[0]+strlen(argv[0])-25){
+    }else if (strstr(p,"rtl83xx_compex_ps2216_6e")==argv[0]+strlen(argv[0])-25){
 	switchtype=13;
     }else if (strstr(p,"rtl83xx_asus_gigax_1024p")==argv[0]+strlen(argv[0])-24){
 	switchtype=14;

@@ -66,17 +66,50 @@ int cmd_set_eeprom_register(struct cli_def *cli, char *command, char *argv[], in
 	    if (argc==1){
         	cli_print(cli, "  <0-fff> Specify EEPROM register number (hex)");
 	    }else if (argc==2){
-        	cli_print(cli, "  <0-ffff> Specify EEPROM register value (hex)");
+        	cli_print(cli, "  <0-ff> Specify EEPROM register value (hex)");
 	    }
         }else if (argc==2){
             int regno,regval;
             if (sscanf(argv[0],"%x",&regno)==1){
         	if (sscanf(argv[1],"%x",&regval)==1){
             	    if (eeprom_write(regno,regval)==0){
-                	cli_print(cli, "%% INFO: EEPROM register 0x%04x is not set to0x%02x",regno,regval);
+                	cli_print(cli, "%% INFO: EEPROM register 0x%04x is now set to 0x%02x",regno,regval);
             	    }else{
                 	cli_print(cli, "%% ERROR: Can't access EEPROM register 0x%04x.",regno);
             	    }
+        	}else{
+            	    cli_print(cli, "%% ERROR: Invalig register value: '%s'.",argv[1]);
+		    return CLI_ERROR;
+        	}
+            }else{
+                cli_print(cli, "%% ERROR: Invalig register number: '%s'.",argv[0]);
+		return CLI_ERROR;
+            }
+        }else{
+	    cli_print(cli, "%% ERROR: Register number and/or value not specified.");
+	    return CLI_ERROR;
+	}
+        return CLI_OK;
+    }
+    cli_print(cli, "%% ERROR: Invalid input detected.");
+    return CLI_ERROR;
+}
+
+int cmd_set_switch_register(struct cli_def *cli, char *command, char *argv[], int argc)
+{
+    if (argc<3){
+        if (strstr(argv[argc-1],"?")!=NULL){
+	    if (argc==1){
+        	cli_print(cli, "  <0-fff> Specify switch controller register number (hex)");
+	    }else if (argc==2){
+        	cli_print(cli, "  <0-ffff> Specify switch controller register value (hex)");
+	    }
+        }else if (argc==2){
+            int regno,regval;
+            if (sscanf(argv[0],"%x",&regno)==1){
+        	if (sscanf(argv[1],"%x",&regval)==1){
+            	    rtl83xx_setreg16(regno,regval);
+            	    cli_print(cli, "%% INFO: Switch controller register 0x%04x is now set to 0x%04x",regno,regval);
         	}else{
             	    cli_print(cli, "%% ERROR: Invalig register value: '%s'.",argv[1]);
 		    return CLI_ERROR;
@@ -244,6 +277,7 @@ void cmd_other_register_commands(struct cli_def *cli)
     {
 	c = cli_register_command(cli, NULL, "set", NULL,  PRIVILEGE_PRIVILEGED, MODE_EXEC, "Set various low-level registers");
 	cli_register_command(cli, c, "eeprom-register", cmd_set_eeprom_register, PRIVILEGE_PRIVILEGED, MODE_EXEC, "Set single EEPROM register");
+	cli_register_command(cli, c, "switch-register", cmd_set_switch_register, PRIVILEGE_PRIVILEGED, MODE_EXEC, "Set single switch controller register");
     }
 
     {

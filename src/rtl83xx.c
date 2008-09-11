@@ -1005,8 +1005,12 @@ int main(int argc, char **argv){
 	for (i=0;i<6;i++){
 	    dest_mac[i]=(unsigned char)x[i];
 	}
-    }else{
+    }else if (argc>=2 && strcmp(argv[2],"scan")==0){
 	strcpy(ifname,argv[1]);
+    }else{
+	printf("%s: malformed switch reference: '%s'\n",argv[0],argv[1]);
+	printf("Usage: rtl8316b [[authkey-]xx:xx:xx:xx:xx:xx@]if-name <command> [<argument>]\n");
+	exit(0);	
     }
 
     if (if_nametoindex(ifname)<=0){
@@ -1014,11 +1018,13 @@ int main(int argc, char **argv){
 	exit(0);
     }
 
-    printf("! rtl83xx: trying to reach %d-port \"%s %s\" switch at %s\n",
+    if (argc<2 || strcmp(argv[2],"scan")!=0){
+	printf("! rtl83xx: trying to reach %d-port \"%s %s\" switch at %s\n",
 	    switchtypes[switchtype].num_ports,
 	    switchtypes[switchtype].vendor,
 	    switchtypes[switchtype].model,
 	    argv[1]);
+    }
 
     engage_timeout(30);
     if (rtl83xx_prepare()){ printf("%s\n",ErrIOMsg); exit(1);}

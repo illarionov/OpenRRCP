@@ -1,3 +1,8 @@
+Thu Sep 11 23:28:07 CEST 2008
+        * Add "set switch-register" command to rrcpcli
+        * Fix commiting config to hardware in rrcpcli
+        * rename compex_ps2216_6dp to compex_ps2216_6e
+
 Thu Sep 11 20:24:56 CEST 2008
         * Add "set eeprom-register" command to rrcpcli
         * Rewrite EEPROM size autodetect

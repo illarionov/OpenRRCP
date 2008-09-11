@@ -63,6 +63,7 @@ int cmd_config_mac_aging(struct cli_def *cli, char *command, char *argv[], int a
 	    cli_print(cli, "  <12|300>   Aging time in seconds");
 	}else if (strcmp(argv[0],"0")==0){
 	    swconfig.alt_config.s.config.mac_aging_disable=1;
+	    swconfig.alt_config.s.config.mac_aging_fast=0;
 	}else if (strcmp(argv[0],"12")==0){
 	    swconfig.alt_config.s.config.mac_aging_disable=0;
 	    swconfig.alt_config.s.config.mac_aging_fast=1;
@@ -71,7 +72,9 @@ int cmd_config_mac_aging(struct cli_def *cli, char *command, char *argv[], int a
 	    swconfig.alt_config.s.config.mac_aging_fast=0;
 	}else{
 	    cli_print(cli, "%% Invalid aging time '%s', can be only 0,12 or 300.",argv[0]);
+	    return CLI_ERROR;
 	}
+	rtl83xx_setreg16(0x0300,swconfig.alt_config.raw);
     }
     return CLI_OK;
 }
@@ -248,6 +251,7 @@ int cmd_config_vlan_leaky(struct cli_def *cli, char *command, char *argv[], int 
 	if (strcasecmp(command,"no vlan leaky multicast")==0) swconfig.vlan.s.config.multicast_leaky=0;
 	if (strcasecmp(command,"vlan leaky unicast")==0) swconfig.vlan.s.config.unicast_leaky=1;
 	if (strcasecmp(command,"no vlan leaky unicast")==0) swconfig.vlan.s.config.unicast_leaky=0;
+	rtl83xx_setreg16(0x030b,swconfig.vlan.raw[0]);
     }
     return CLI_OK;
 }
@@ -265,6 +269,7 @@ int cmd_config_vlan_drop(struct cli_def *cli, char *command, char *argv[], int a
 	if (strcasecmp(command,"no vlan drop untagged_frames")==0) swconfig.vlan.s.config.drop_untagged_frames=0;
 	if (strcasecmp(command,"vlan drop invalid_vid")==0) swconfig.vlan.s.config.ingress_filtering=1;
 	if (strcasecmp(command,"no vlan drop invalid_vid")==0) swconfig.vlan.s.config.ingress_filtering=0;
+	rtl83xx_setreg16(0x030b,swconfig.vlan.raw[0]);
     }
     return CLI_OK;
 }

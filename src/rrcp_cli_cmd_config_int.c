@@ -270,6 +270,7 @@ int cmd_rate_limit(struct cli_def *cli, char *command, char *argv[], int argc)
 	}else{
 	    swconfig.bandwidth.rxtx[port_phys].tx=rate;
 	}
+	rtl83xx_setreg16(0x020a+((port_phys/2)&0x0f),swconfig.bandwidth.raw[((port_phys/2)&0x0f)]);
     }
     return CLI_OK;
 }
@@ -286,13 +287,16 @@ int cmd_config_int_mac_learning(struct cli_def *cli, char *command, char *argv[]
 	int port,port_phys;
 	port=atoi(strrchr(cli->modestring,'/')+1);
 	port_phys=map_port_number_from_logical_to_physical(port);
-	if (strcasecmp(command,"mac-learn disable")==0)
+	if (strcasecmp(command,"mac-learn disable")==0) {
 	    swconfig.alt_mask.mask |= (1<<port_phys);
-	else if ((strcasecmp(command,"mac-learn enable")==0)||
-	         (strcasecmp(command,"no mac-learn disable")==0))
+	} else if ((strcasecmp(command,"mac-learn enable")==0)||
+	         (strcasecmp(command,"no mac-learn disable")==0)) {
 	    swconfig.alt_mask.mask &= (~(1<<port_phys));
-	else
+	} else {
 	    cli_print(cli, "Internal error on command '%s'",command);
+	    return CLI_ERROR;
+	}
+	rtl83xx_setreg16(0x0301+((port_phys/16)&3),swconfig.alt_mask.raw[((port_phys/16)&3)]);
     }
     return CLI_OK;
 }
@@ -309,12 +313,14 @@ int cmd_config_int_rrcp(struct cli_def *cli, char *command, char *argv[], int ar
 	int port,port_phys;
 	port=atoi(strrchr(cli->modestring,'/')+1);
 	port_phys=map_port_number_from_logical_to_physical(port);
-	if (strcasecmp(command,"rrcp enable")==0)
+	if (strcasecmp(command,"rrcp enable")==0) {
 	    swconfig.rrcp_byport_disable.bitmap &= (~(1<<port_phys));
-	else if (strcasecmp(command,"no rrcp enable")==0)
+	} else if (strcasecmp(command,"no rrcp enable")==0) {
 	    swconfig.rrcp_byport_disable.bitmap |= (1<<port_phys);
-	else
+	} else {
 	    cli_print(cli, "Internal error on command '%s'",command);
+	    return CLI_ERROR;
+	}
 	rtl83xx_setreg16(0x0201+((port_phys/16)&3),swconfig.rrcp_byport_disable.raw[((port_phys/16)&3)]);
     }
     return CLI_OK;
@@ -423,10 +429,13 @@ int cmd_config_int_speed_duplex(struct cli_def *cli, char *command, char *argv[]
 		}
 	    }else{
 		cli_print(cli, "Internal error on command '%s'",command);
+		return CLI_ERROR;
 	    }
 	}else{
 	    cli_print(cli, "Internal error on command '%s'",command);
+	    return CLI_ERROR;
 	}
+	rtl83xx_setreg16(0x060a+((port_phys/2)&0xf),swconfig.port_config.raw[((port_phys/2)&0xf)]);
     }
     return CLI_OK;
 }

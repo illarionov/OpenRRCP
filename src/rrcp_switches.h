@@ -38,6 +38,8 @@ struct switchtype_t {
 	char		*vendor;
 	char		*model;
 	char		*hw_rev;
+	uint32_t	r_vendor_id[3];	
+	uint16_t	r_chip_id;
 	char		*chip_name;
 	unsigned int	chip_id;
 	unsigned int	num_ports;

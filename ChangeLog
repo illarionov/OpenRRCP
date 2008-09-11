@@ -1,4 +1,14 @@
+Thu Sep 11 20:24:56 CEST 2008
+        * Add "set eeprom-register" command to rrcpcli
+        * Rewrite EEPROM size autodetect
+        * Fix manual specifying switch type in rrcpcli with "-t<X> -f"
+        * Fix register 0x217 write mask - avoids bogus warnings while
+          accessing EEPROM
+        * Fix EEPROM waiting loop - should make "write memory" working
+        * Avoid detecting switch twice
+        
 ------------------------ OpenRRCP 0.2.1 ---------------------------------------
+
 Tue Jun  3 04:14:46 CEST 2008
         * Fix switch/chip autodetection
         * Don't touch registers, not present on current chip in order to not issue warnings

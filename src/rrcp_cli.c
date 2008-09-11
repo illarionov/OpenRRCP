@@ -202,7 +202,17 @@ int main(int argc, char *argv[])
         printf("%s\n",ErrIOMsg); 
         exit(1);
     }
-    rrcp_autodetect_switch_chip_eeprom(&swconfig.switch_type, &swconfig.chip_type, &swconfig.eeprom_type);
+    if (!switchtype_force){
+	rrcp_autodetect_switch_chip_eeprom(&swconfig.switch_type, &swconfig.chip_type, &swconfig.eeprom_type);	
+    }else{
+	swconfig.switch_type=switchtype;
+	swconfig.chip_type=switchtypes[switchtype].chip_id;
+	if (swconfig.chip_type==rtl8326){
+	    swconfig.eeprom_type=EEPROM_NONE;
+	}else{
+	    swconfig.eeprom_type=EEPROM_2416;
+	}
+    }
 
     // preset counters types
     {

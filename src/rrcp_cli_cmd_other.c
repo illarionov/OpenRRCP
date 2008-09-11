@@ -59,6 +59,42 @@ int cmd_write_memory(struct cli_def *cli, char *command, char *argv[], int argc)
     return CLI_OK;
 }
 
+int cmd_set_eeprom_register(struct cli_def *cli, char *command, char *argv[], int argc)
+{
+    if (argc<3){
+        if (strstr(argv[argc-1],"?")!=NULL){
+	    if (argc==1){
+        	cli_print(cli, "  <0-fff> Specify EEPROM register number (hex)");
+	    }else if (argc==2){
+        	cli_print(cli, "  <0-ffff> Specify EEPROM register value (hex)");
+	    }
+        }else if (argc==2){
+            int regno,regval;
+            if (sscanf(argv[0],"%x",&regno)==1){
+        	if (sscanf(argv[1],"%x",&regval)==1){
+            	    if (eeprom_write(regno,regval)==0){
+                	cli_print(cli, "%% INFO: EEPROM register 0x%04x is not set to0x%02x",regno,regval);
+            	    }else{
+                	cli_print(cli, "%% ERROR: Can't access EEPROM register 0x%04x.",regno);
+            	    }
+        	}else{
+            	    cli_print(cli, "%% ERROR: Invalig register value: '%s'.",argv[1]);
+		    return CLI_ERROR;
+        	}
+            }else{
+                cli_print(cli, "%% ERROR: Invalig register number: '%s'.",argv[0]);
+		return CLI_ERROR;
+            }
+        }else{
+	    cli_print(cli, "%% ERROR: Register number and/or value not specified.");
+	    return CLI_ERROR;
+	}
+        return CLI_OK;
+    }
+    cli_print(cli, "%% ERROR: Invalid input detected.");
+    return CLI_ERROR;
+}
+
 int cmd_copy_running_config(struct cli_def *cli, char *command, char *argv[], int argc)
 {
     if (argc>0){
@@ -157,7 +193,7 @@ int cmd_copy_eeprom(struct cli_def *cli, char *command, char *argv[], int argc)
 	    if (strncmp(argv[0], "file:",5)==0){
 		s=argv[0]+5;
 		if ((f=fopen(s,"w"))!=NULL){
-		    for (i=0;i<2048;i++){
+		    for (i=0;i<eeprom_type_size[swconfig.eeprom_type];i++){
 			if ((i % 32)==0){
 			    fprintf(cli->client, "%% %4d bytes read from EEPROM.\r", i);
 			}
@@ -204,6 +240,11 @@ void cmd_other_register_commands(struct cli_def *cli)
     c = cli_register_command(cli, NULL, "write", NULL,  PRIVILEGE_PRIVILEGED, MODE_EXEC, "Write running configuration to memory or terminal");
     cli_register_command(cli, c, "memory", cmd_write_memory, PRIVILEGE_PRIVILEGED, MODE_EXEC, "Write to NV memory");
     cli_register_command(cli, c, "terminal", cmd_write_terminal, PRIVILEGE_PRIVILEGED, MODE_EXEC, "Write to terminal");
+
+    {
+	c = cli_register_command(cli, NULL, "set", NULL,  PRIVILEGE_PRIVILEGED, MODE_EXEC, "Set various low-level registers");
+	cli_register_command(cli, c, "eeprom-register", cmd_set_eeprom_register, PRIVILEGE_PRIVILEGED, MODE_EXEC, "Set single EEPROM register");
+    }
 
     {
 	c = cli_register_command(cli, NULL, "copy", cmd_copy,  PRIVILEGE_PRIVILEGED, MODE_EXEC, "Copy from one file to another");

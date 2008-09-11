@@ -64,7 +64,7 @@ uint32_t registers_mask_unknown[]={
   0x206,    0x0000,    0x00ff,1,
   0x207,    0x0000,    0xffff,2,
   0x209,    0xffff,    0xffff,14,
-  0x217,    0x3fff,    0x3fff,1,
+  0x217,    0x0fff,    0x3fff,1,
   0x218,    0x00ff,    0xffff,1,
   0x219,    0xffff,    0xffff,1,
   0x21a,    0x00ff,    0x03ff,1,
@@ -350,7 +350,7 @@ uint32_t registers_mask_rtl8316b[]={
   0x206,    0x0000,    0x00ff,1,
   0x207,    0x0000,    0xffff,2,
   0x209,    0xffff,    0xffff,9,
-  0x217,    0x3fff,    0x3fff,1,
+  0x217,    0x0fff,    0x3fff,1,
   0x218,    0x00ff,    0xffff,1,
   0x219,    0xffff,    0xffff,1,
   0x21b,    0xffff,    0xffff,1,
@@ -470,7 +470,7 @@ uint32_t registers_mask_rtl8318[]={
   0x207,    0x0000,    0xffff,2,
   0x209,    0xffff,    0xffff,9,
   0x215,    0xffff,    0xffff,1,
-  0x217,    0x3fff,    0x3fff,1,
+  0x217,    0x0fff,    0x3fff,1,
   0x218,    0x00ff,    0xffff,1,
   0x219,    0xffff,    0xffff,1,
   0x21a,    0x00c0,    0x00c0,1,
@@ -628,7 +628,7 @@ uint32_t registers_mask_rtl8324[]={
   0x206,    0x0000,    0x00ff,1,
   0x207,    0x0000,    0xffff,2,
   0x209,    0xffff,    0xffff,13,
-  0x217,    0x3fff,    0x3fff,1,
+  0x217,    0x0fff,    0x3fff,1,
   0x218,    0x00ff,    0xffff,1,
   0x219,    0xffff,    0xffff,1,
   0x21a,    0x00ff,    0x00ff,1,
@@ -1262,9 +1262,8 @@ uint16_t rrcp_autodetect_switch_chip_eeprom(uint8_t *switch_type, uint8_t *chip_
     uint16_t detected_switchtype=-1;
     uint16_t detected_chiptype=unknown;
     t_eeprom_type detected_eeprom=EEPROM_NONE;
-    int i,errcnt=0;
-    uint8_t test1[6];
-    uint8_t test2[4]={0x0,0x55,0xaa,0xff};
+    int i,j,errcnt=0;
+    uint8_t test3[4]={0x0,0x55,0xaa,0xff};
     uint8_t port_count;
 
     // step 1: detect number of ports
@@ -1280,27 +1279,33 @@ uint16_t rrcp_autodetect_switch_chip_eeprom(uint8_t *switch_type, uint8_t *chip_
 
     // step 2: detect EEPROM presence and size
     if (switchtype>0){
-	for(i=0;i<6;i++){
-	    if ((errcnt=eeprom_read(0x12+i,&test1[i]))!=0){break;}
+	uint8_t mac_and_ids[12];
+
+	for(i=0;i<12;i++){
+	    if ((errcnt=eeprom_read(0x12+i,&mac_and_ids[i]))!=0){break;}
 	}
-	if (errcnt==0){
-	    if (!eeprom_read(0x7f,&test1[0])){
-		detected_eeprom=EEPROM_2401;
-		if (!eeprom_read(0xff,&test1[0])){
-		    detected_eeprom=EEPROM_2402;
-		    if (!eeprom_read(0x1ff,&test1[0])){
-			detected_eeprom=EEPROM_2404;
-			if (!eeprom_read(0x3ff,&test1[0])){
-			    detected_eeprom=EEPROM_2408;
-			    if (!eeprom_read(0x7ff,&test1[0])){
-				detected_eeprom=EEPROM_2416;
-			    }
-			}
-		    }
+	if (errcnt==0){ // read ok, now let's test it for re-occurencies
+	    int flag=0;
+	    uint8_t t;
+	    int eeprom_offset[5]={0x0,0x80,0x100,0x200,0x400};
+
+	    detected_eeprom=EEPROM_2416; //if next test will run clear, than eeprom is 2416
+	    for (i=1;i<5;i++){
+		for(j=0;j<12;j++){
+		    if ((eeprom_read(eeprom_offset[i]+0x12+j,&t))!=0){flag=1;break;}
+		    if (t!=mac_and_ids[j]){flag=0;break;}
 		}
-	    }else{
-		detected_eeprom=EEPROM_WRITEPOTECTED;
+		if (j==12){ //mac+id's pattern repeats, meaning eeprom is smaller
+		    detected_eeprom=EEPROM_2401+i-1;
+		    break;
+		}
+		if (flag==1){ //eeprom read failed, meaning eeprom is smaller
+		    detected_eeprom=EEPROM_2401+i-1;
+		    break;
+		}
 	    }
+	}else{
+	    detected_eeprom=EEPROM_NONE;
 	}
     }else{
 	detected_eeprom=EEPROM_NONE;
@@ -1309,8 +1314,8 @@ uint16_t rrcp_autodetect_switch_chip_eeprom(uint8_t *switch_type, uint8_t *chip_
     // step 3: check for registers, absent on rtl8326
     saved_reg=rtl83xx_readreg16(0x0218);
     for(i=0;i<4;i++){
-	rtl83xx_setreg16(0x0218,test2[i]);
-	if ((rtl83xx_readreg16(0x0218) & 0xff) != test2[i]) {
+	rtl83xx_setreg16(0x0218,test3[i]);
+	if ((rtl83xx_readreg16(0x0218) & 0xff) != test3[i]) {
 	    errcnt++; 
 	    break;
 	}

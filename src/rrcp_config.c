@@ -42,7 +42,7 @@ void rrcp_config_read_from_switch(void)
 {
     int i;
 
-    rrcp_autodetect_switch_chip_eeprom(&swconfig.switch_type, &swconfig.chip_type, &swconfig.eeprom_type);
+//    rrcp_autodetect_switch_chip_eeprom(&swconfig.switch_type, &swconfig.chip_type, &swconfig.eeprom_type);
     rrcp_io_probe_switch_for_facing_switch_port(swconfig.mac_address,&swconfig.facing_switch_port_phys);
 
     swconfig.rrcp_config.raw=rtl83xx_readreg16(0x0200);
@@ -348,6 +348,7 @@ void do_show_config(int verbose)
     char *text;
 
     text=malloc(65536);
+    rrcp_autodetect_switch_chip_eeprom(&swconfig.switch_type, &swconfig.chip_type, &swconfig.eeprom_type);
     rrcp_config_read_from_switch();
     rrcp_config_bin2text(text,65535,verbose);
     printf("%s",text);
@@ -403,6 +404,7 @@ void rrcp_config_write_to_eeprom(void)
     int i,numreg;
 
     numreg=(switchtypes[switchtype].num_ports==16)?12:13;
+    rrcp_autodetect_switch_chip_eeprom(&swconfig.switch_type, &swconfig.chip_type, &swconfig.eeprom_type);
     rrcp_config_read_from_switch();
     if (eeprom_write(0x0d,swconfig.rrcp_config.raw)) {printf("write eeprom\n");exit(1);}
     if (eeprom_write(0x0f,swconfig.rrcp_byport_disable.raw[0])) {printf("write eeprom\n");exit(1);}

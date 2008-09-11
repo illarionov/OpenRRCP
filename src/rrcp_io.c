@@ -726,10 +726,10 @@ int wait_eeprom(){
     int i;
     uint16_t res;
 
-    for(i=0;i<=15;i++){
+    for(i=1;i<=20;i++){
 	res=rtl83xx_readreg16(0x217);
 	if ((res&0x1000) == 0) return(res);
-	usleep(1000+2000*i);
+	usleep(7500*i);
     }
     return(0xffff);
 }
@@ -860,7 +860,7 @@ void do_write_eeprom_all(int mode){
      addr=(uint16_t)switchtypes[switchtype].reg2eeprom[i+1]+k*2;
      if ( eeprom_write(addr,(uint8_t)(data&0x00ff)) ||
           eeprom_write(++addr,(uint8_t)(data>>8))  ) {
-       printf("Can't write register N0x%04x to EEPROM 0x%03x\n",switchtypes[switchtype].reg2eeprom[i]+k,addr);
+       printf("Can't write register 0x%04x to EEPROM 0x%03x\n",switchtypes[switchtype].reg2eeprom[i]+k,addr);
        exit(1);
      }
      // else printf("Success write register N0x%04x to EEPROM 0x%03x-0x%03x value 0x%04x\n",switchtypes[switchtype].reg2eeprom[i]+k,addr-1,addr,data);

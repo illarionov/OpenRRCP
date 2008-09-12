@@ -977,7 +977,7 @@ int main(int argc, char **argv){
 	switchtype=11;
     }else if (strstr(p,"rtl83xx_compex_ps2216_6d")==argv[0]+strlen(argv[0])-24){
 	switchtype=12;
-    }else if (strstr(p,"rtl83xx_compex_ps2216_6e")==argv[0]+strlen(argv[0])-25){
+    }else if (strstr(p,"rtl83xx_compex_ps2216_6e")==argv[0]+strlen(argv[0])-24){
 	switchtype=13;
     }else if (strstr(p,"rtl83xx_asus_gigax_1024p")==argv[0]+strlen(argv[0])-24){
 	switchtype=14;

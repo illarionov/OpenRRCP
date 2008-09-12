@@ -84,7 +84,7 @@ diff -urP tcpdump-3.9.8/print-ether.c tcpdump-3.9.8-my/print-ether.c
 diff -urP tcpdump-3.9.8/print-rrcp.c tcpdump-3.9.8-my/print-rrcp.c
 --- tcpdump-3.9.8/print-rrcp.c	1970-01-01 03:00:00.000000000 +0300
 +++ tcpdump-3.9.8-my/print-rrcp.c	2007-11-12 00:00:47.000000000 +0300
-@@ -0,0 +1,137 @@
+@@ -0,0 +1,139 @@
 +/*
 + * Copyright (c) 2007 - Andrey "nording" Chernyak <andrew@nording.ru>
 + *
@@ -222,7 +222,7 @@ diff -urP tcpdump-3.9.8/print-rrcp.c tcpdump-3.9.8-my/print-rrcp.c
 +		    rrcp->cookie2, rrcp->cookie1));
 +	}
 +        if (!ndo->ndo_vflag)
-+            return;
++              return;
 +}
 diff -urP tcpdump-3.9.8/win32/prj/GNUmakefile tcpdump-3.9.8-my/win32/prj/GNUmakefile
 --- tcpdump-3.9.8/win32/prj/GNUmakefile	2007-09-26 05:59:54.000000000 +0400

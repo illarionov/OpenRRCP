@@ -1,3 +1,6 @@
+Fri Sep 12 23:38:42 CEST 2008
+        * Fix register to eeprom mapping for compex px2216b hw rev. 6e
+
 Thu Sep 11 23:28:07 CEST 2008
         * Add "set switch-register" command to rrcpcli
         * Fix commiting config to hardware in rrcpcli

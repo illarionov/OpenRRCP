@@ -858,10 +858,15 @@ void do_write_eeprom_all(int mode){
        }
      }
      addr=(uint16_t)switchtypes[switchtype].reg2eeprom[i+1]+k*2;
+//    printf("0x%04x -> 0x%04x\n",switchtypes[switchtype].reg2eeprom[i]+k,addr);
      if ( eeprom_write(addr,(uint8_t)(data&0x00ff)) ||
-          eeprom_write(++addr,(uint8_t)(data>>8))  ) {
+          eeprom_write(addr+1,(uint8_t)(data>>8))  ) {
+      usleep(100000);
+      if ( eeprom_write(addr,(uint8_t)(data&0x00ff)) ||
+       eeprom_write(addr+1,(uint8_t)(data>>8))  ) {
        printf("Can't write register 0x%04x to EEPROM 0x%03x\n",switchtypes[switchtype].reg2eeprom[i]+k,addr);
        exit(1);
+      }
      }
      // else printf("Success write register N0x%04x to EEPROM 0x%03x-0x%03x value 0x%04x\n",switchtypes[switchtype].reg2eeprom[i]+k,addr-1,addr,data);
    }

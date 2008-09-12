@@ -1159,7 +1159,7 @@ struct switchtype_t switchtypes[] = {
 	rtl8316bp,
 	16,
 	{16,13,11,9,7,5,3,1,15,14,12,10,8,6,4,2,0,0,0,0,0,0,0,0,0,0,0},
-        &reg2eeprom_rtl8316b_generic[0],
+        &reg2eeprom_rtl8316bp_generic[0],
         &defregval_rtl8316b_generic[0]
     },
     {

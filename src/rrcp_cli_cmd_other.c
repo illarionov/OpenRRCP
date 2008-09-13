@@ -128,6 +128,54 @@ int cmd_set_switch_register(struct cli_def *cli, char *command, char *argv[], in
     return CLI_ERROR;
 }
 
+int cmd_set_phy_register(struct cli_def *cli, char *command, char *argv[], int argc)
+{
+    if (argc<4){
+        if (strstr(argv[argc-1],"?")!=NULL){
+	    if (argc==1){
+        	cli_print(cli, "  <1-32> Specify PHY port number (not remapped!)");
+	    }else if (argc==2){
+        	cli_print(cli, "  <0-31> Specify PHY register number");
+	    }else if (argc==3){
+        	cli_print(cli, "  <0-ffff> Specify PHY register value (hex)");
+	    }
+        }else if (argc==3){
+            int portno,regno,regval;
+            int phy_mapped_portno;
+            if (sscanf(argv[0],"%d",&portno)==1 || portno>32 || portno<1){
+        	if (sscanf(argv[1],"%d",&regno)==1 || regno>31 || regno<0){
+        	    if (sscanf(argv[2],"%x",&regval)==1 || regval>0xffff){
+			if (portno<=16){
+			    phy_mapped_portno=portno+15;
+			}else if (portno<=24){
+			    phy_mapped_portno=portno-9;
+			}else{
+			    phy_mapped_portno=portno-25;
+			}
+            		phy_write(phy_mapped_portno,regno,regval);
+            		cli_print(cli, "%% INFO: PHY port %d (phy_addr=%d), register %d is now set to 0x%04x",portno,phy_mapped_portno,regno,regval);
+        	    }else{
+        		cli_print(cli, "%% ERROR: Invalig register value: '%s'.",argv[0]);
+			return CLI_ERROR;
+		    }
+        	}else{
+        	    cli_print(cli, "%% ERROR: Invalig register number: '%s'.",argv[0]);
+		    return CLI_ERROR;
+		}
+            }else{
+                cli_print(cli, "%% ERROR: Invalig port number: '%s'.",argv[0]);
+		return CLI_ERROR;
+            }
+        }else{
+	    cli_print(cli, "%% ERROR: Port number, register number, or value are not specified.");
+	    return CLI_ERROR;
+	}
+        return CLI_OK;
+    }
+    cli_print(cli, "%% ERROR: Invalid input detected.");
+    return CLI_ERROR;
+}
+
 int cmd_copy_running_config(struct cli_def *cli, char *command, char *argv[], int argc)
 {
     if (argc>0){
@@ -278,6 +326,7 @@ void cmd_other_register_commands(struct cli_def *cli)
 	c = cli_register_command(cli, NULL, "set", NULL,  PRIVILEGE_PRIVILEGED, MODE_EXEC, "Set various low-level registers");
 	cli_register_command(cli, c, "eeprom-register", cmd_set_eeprom_register, PRIVILEGE_PRIVILEGED, MODE_EXEC, "Set single EEPROM register");
 	cli_register_command(cli, c, "switch-register", cmd_set_switch_register, PRIVILEGE_PRIVILEGED, MODE_EXEC, "Set single switch controller register");
+	cli_register_command(cli, c, "phy-register", cmd_set_phy_register, PRIVILEGE_PRIVILEGED, MODE_EXEC, "Set single PHY chip register");
     }
 
     {

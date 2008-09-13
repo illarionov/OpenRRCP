@@ -612,7 +612,7 @@ int rtl83xx_readreg32_(uint16_t regno,uint32_t *regval){
     pkt.cookie1=rand();
     pkt.cookie2=rand();
 
-    for(i=0;i<7;i++){
+    for(i=0;i<30;i++){
         if (sock_send_(&pkt, sizeof(pkt)) < 0) return(1);
 	usleep(100+5000*i);
 	memset(&pktr,0,sizeof(pktr));
@@ -778,22 +778,33 @@ int phy_wait(){
     uint16_t res;
 
     for(i=0;i<10;i++){
-    res=rtl83xx_readreg16(0x500);
-    if ((res&0x8000) == 0) return(res);
-	usleep(5000);
+	res=rtl83xx_readreg16(0x500);
+	if ((res&0x8000) == 0) return(res);
+	    usleep(5000);
     }
     return(0xffff);
 }
 
-int phy_read(uint16_t phy_number,uint8_t phy_reg, uint16_t *data){
+int phy_read(uint16_t phy_portno, uint8_t phy_regno, uint16_t *data){
     uint16_t tmp;
 
-    rtl83xx_setreg16(0x500,((phy_number&0x01f)<<5)|(phy_reg&0x01f));
+    rtl83xx_setreg16(0x500,((phy_portno&0x01f)<<5)|(phy_regno&0x01f));
     if ((phy_wait()&0x8000)!=0){
 	return 1;
     }
     tmp=rtl83xx_readreg16(0x502);
     data[0]=tmp;
+//    printf("PHY_READ(%d,%d)=0x%04x\n",phy_portno,phy_regno,(int)tmp);
+    return 0;
+}
+
+int phy_write(uint16_t phy_portno, uint8_t phy_regno, uint16_t data){
+//    printf("PHY_WRITE(%d,%d)=0x%04x\n",phy_portno,phy_regno,data);
+    rtl83xx_setreg16(0x501,data);
+    rtl83xx_setreg16(0x500,((phy_portno&0x01f)<<5)|(phy_regno&0x01f)|1<<14);
+    if ((phy_wait()&0x8000)!=0){
+	return 1;
+    }
     return 0;
 }
 

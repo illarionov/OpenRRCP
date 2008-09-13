@@ -1,3 +1,7 @@
+Sat Sep 13 19:48:05 CEST 2008
+        * Add cable tester to rrcpcli's "show interface"
+        * Add "set phy-register" command to rrcpcli
+
 Fri Sep 12 23:38:42 CEST 2008
         * Fix register to eeprom mapping for compex px2216b hw rev. 6e
 

@@ -72,7 +72,9 @@ int eeprom_write(uint16_t addr,uint8_t data);
 
 int eeprom_read(uint16_t addr,uint8_t *data);
 
-int phy_read(uint16_t phy_number,uint8_t phy_reg, uint16_t *data);
+int phy_read(uint16_t phy_portno, uint8_t phy_regno, uint16_t *data);
+
+int phy_write(uint16_t phy_portno, uint8_t phy_regno, uint16_t data);
 
 uint32_t rtl83xx_ping(void);
 

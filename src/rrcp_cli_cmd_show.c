@@ -25,6 +25,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 #include "../lib/libcli.h"
 #include "rrcp_cli.h"
 #include "rrcp_io.h"
@@ -139,6 +140,49 @@ int cmd_show_interfaces(struct cli_def *cli, char *command, char *argv[], int ar
 		(swconfig.port_disable.bitmap&(1<<port_phys)) ? "administratively down" : 
 		    (link_status.struc.link ? "up" : "down"),
 		link_status.struc.link ? "up (connected)" : "down (notconnect)");
+
+	    if (!link_status.struc.link){
+		// cable tester, works only with rtl8308b PHY chip
+		uint16_t t;
+		int i,tx,phy_mapped_portno;
+		int status[2],length[2];
+		char *status_desc[4] = {"normal","open","short","n/a"};
+
+		if (port_phys<16){
+		    phy_mapped_portno=(port_phys&0x8)+17;
+		}else if (port_phys<24){
+		    phy_mapped_portno=9;
+		}else{
+		    phy_mapped_portno=1;
+		}
+		phy_write(phy_mapped_portno, 24, 0x0780);
+		for (tx=0;tx<2;tx++){		
+		    phy_write(phy_mapped_portno, 29, 0x1d70+((tx&1)<<14));
+		    phy_write(phy_mapped_portno, 24, 0x0f80|(port_phys&0xf)<<13);	    
+		    for(i=1;i<=8;i++){
+			usleep(30000*i);
+			phy_read(phy_mapped_portno, 30, &t);
+			if ((t>>15)==1){
+			    status[tx]=(int)((t>>12) & 0x03);
+			    length[tx]=(int)(t & 0xff);
+			    break;
+			}
+			if (i>=10){
+			    status[tx]=3;
+			    length[tx]=0;			
+			}
+		    }
+		    phy_write(phy_mapped_portno, 24, 0x0780);
+		}
+		cli_print(cli, "  Cable status: rx is %s at %d.%d meters,"
+			       " tx is %s at %d.%d meters",
+			       status_desc[status[0]],
+			       length[0]>>2,
+			       (length[0]&3)*25,
+			       status_desc[status[1]],
+			       length[1]>>2,
+			       (length[1]&3)*25);
+	    }      	    	    
 	    if (link_status.struc.link){
 		cli_print(cli, "  %s, %sMb/s",
 		    link_status.struc.duplex ? "Full-duplex" : "Half-duplex",
@@ -251,23 +295,30 @@ int cmd_show_phy_register(struct cli_def *cli, char *command, char *argv[], int 
     if (argc==1){
 	if (strcmp(argv[0],"?")==0){
 	    cli_print(cli, "  |  Output modifiers");
-	    cli_print(cli, "  <2-3,8-31> Specify register number (dec)");
+	    cli_print(cli, "  1-32  Specify port number to display PHY registers");
 	}else{
-	    uint16_t regno,regval[4];
+	    uint16_t regval[4];
+	    int portno,phy_mapped_portno;
 	    int i,j;	    
 
 	    if (sscanf(argv[0],"%d",&i)==1){
-		regno=(uint16_t)i;
-		cli_print(cli, "  PHY number %d registers hex dump:",(int)regno);
-		cli_print(cli, "   +0x00  +0x08  +0x10  +0x18");
+		portno=i;
+		if (portno<=16){
+		    phy_mapped_portno=portno+15;
+		}else if (portno<=24){
+		    phy_mapped_portno=portno-9;
+		}else{
+		    phy_mapped_portno=portno-25;
+		}
+		cli_print(cli, "   Port %d (phy_addr=%d) PHY chip registers hex dump:",portno,phy_mapped_portno);
 		for(i=0;i<8;i++){
 		    for(j=0;j<4;j++){
-			if (phy_read(regno,i+j*8,&regval[j])!=0){
-			    cli_print(cli, "%% ERROR: Can't access PHY number %d, register %d(0x%02d)",regno,i+j*8,i+j*8);
+			if (phy_read(phy_mapped_portno,i+j*8,&regval[j])!=0){
+			    cli_print(cli, "%% ERROR: Can't access port %d (phy_addr=%d) PHY register %d(0x%02d)",portno,phy_mapped_portno,i+j*8,i+j*8);
 			    break;
 			}
 		    }
-		    cli_print(cli, "  0x%04x 0x%04x 0x%04x 0x%04x",(int)regval[0],(int)regval[1],(int)regval[2],(int)regval[3]);
+		    cli_print(cli, "%d: 0x%04x  %2d: 0x%04x  %d: 0x%04x  %d: 0x%04x",i,(int)regval[0],i+8,(int)regval[1],i+16,(int)regval[2],i+24,(int)regval[3]);
 		}
 	    }else{
 		cli_print(cli, "%% ERROR: Invalig register number: '%s'.",argv[0]);

@@ -955,36 +955,40 @@ int main(int argc, char **argv){
 	switchtype=0;
     }else if (strstr(p,"rtl8316b")==argv[0]+strlen(argv[0])-8){
 	switchtype=1;
-    }else if (strstr(p,"rtl8318")==argv[0]+strlen(argv[0])-8){
+    }else if (strstr(p,"rtl8316bp")==argv[0]+strlen(argv[0])-8){
 	switchtype=2;
-    }else if (strstr(p,"rtl8324")==argv[0]+strlen(argv[0])-7){
+    }else if (strstr(p,"rtl8318")==argv[0]+strlen(argv[0])-8){
 	switchtype=3;
-    }else if (strstr(p,"rtl83xx_dlink_des1016d")==argv[0]+strlen(argv[0])-22){
+    }else if (strstr(p,"rtl8324")==argv[0]+strlen(argv[0])-7){
 	switchtype=4;
-    }else if (strstr(p,"rtl83xx_dlink_des1024d_b1")==argv[0]+strlen(argv[0])-25){
+    }else if (strstr(p,"rtl8324p")==argv[0]+strlen(argv[0])-7){
 	switchtype=5;
-    }else if (strstr(p,"rtl83xx_dlink_des1024d_c1")==argv[0]+strlen(argv[0])-25){
-	switchtype=6;
-    }else if (strstr(p,"rtl83xx_compex_ps2216")==argv[0]+strlen(argv[0])-21){
-	switchtype=7;
-    }else if (strstr(p,"rtl83xx_ovislink_fsh2402gt")==argv[0]+strlen(argv[0])-26){
-	switchtype=8;
-    }else if (strstr(p,"rtl83xx_zyxel_es116p")==argv[0]+strlen(argv[0])-20){ 
-        switchtype=9; 
-    }else if (strstr(p,"rtl83xx_compex_sds1224")==argv[0]+strlen(argv[0])-22){
-	switchtype=10;
-    }else if (strstr(p,"rtl83xx_signamax_065-7531a")==argv[0]+strlen(argv[0])-26){
-	switchtype=11;
-    }else if (strstr(p,"rtl83xx_compex_ps2216_6d")==argv[0]+strlen(argv[0])-24){
-	switchtype=12;
-    }else if (strstr(p,"rtl83xx_compex_ps2216_6e")==argv[0]+strlen(argv[0])-24){
-	switchtype=13;
     }else if (strstr(p,"rtl83xx_asus_gigax_1024p")==argv[0]+strlen(argv[0])-24){
-	switchtype=14;
-    }else if (strstr(p,"rtl83xx_repotec_g3224x")==argv[0]+strlen(argv[0])-22){
-	switchtype=15;
+	switchtype=6;
+    }else if (strstr(p,"rtl83xx_compex_sds1224")==argv[0]+strlen(argv[0])-22){
+	switchtype=7;
+    }else if (strstr(p,"rtl83xx_compex_ps2216")==argv[0]+strlen(argv[0])-21){
+	switchtype=8;
+    }else if (strstr(p,"rtl83xx_compex_ps2216_6d")==argv[0]+strlen(argv[0])-24){
+	switchtype=9;
+    }else if (strstr(p,"rtl83xx_compex_ps2216_6e")==argv[0]+strlen(argv[0])-24){
+	switchtype=10;
+    }else if (strstr(p,"rtl83xx_dlink_des1016d")==argv[0]+strlen(argv[0])-22){
+	switchtype=11;
+    }else if (strstr(p,"rtl83xx_dlink_des1024d_b1")==argv[0]+strlen(argv[0])-25){
+	switchtype=12;
+    }else if (strstr(p,"rtl83xx_dlink_des1024d_c1")==argv[0]+strlen(argv[0])-25){
+	switchtype=13;
     }else if (strstr(p,"rtl83xx_edimax_es-3116p")==argv[0]+strlen(argv[0])-23){
+	switchtype=14;
+    }else if (strstr(p,"rtl83xx_ovislink_fsh2402gt")==argv[0]+strlen(argv[0])-26){
+	switchtype=15;
+    }else if (strstr(p,"rtl83xx_repotec_g3224x")==argv[0]+strlen(argv[0])-22){
 	switchtype=16;
+    }else if (strstr(p,"rtl83xx_signamax_065-7531a")==argv[0]+strlen(argv[0])-26){
+	switchtype=17;
+    }else if (strstr(p,"rtl83xx_zyxel_es116p")==argv[0]+strlen(argv[0])-20){ 
+        switchtype=18; 
     }else if (strcmp(argv[2],"scan")==0){ //allow scan command to be runt without specifying chip/switch
 	switchtype=0;
     }else {

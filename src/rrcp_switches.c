@@ -977,7 +977,7 @@ int defregval_rtl8324_generic[]={   // generic rtl8324 & rtl8324p
      -1,0,0
 };
 
-const uint32_t switchtype_n = 17;
+const uint32_t switchtype_n = 19;
 
 struct switchtype_t switchtypes[] = {
     {
@@ -1008,6 +1008,19 @@ struct switchtype_t switchtypes[] = {
     },
     {
 	"generic",
+	"rtl8316bp",
+	"unknown",
+	{0,0,0},
+	0,
+	"rtl8316bp",
+	rtl8316bp,
+	16,
+	{1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,0,0,0,0,0,0,0,0,0,0,0},
+        &reg2eeprom_rtl8316bp_generic[0],
+        &defregval_rtl8316b_generic[0]
+    },
+    {
+	"generic",
 	"rtl8318",
 	"unknown",
 	{0,0,0},
@@ -1031,6 +1044,84 @@ struct switchtype_t switchtypes[] = {
 	{1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,0,0,0},
         &reg2eeprom_rtl8324_generic[0],
         &defregval_rtl8324_generic[0]
+    },
+    {
+	"generic",
+	"rtl8324p",
+	"unknown",
+	{0,0,0},
+	0,
+	"rtl8324p",
+	rtl8324p,
+	24,
+	{1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,0,0,0},
+        &reg2eeprom_rtl8324p_generic[0],
+        &defregval_rtl8324_generic[0]
+    },
+    {
+	"asus",
+	"gigax_1024p",
+	"unknown",
+	{0,0,0},
+	0,
+	"rtl8326",
+	rtl8326,
+	26,
+	{2,1,4,3,6,5,8,7,10,9,12,11,14,13,16,15,18,17,20,19,22,21,24,23,25,26,0},
+        &reg2eeprom_rtl8326_generic[0],
+        &defregval_rtl8326_generic[0]
+    },
+    {
+	"compex",
+	"sds1224",
+	"unknown",
+	{0,0,0},
+	0,
+	"rtl8324",
+	rtl8324,
+	24,
+	{2,1,4,3,6,5,8,7,10,9,12,11,14,13,16,15,18,17,20,19,22,21,24,23,0,0,0},
+        &reg2eeprom_rtl8324_generic[0],
+        &defregval_rtl8324_generic[0]
+    },
+    {
+	"compex",
+	"ps2216",
+	"1x",
+	{0,0,0},
+	0,
+	"rtl8316b",
+	rtl8316b,
+	16,
+	{16,13,11,9,7,5,3,1,15,14,12,10,8,6,4,2,0,0,0,0,0,0,0,0,0,0,0},
+        &reg2eeprom_rtl8316b_generic[0],
+        &defregval_rtl8316b_generic[0]
+    },
+    {
+	"compex",
+	"ps2216-6d",
+	"6D",
+	{0x11f67003,0x11f67004,0},
+	0,
+	"rtl8316b",
+	rtl8316b,
+	16,
+	{16,13,11,9,7,5,3,1,15,14,12,10,8,6,4,2,0,0,0,0,0,0,0,0,0,0,0},
+        &reg2eeprom_ps2216_6d[0],
+        &defregval_rtl8316b_generic[0]
+    },
+    {
+	"compex",
+	"ps2216-6e",
+	"6E",
+	{0x11f67005,0,0},
+	0,
+	"rtl8316bp",
+	rtl8316bp,
+	16,
+	{16,13,11,9,7,5,3,1,15,14,12,10,8,6,4,2,0,0,0,0,0,0,0,0,0,0,0},
+        &reg2eeprom_rtl8316bp_generic[0],
+        &defregval_rtl8316b_generic[0]
     },
     {
 	"dlink",
@@ -1072,17 +1163,17 @@ struct switchtype_t switchtypes[] = {
         &defregval_rtl8324_generic[0]
     },
     {
-	"compex",
-	"ps2216",
+	"edimax",
+	"es-3116p",
 	"unknown",
 	{0,0,0},
 	0,
 	"rtl8316b",
 	rtl8316b,
 	16,
-	{16,13,11,9,7,5,3,1,15,14,12,10,8,6,4,2,0,0,0,0,0,0,0,0,0,0,0},
-        &reg2eeprom_rtl8316b_generic[0],
-        &defregval_rtl8316b_generic[0]
+	{16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0,0,0,0,0,0,0,0,0,0,0},
+	&reg2eeprom_rtl8316b_generic[0],
+	&defregval_rtl8316b_generic[0]
     },
     {
 	"ovislink",
@@ -1094,84 +1185,6 @@ struct switchtype_t switchtypes[] = {
 	rtl8326,
 	26,
 	{2,4,6,8,10,12,14,16,18,20,22,24,1,3,5,7,9,11,13,15,17,19,21,23,25,26,0},
-        &reg2eeprom_rtl8326_generic[0],
-        &defregval_rtl8326_generic[0]
-    },
-    {
-	"zyxel",
-	"es116p",
-	"unknown",
-	{0,0,0},
-	0,
-	"rtl8316b",
-	rtl8316b,
-	16,
-	{2,4,6,8,10,12,14,16,1,3,5,7,9,11,13,15,0,0,0,0,0,0,0,0,0,0,0},
-        &reg2eeprom_rtl8316b_generic[0],
-        &defregval_rtl8316b_generic[0]
-    },
-    {
-	"compex",
-	"sds1224",
-	"unknown",
-	{0,0,0},
-	0,
-	"rtl8324",
-	rtl8324,
-	24,
-	{2,1,4,3,6,5,8,7,10,9,12,11,14,13,16,15,18,17,20,19,22,21,24,23,0,0,0},
-        &reg2eeprom_rtl8324_generic[0],
-        &defregval_rtl8324_generic[0]
-    },
-    {
-	"signamax",
-	"065-7531a",
-	"unknown",
-	{0,0,0},
-	0,
-	"rtl8316b",
-	rtl8316b,
-	16,
-	{1,3,5,7,9,11,13,15,2,4,6,8,10,12,14,16,0,0,0,0,0,0,0,0,0,0,0},
-        &reg2eeprom_rtl8316b_generic[0],
-        &defregval_rtl8316b_generic[0]
-    },
-    {
-	"compex",
-	"ps2216-6d",
-	"6D",
-	{0x11f67003,0x11f67004,0},
-	0,
-	"rtl8316b",
-	rtl8316b,
-	16,
-	{16,13,11,9,7,5,3,1,15,14,12,10,8,6,4,2,0,0,0,0,0,0,0,0,0,0,0},
-        &reg2eeprom_ps2216_6d[0],
-        &defregval_rtl8316b_generic[0]
-    },
-    {
-	"compex",
-	"ps2216-6e",
-	"6E",
-	{0x11f67005,0,0},
-	0,
-	"rtl8316bp",
-	rtl8316bp,
-	16,
-	{16,13,11,9,7,5,3,1,15,14,12,10,8,6,4,2,0,0,0,0,0,0,0,0,0,0,0},
-        &reg2eeprom_rtl8316bp_generic[0],
-        &defregval_rtl8316b_generic[0]
-    },
-    {
-	"asus",
-	"gigax_1024p",
-	"unknown",
-	{0,0,0},
-	0,
-	"rtl8326",
-	rtl8326,
-	26,
-	{2,1,4,3,6,5,8,7,10,9,12,11,14,13,16,15,18,17,20,19,22,21,24,23,25,26,0},
         &reg2eeprom_rtl8326_generic[0],
         &defregval_rtl8326_generic[0]
     },
@@ -1189,17 +1202,30 @@ struct switchtype_t switchtypes[] = {
 	&defregval_rtl8326_generic[0]
     },
     {
-	"edimax",
-	"es-3116p",
+	"signamax",
+	"065-7531a",
 	"unknown",
 	{0,0,0},
 	0,
 	"rtl8316b",
 	rtl8316b,
 	16,
-	{16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0,0,0,0,0,0,0,0,0,0,0},
-	&reg2eeprom_rtl8316b_generic[0],
-	&defregval_rtl8316b_generic[0]
+	{1,3,5,7,9,11,13,15,2,4,6,8,10,12,14,16,0,0,0,0,0,0,0,0,0,0,0},
+        &reg2eeprom_rtl8316b_generic[0],
+        &defregval_rtl8316b_generic[0]
+    },
+    {
+	"zyxel",
+	"es116p",
+	"unknown",
+	{0,0,0},
+	0,
+	"rtl8316b",
+	rtl8316b,
+	16,
+	{2,4,6,8,10,12,14,16,1,3,5,7,9,11,13,15,0,0,0,0,0,0,0,0,0,0,0},
+        &reg2eeprom_rtl8316b_generic[0],
+        &defregval_rtl8316b_generic[0]
     },
 };
 
@@ -1308,7 +1334,7 @@ uint16_t rrcp_autodetect_switch_chip_eeprom(uint8_t *switch_type, uint8_t *chip_
     if (port_count==16){
 	switchtype=1; // generic rtl8316b
     }else if (port_count==24){
-	switchtype=3; // generic rtl8324
+	switchtype=4; // generic rtl8324
     }
 
     // step 2: detect EEPROM presence and size
@@ -1365,10 +1391,10 @@ uint16_t rrcp_autodetect_switch_chip_eeprom(uint8_t *switch_type, uint8_t *chip_
 	detected_switchtype=1; // generic rtl8316b
     }else if (port_count==18){
         detected_chiptype=rtl8318;
-        detected_switchtype=2; // generic rtl8318
+        detected_switchtype=3; // generic rtl8318
     }else{
         detected_chiptype=rtl8324;
-        detected_switchtype=3; // generic rtl8324
+        detected_switchtype=4; // generic rtl8324
     }
 
     *switch_type=detected_switchtype;

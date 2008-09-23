@@ -75,7 +75,7 @@ int main(int argc, char *argv[]){
  int c;
  char *file_name=NULL;
  int promisc=0;
- int switchtype=7;
+ int switchtype=4;
  unsigned int x[6];
  struct bpf_program filter;
  bpf_u_int32 mask;

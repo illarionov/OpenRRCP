@@ -180,6 +180,7 @@ void do_ping(void){
 			dest_mac[4],
 			dest_mac[5],
 			r ? "":"not ");
+    fflush(stdout);
     _exit(!r);
 }
 

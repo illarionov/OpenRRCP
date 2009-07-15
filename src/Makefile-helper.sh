@@ -8,17 +8,17 @@ if test "$sys" = "Linux"; then
 fi;
 
 if test "$sys" = "NetBSD"; then
-    echo -n "-s -Wall -O2 -ldnet -lpcap -I/usr/pkg/include -L/usr/pkg/lib"
+    echo -n "-s -Wall -O2 -lpcap -I/usr/pkg/include -L/usr/pkg/lib"
     exit;
 fi;
 
 if test "$sys" = "FreeBSD"; then
-    echo -n "-s -Wall -O2 -ldnet -lpcap -I/usr/local/include -L/usr/local/lib -L/usr/lib"
+    echo -n "-s -Wall -O2 -lpcap -L/usr/lib"
     exit;
 fi;
 
 if test "$sys" = "OpenBSD"; then
-    echo -n "-s -Wall -O2 -ldnet -lpcap -I/usr/local/include -L/usr/local/lib"
+    echo -n "-s -Wall -O2 -lpcap -I/usr/local/include -L/usr/local/lib"
     exit;
 fi;
 

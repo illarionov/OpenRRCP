@@ -41,10 +41,6 @@
 #include <unistd.h>
 #include <setjmp.h>
 
-#ifndef __linux__
-#include <dnet.h>
-#endif
-
 #include "rrcp_packet.h"
 #include "rrcp_io.h"
 #include "rrcp_config.h"
@@ -115,7 +111,6 @@ unsigned short int 		port_list[26];
 char 				 Temp[512];
 extern char			 ErrIOMsg[];
 #ifndef __linux__
-extern eth_t                    *p_eth;
 extern pcap_t                   *handle;
 #endif
 
@@ -171,7 +166,7 @@ void print_quit(int state,char *msg){
  printf("RRCP %s: %s\n",status[state],msg);
 #ifndef __linux__
  if (handle != NULL) pcap_close(handle);
- if (p_eth != NULL) eth_close(p_eth);
+/* if (p_eth != NULL) eth_close(p_eth); */
 // #else
 // if (s_rec != -1) shutdown(s_rec,SHUT_RDWR);
 // if (s_send != -1) shutdown(s_send,SHUT_RDWR);

@@ -34,6 +34,8 @@
 #include <linux/if_arp.h>
 #else
 #include <net/if.h>
+#include <net/if_dl.h>
+#include <ifaddrs.h>
 #include <pcap.h>
 #include <err.h>
 #endif
@@ -44,10 +46,6 @@
 #include <unistd.h>
 #ifndef htonl
 #include <arpa/inet.h>
-#endif
-
-#ifndef __linux__
-#include <dnet.h>
 #endif
 
 #include <errno.h>
@@ -69,14 +67,10 @@ int s,s_rec,s_send;
 #ifdef __linux__
 struct sockaddr_ll sockaddr_rec,sockaddr_send;
 #else
-eth_t                    *p_eth;
 pcap_t                   *handle;
 const u_char		 *rcvbuf;
-struct addr               intf_mac;
 char errbuf[PCAP_ERRBUF_SIZE];
 struct bpf_program filter;
-bpf_u_int32 mask;
-bpf_u_int32 net;
 char filter_app[512];
 #endif
 char ErrIOMsg[512];
@@ -172,6 +166,45 @@ int sock_rec(void *ptr, int size, int waittick){
 }
 
 #else
+static int get_link_addr(const char *iface, unsigned char *haddr, size_t size) {
+   struct ifaddrs *ifss, *ifs;
+   int res;
+
+   if (getifaddrs(&ifss) < 0)
+      return errno;
+
+   res=-1;
+
+   for (ifs=ifss; ifs; ifs=ifs->ifa_next) {
+      if (ifs->ifa_name == NULL)
+	 continue;
+
+      if (strcmp(iface, ifs->ifa_name) == 0) {
+	 struct sockaddr_dl *sa;
+	 /* Interface found */
+	 res=-2;
+	 if ((ifs->ifa_addr == NULL)
+	       || (ifs->ifa_addr->sa_family != PF_LINK))
+	    continue;
+
+	 sa = (struct sockaddr_dl *)ifs->ifa_addr;
+
+	 if (size >= sa->sdl_alen) {
+	    unsigned i;
+	    unsigned char *p;
+	    /* MAC found */
+	    res=0;
+	    for (p=haddr, i=0; i < sa->sdl_alen; i++, p++)
+	       *p = (unsigned char)sa->sdl_data[sa->sdl_nlen + i];
+	 }else
+	    res=-3;
+	 break;
+      }
+   }
+   freeifaddrs(ifss);
+   return res;
+}
+
 int rtl83xx_prepare(){
     struct timeval time;
     struct timezone timez;
@@ -181,20 +214,26 @@ int rtl83xx_prepare(){
     gettimeofday(&time, &timez);
     srand(time.tv_sec+time.tv_usec);
 
-    intf_mac.addr_type=ADDR_TYPE_ETH;
-    intf_mac.addr_bits=ETH_ADDR_BITS;
-    if ((p_eth = eth_open(ifname)) == NULL) {
-       snprintf(ErrIOMsg,sizeof(ErrIOMsg),"Can't open interface %s.",ifname);
-       return(1);
+    {
+       int res;
+       res = get_link_addr(ifname, my_mac, sizeof(my_mac));
+       if (res == -1) {
+	  snprintf(ErrIOMsg,sizeof(ErrIOMsg),"Can't open interface %s.",ifname);
+	  return(1);
+       }else if (res < 0) {
+	  snprintf(ErrIOMsg,sizeof(ErrIOMsg),"Fail to get hw addr");
+	  return(1);
+       }else if (res > 0) {
+	  snprintf(ErrIOMsg,sizeof(ErrIOMsg),
+		"Attempt to retrieve interface list failed: %s",
+		strerror(errno));
+	  return(1);
+       }
     }
-    if (eth_get(p_eth,&intf_mac.addr_eth) < 0) {
-       snprintf(ErrIOMsg,sizeof(ErrIOMsg),"Fail to get hw addr");
-       return(1);
-    }
-    memcpy(my_mac,&intf_mac.addr_eth,ETH_ADDR_LEN);
     memset(filter_app,0,sizeof(filter_app));
-    snprintf(filter_app, sizeof(filter_app), "ether proto 0x8899 and not ether src %s", addr_ntoa(&intf_mac));
-    if (pcap_lookupnet(ifname, &net, &mask, errbuf) < 0){ net = 0;mask = 0;}
+    snprintf(filter_app, sizeof(filter_app),
+	  "ether proto 0x8899 and not ether src %02hhx:%02hhx:%02hhx:%02hhx:%02hhx:%02hhx",
+	  my_mac[0], my_mac[1], my_mac[2], my_mac[3], my_mac[4], my_mac[5]);
     if ((handle = pcap_open_live(ifname, 128, 0, 3, errbuf))== NULL) {
        snprintf(ErrIOMsg,sizeof(ErrIOMsg),"pcap_open_live get error: %s", errbuf); 
        return(1);
@@ -208,7 +247,9 @@ int rtl83xx_prepare(){
        }
     }
 #endif
-    if (pcap_compile(handle, &filter, filter_app, 1, mask) < 0) {
+    pcap_setdirection(handle, PCAP_D_IN);
+
+    if (pcap_compile(handle, &filter, filter_app, 1, 0) < 0) {
        snprintf(ErrIOMsg,sizeof(ErrIOMsg), "Bad pcap filter: %s", pcap_geterr(handle));
        return(1);
     }
@@ -217,6 +258,7 @@ int rtl83xx_prepare(){
        snprintf(ErrIOMsg,sizeof(ErrIOMsg), "Bad pcap filter: %s", pcap_geterr(handle));
        return(1);
     }
+
     return(0);
 }
 
@@ -224,8 +266,8 @@ int rtl83xx_prepare(){
 ssize_t sock_send_(void *ptr, int size){
     int i,res;
     for (i=0;i<3;i++){
-        res=eth_send(p_eth,ptr,size);
-	if (res!=-1) return(res);
+        res=pcap_inject(handle, ptr, size);
+	if (res>0) return(res);
 	usleep(10000+40000*i);
     }
     return(res);
@@ -236,11 +278,11 @@ int sock_rec(void *ptr, int size, int waittick){
     int len=0;
     int i=0;
     struct pcap_pkthdr pkt_h;
- 
+
     while(i++ < 11){
      rcvbuf=pcap_next(handle,&pkt_h);
      if (rcvbuf!=NULL) break;
-     usleep(waittick);     
+     usleep(waittick);
     }
     if (rcvbuf!=NULL){
      if (pkt_h.caplen > size) len=size;
@@ -290,6 +332,7 @@ void rtl83xx_scan(int verbose, int retries){
     unsigned char *hidden_mac=NULL;
 
 
+    memset(&pkt, 0, sizeof(pkt));
     memcpy(pkt.ether_dhost,mac_bcast,6);
     memcpy(pkt.ether_shost,my_mac,6);
     pkt.ether_type=htons(0x8899);

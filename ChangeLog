@@ -1,3 +1,8 @@
+Wed Jul 15 11:59:15 CEST 2009
+        * Re-implement *BSD port without using libdnet
+         (contributed by littlesavage, see bug #20 for discussion)
+        * Make sure, that stdout is flushed on exit (fix "no output on ping" bug)
+
 Sat Sep 13 19:48:05 CEST 2008
         * Add cable tester to rrcpcli's "show interface"
         * Add "set phy-register" command to rrcpcli
@@ -18,7 +23,7 @@ Thu Sep 11 20:24:56 CEST 2008
           accessing EEPROM
         * Fix EEPROM waiting loop - should make "write memory" working
         * Avoid detecting switch twice
-        
+
 ------------------------ OpenRRCP 0.2.1 ---------------------------------------
 
 Tue Jun  3 04:14:46 CEST 2008

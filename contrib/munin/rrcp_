@@ -1,0 +1,277 @@
+#!/bin/sh
+#
+# Wildcard-plugin to monitor network interfaces on RRCP-capable switch
+# To monitor an interface, link rrcp_<switch>_if<interface> to this file. E.g.
+#
+# ln -s /usr/share/munin/node/plugins-auto/rrcp_ /etc/munin/node.d/rrcp_switch1_if0
+#
+# ...will monitor port 0 on switch1
+#
+# To monitor dropped bytes on interface, link rrcp_<switch>_iferrcol<interface>
+# to this file.
+#
+# To aggregate all network interfaces on switch
+# link if_<switch>_ifaggregated (or if_switch_if_errcolaggregated) to this file.
+#
+# To monitor switch link status, link if_<switch>_ifstatus to this file
+#
+# Configuration variables:
+#
+#       rtl83xx		rtl83xx binary (default /usr/bin/rtl83xx)
+#       switchaddress	switch address in [[authkey-]xx:xx:xx:xx:xx:xx@]if-name
+#			format (required)
+#	swithtype	switch type (rtl8326, rtl8316b, dlink-des1016d, e.t.c)
+#			(required)
+#       switchnumports  number of ports (for aggregated statistics)
+#
+# Sample plugins.conf:
+#
+#[rrcp_switch1_*]
+# env.switchaddress 52:54:4c:01:02:03@eth0
+# env.swithtype dlink-des1016d
+# env.switchnumports 16
+#
+#[rrcp_switch2_*]
+# env.switchaddress 00:80:48:58:66:a2@eth1
+# env.swithtype compex-ps2216-6e
+# env.switchnumports 16
+#
+# rtl83xx binary must be setuid to root
+#
+
+RTL83XX=${rtl83xx:-'/usr/bin/rtl83xx'}
+IFACE=`basename $0 | sed 's/^rrcp_.*_if//g'`
+SWNAME=`basename $0 | sed 's/^rrcp_\(.*\)_if.*$/\1/g'`
+ADDR=${switchaddress:-'52:54:4c:01:02:03@eth0'}
+SWTYPE=${swithtype:-'rtl8316b'}
+NUMPORTS=${switchnumports:-16}
+
+if [ "$1" = "autoconf" ]; then
+   if [ -x RTL83XX ]; then
+      echo yes
+      exit 0
+   else
+      echo "no ($RTL83XX not found)" >&2
+      exit 1
+   fi
+fi
+
+if [ -z "$SWNAME" ]; then
+   echo "Switch name not defined" >&2
+   exit 0;
+fi
+
+if [ -z "$IFACE" ]; then
+   echo "Interface not defined" >&2
+   exit 0;
+fi
+
+if [ ${IFACE} != ${IFACE##errcol} ]; then
+   IFACE=${IFACE##errcol}
+   ERRCOL=1
+fi
+
+i=1
+rbss=""
+obss=""
+dbss=""
+while [ $i -le $NUMPORTS ]; do
+   ibss="${ibss} port${i}_rbytes"
+   obss="${obss} port${i}_obytes"
+   dbss="${dbss} port${i}_dbytes"
+   statuses="${statuses} port${i}_status"
+   i=$(($i+1));
+done
+
+
+#Port statistics
+if [ "$1" = "config" ]; then
+   echo "host_name $SWNAME"
+   echo 'graph_category network'
+
+   if [ "$IFACE" != "status" ]; then
+      echo 'graph_args --base 1000'
+      if [ "$ERRCOL" ]; then
+        echo "graph_vlabel bits per ${graph_period} in, dropped"
+      else
+        echo "graph_vlabel bits per ${graph_period} in(-) / out(+)"
+      fi
+   fi
+
+   if [ "$IFACE" = "status" ]; then
+      i=1
+
+      echo "graph_vlabel link status: 0 - down; 1 - up; -1 - loop"
+      echo "graph_args --upper-limit ${NUMPORTS}"
+      echo "graph_title ${SWNAME} Link status"
+      echo "graph_info This graph shows link status of the $SWNAME switch"
+      echo "graph_order $statuses"
+
+      while [ $i -le $NUMPORTS ]; do
+	 echo "port${i}_status.label port${i}_status"
+	 echo "port${i}_status.type GAUGE"
+	 echo "port${i}_status.cdef port${i}_status,${i},*"
+	 echo "port${i}_status.info Status of the port ${i} "
+	 i=$(($i+1));
+      done
+   elif [ "$IFACE" = "aggregated" ]; then
+      #Aggregated traffic
+      if [ "$ERRCOL" ]; then
+	 echo "graph_order $dbss"
+	 echo "graph_title ${SWNAME} dropped aggregated traffic"
+	 echo "graph_info This graph shows the dropped aggregaded traffic of the $SWNAME switch" 
+      else
+	 echo "graph_order $ibss $obss"
+	 echo "graph_title ${SWNAME} aggregated traffic"
+	 echo "graph_info This graph shows the aggregaded traffic of the $SWNAME switch" 
+      fi
+
+      i=1
+      draw="AREA" # first valuse is AREA, other is STACK
+      while [ $i -le $NUMPORTS ]; do
+	 if [ "$ERRCOL" ]; then
+	    echo "port${i}_dbytes.label port${i}_dropped"
+	    echo "port${i}_dbytes.type COUNTER"
+	    echo "port${i}_dbytes.draw $draw"
+	    echo "port${i}_dbytes.cdef port${i}_dbytes,8,*"
+	    echo "port${i}_dbytes.info Traffic dropped on the port ${i} "
+	 else
+	    echo "port${i}_rbytes.label port${i}_rx"
+	    echo "port${i}_rbytes.type COUNTER"
+	    echo "port${i}_rbytes.graph no"
+	    echo "port${i}_rbytes.cdef port${i}_rbytes,8,*"
+
+	    echo "port${i}_obytes.label port${i}"
+	    echo "port${i}_obytes.type COUNTER"
+	    echo "port${i}_obytes.draw $draw"
+	    echo "port${i}_obytes.cdef port${i}_obytes,8,*"
+	    echo "port${i}_obytes.negative port${i}_rbytes"
+	    echo "port${i}_obytes.info Traffic recived(-) and transmitted(+) on the port ${i} "
+	 fi
+	 i=$(($i+1));
+	 draw="STACK"
+      done
+   else
+      # Not aggregated traffic
+      if [ "$ERRCOL" ]; then
+	echo "graph_title Port $IFACE dropped traffic"
+	echo "graph_info This graph shows the dropped traffic of the " \
+	       "Port $IFACE of $SWNAME switch"
+	echo 'dbytes.label dropped'
+	echo 'dbytes.type COUNTER'
+	echo 'dbytes.cdef dbytes,8,*'
+	echo "dbytes.info Traffic dropped on the port $IFACE"
+      else
+	echo "graph_order rbytes obytes"
+	echo "graph_title Port $IFACE traffic"
+	echo "graph_info This graph shows the traffic of the port $IFACE " \
+	       "of $SWNAME ($ADDR) switch"
+	echo 'rbytes.label received'
+        echo 'rbytes.type COUNTER'
+        echo 'rbytes.graph no'
+        echo 'rbytes.cdef rbytes,8,*'
+        echo "obytes.label port${IFACE}"
+	echo 'obytes.type COUNTER'
+	echo 'obytes.negative rbytes'
+	echo 'obytes.cdef obytes,8,*'
+	echo "obytes.info Traffic received(-) and transmitted(+) on the port $IFACE"
+      fi
+   fi
+   exit 0
+fi
+
+if [ -x RTL83XX ]; then
+   echo "RTL83XX binary ($RTL83XX) not  found"
+   exit 0;
+fi
+
+if [ $IFACE = "status" ]; then
+
+
+$RTL83XX $SWTYPE $ADDR show interface |
+   awk -v addr="$ADDR" -v numports="$NUMPORTS" '
+BEGIN {
+   numports=numports+0;
+   split(addr,a,/@/);
+   addr_iface=a[2];
+}
+
+(NF < 6) {next;}
+
+/trying to reach .+-port .+ switch at/ {
+   match($0, /[0-9]+\-port/);
+   str=substr($0,RSTART,RLENGTH);
+   split(str,a,/-/);
+   numports = a[1];
+}
+{
+   split($1, a, /[\/:]+/);
+   if (a[1] != addr_iface) {next;}
+   port = a[2];
+
+   if ($NF == "LOOP")
+      stats[port]=-1;
+   else
+      stats[port] = ((index($0, "LINK") == 0) ? 0 : 1);
+}
+END {
+   for (i=1;i<=numports;i++)
+      printf "port%u_status.value %i\n", i, stats[i] + 0;
+}
+'
+
+else
+
+$RTL83XX $SWTYPE $ADDR show interface summary |
+   awk -v addr="$ADDR" -v ifacenum="$IFACE" \
+      -v numports="$NUMPORTS" -v errcol="$ERRCOL" '
+BEGIN {
+   numports=numports+0;
+   split(addr,a,/@/);
+   addr_iface=a[2];
+}
+
+(NF < 4) {next;}
+
+/trying to reach .+-port .+ switch at/ {
+   match($0, /[0-9]+\-port/);
+   str=substr($0,RSTART,RLENGTH);
+   split(str,a,/-/);
+   numports = a[1];
+}
+
+{
+   split($1, a, /[\/:]+/);
+   if (a[1] != addr_iface) {next;}
+   port = a[2];
+
+   if (port > 0) {
+      stats[port, "dropped"] = $NF;
+      stats[port, "tx"] = $(NF-1);
+      stats[port, "rx"] = $(NF-2);
+   }
+}
+
+END {
+   if (ifacenum != "aggregated") {
+      if (errcol) {
+	 print "dbytes.value", stats[ifacenum,"dropped"];
+      }else {
+	 print "rbytes.value", stats[ifacenum,"rx"];
+	 print "obytes.value", stats[ifacenum,"tx"];
+      }
+   }else {
+     for (i=1;i<=numports;i++) {
+	if (errcol) {
+	   printf "port%u_dbytes.value %s\n", i, stats[i,"dropped"] + 0;
+	}else {
+	   printf "port%u_rbytes.value %s\n", i, stats[i,"rx"] + 0;
+	   printf "port%u_obytes.value %s\n", i, stats[i,"tx"] + 0;
+        }
+     }
+   }
+}
+'
+
+fi
+

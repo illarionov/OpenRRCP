@@ -1,0 +1,29 @@
+*** Probes ***
+
++ RtlPing
+
+binary = /usr/local/bin/rtlping
+hostinterval = 0.2
+
+*** Targets ***
+
+probe = RtlPing
+
+menu = Top
+
++ RRCP
+menu = RRCP
+title = RRCP
+probe = RtlPing
+
+++ Switch_1
+menu = Switch 1
+title = Switch 1 Des-1016 16 52:54:4c:01:02:03@vlan100
+host = 52:54:4c:01:02:03@vlan100
+
+++ Switch_2
+menu = Switch 2
+title = Switch 1 Des-1016 16 52:54:4c:01:02:03@vlan200
+host = 52:54:4c:01:02:03@vlan200
+pingmode = rep
+

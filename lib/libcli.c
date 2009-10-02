@@ -1574,7 +1574,7 @@ int cli_file(struct cli_def *cli, FILE *fh, int privilege, int mode)
 		char *cmd;
 		char *end;
 
-		if (fgets(buf, sizeof(buf), fh) <= 0)
+		if (fgets(buf, sizeof(buf), fh) == NULL)
 			break; // End of file
 
 		if ((p = strpbrk(buf, "#!\r\n")))

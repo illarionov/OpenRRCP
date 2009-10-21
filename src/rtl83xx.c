@@ -48,6 +48,7 @@
 
 int myPid = 0;
 extern char ErrIOMsg[];
+char ErrMsg[512];
 
 void sigHandler(int sig)
 {
@@ -73,6 +74,50 @@ void dumpmem(void *ptr, int len){
 	    p[i*8+0],p[i*8+1],p[i*8+2],p[i*8+3],
 	    p[i*8+4],p[i*8+5],p[i*8+6],p[i*8+7]);
     }
+}
+
+/*
+ * PARAMETERS:
+ *     idx_list - vlan index entry list. i.e. "1,2,5-10"
+ *     max_cnt  - maximum allowed values in list. 0 - unlimited
+ * RETURN VALUES:
+ *    < 0 - on error, error in ErrMsg
+ *    first value - on success
+ */
+static int check_vlan_entry_index_list(const char *idx_list, int max_cnt)
+{
+   int idx;
+   int cnt;
+   int first;
+   struct t_str_number_list list;
+
+   if ((idx_list == NULL)
+	 || (idx_list[0] == '\0')) {
+      snprintf(ErrMsg, sizeof(ErrMsg), "Incorrect VLAN index\n");
+      return -1;
+   }
+
+   cnt = str_number_list_init(idx_list, &list);
+   if ((cnt <= 0) || (max_cnt && (cnt > max_cnt))) {
+      snprintf(ErrMsg, sizeof(ErrMsg),
+	    "Incorrect VLAN index: %s\n", idx_list);
+      return -2;
+   }
+
+   first = -1;
+   for (cnt=0; str_number_list_get_next(&list, &idx) == 0; cnt++) {
+      if (idx < 0 || idx > 31) {
+	 snprintf(ErrMsg, sizeof(ErrMsg),
+	       "Incorrect VLAN index: %i\n"
+	       "This hardware can store only 32 indexes (0-31).\n"
+	       ,idx);
+	 return -3;
+      }
+      if (cnt == 0)
+	 first = idx;
+   }
+
+   return first;
 }
 
 void print_port_link_status(int port_no, int enabled, unsigned char encoded_status, int loopdetect){
@@ -633,11 +678,24 @@ void do_tag_command(unsigned short int *arr, unsigned short int val){
 	}
 }
 
-void do_vlan_table_config(unsigned short int *arr, unsigned int idx, unsigned short int val){
-	swconfig.vlan.raw[0]=rtl83xx_readreg16(0x030b);
-	if (!swconfig.vlan.s.config.dot1q) { printf("WARNING: vlan dot1q mode not enabled\n"); }
-	
+static int do_vlan_table_config(unsigned short int *arr, const char *idx_list, unsigned short int val)
+{
+   int idx;
+   struct t_str_number_list list;
+
+   if (check_vlan_entry_index_list(idx_list, 0) < 0)
+      return -1;
+
+   swconfig.vlan.raw[0]=rtl83xx_readreg16(0x030b);
+   if (!swconfig.vlan.s.config.dot1q) {
+      printf("WARNING: vlan dot1q mode not enabled\n");
+   }
+
+   str_number_list_init(idx_list, &list);
+   while (str_number_list_get_next(&list, &idx) == 0)
 	do_32bit_reg_action(arr,val,0x31d+3*idx);
+
+   return 0;
 }
 
 void do_vlan_index_ctrl(unsigned short int *arr, unsigned short int val){
@@ -664,11 +722,49 @@ void do_vlan_index_ctrl(unsigned short int *arr, unsigned short int val){
     }
 }
 
-void do_vlan_index_config(unsigned int idx, unsigned int val){
-	swconfig.vlan.raw[0]=rtl83xx_readreg16(0x030b);
-	if (!swconfig.vlan.s.config.dot1q) { printf("WARNING: vlan dot1q mode not enabled\n"); }
-	
-	rtl83xx_setreg16(0x031d+3*idx+2,val & 0xfff);
+static int do_vlan_index_config(const char *idx_list, const char *vid)
+{
+   unsigned u_vid;
+   int idx;
+   char *endptr;
+   struct t_str_number_list list;
+
+   /* Parse index list */
+   if (check_vlan_entry_index_list(idx_list, 0) < 0)
+      return -1;
+
+   /* Parse VID */
+   if ((vid == NULL)
+	 || (vid[0] == '\0')) {
+      snprintf(ErrMsg, sizeof(ErrMsg), "Incorrect VID\n");
+      return -2;
+   }
+
+   u_vid = (unsigned)strtoul(vid, &endptr, 10);
+   if ((endptr[0] != '\0')
+	 || (u_vid > 0xfff)) {
+      snprintf(ErrMsg, sizeof(ErrMsg),
+	    "Incorrect VID: \"%s\"\n"
+	    "VID can be only between 0-4095. "
+	    "Values 0, 1 and 4095 are not recommended.\n"
+	    ,vid);
+      return -2;
+   }
+
+   if ((u_vid == 0) || (u_vid == 1) || (u_vid == 0xfff)) {
+      printf("WARNING: VID %d is not recommended.\n", u_vid);
+   }
+
+   swconfig.vlan.raw[0]=rtl83xx_readreg16(0x030b);
+   if (!swconfig.vlan.s.config.dot1q) {
+      printf("WARNING: vlan dot1q mode not enabled\n");
+   }
+
+   str_number_list_init(idx_list, &list);
+   while (str_number_list_get_next(&list, &idx) == 0)
+      rtl83xx_setreg16(0x031d+3*idx+2, u_vid & 0xfff);
+
+   return 0;
 }
 
 void do_rrcp_ctrl(int state){
@@ -1149,9 +1245,9 @@ void print_usage(void){
 	 " config vlan mode portbased|dot1q      - enable specified VLAN support\n"
 	 " config vlan template-load portbased|dot1qtree - load specified template\n"
 	 " config vlan clear                     - clear vlan table (all ports in vlan 1)\n"
-	 " config vlan add port <port-list> index <idx> - add port(s) in VLAN table on index\n"
-	 " config vlan delete port <port-list> index <idx> - delete port(s) from VLAN table on index\n"
-	 " config vlan index <idx> vid <vid>     - set VLAN ID for index in VLAN table\n"
+	 " config vlan add port <port-list> index <idx-list> - add port(s) in VLAN table on index\n"
+	 " config vlan delete port <port-list> index <idx-list> - delete port(s) from VLAN table on index\n"
+	 " config vlan index <idx-list> vid <vid> - set VLAN ID for index in VLAN table\n"
 	 " config mac-address <mac>              - set a new <mac> address to switch and reboot\n"
 	 " config mac-address-table aging-time|drop-unknown <arg>  - address lookup table control\n"
 	 " config flowcontrol dot3x enable|disable - globally disable full duplex flow control (802.3x pause)\n"
@@ -1504,17 +1600,12 @@ int main(int argc, char **argv){
                                  case 11: // index
 					check_argc(argc,5+shift,"Incorrect VLAN index.\n",NULL);
 
-					if(!sscanf(argv[6+shift], "%d", &subcmd)){
-					   printf("Incorrect VLAN index: \"%s\"\n",argv[6+shift]);
-					   exit(1);
-					} else if(subcmd < 0 || subcmd > 31) {
-					   printf("Incorrect VLAN index: \"%s\"\n",argv[6+shift]);
-					   printf("This hardware can store only 32 indexes (0-31).\n");
+					subcmd = check_vlan_entry_index_list(argv[6+shift], 1);
+					if (subcmd < 0) {
+					   fputs(ErrMsg, stdout);
 					   exit(1);
 					}
-
 					do_vlan_index_ctrl(&port_list[0],subcmd);
-
 					exit(0);
                                  case 12: /* phy-shutdown */
                                         do_port_phy_disable(&port_list[0],0);
@@ -1557,6 +1648,8 @@ int main(int argc, char **argv){
                                          print_unknown(argv[4+shift],&config_rrcp[0]);
                           }
                    case 2: // vlan
+		     {
+			  int vlan_delete_cmd = 1;
                           check_argc(argc,3+shift,NULL,&config_vlan[0]);
                           switch (compare_command(argv[4+shift],&config_vlan[0])){
                                  case 0: // disable
@@ -1577,74 +1670,36 @@ int main(int argc, char **argv){
                                         do_vlan_tmpl(subcmd+1);
                                         exit(0);
                                  case 5: // add
-										for(i=4;i<=7;i++) check_argc(argc,i+shift,NULL,&config_vlan_port[0]);
-										if(strcmp(argv[5+shift],config_vlan_port[0])) print_unknown(argv[5+shift],&config_vlan_port[0]);
-										if (str_portlist_to_array(argv[6+shift],&port_list[0],switchtypes[switchtype].num_ports)!=0){
-											printf("Incorrect list of ports: \"%s\"\n",argv[6+shift]);
-											exit(1);
-										}
-										if(strcmp(argv[7+shift],config_vlan_port[1])) print_unknown(argv[7+shift],&config_vlan_port[0]);
-										
-										if(!sscanf(argv[8+shift], "%d", &subcmd)){
-											printf("Incorrect VLAN index: \"%s\"\n",argv[8+shift]);
-											exit(1);
-										} else if(subcmd < 0 || subcmd > 31) {
-											printf("Incorrect VLAN index: \"%s\"\n",argv[8+shift]);
-											printf("This hardware can store only 32 indexes (0-31).\n");
-											exit(1);
-										}
-										do_vlan_table_config(&port_list[0],subcmd,0);
-										exit(0);
+					vlan_delete_cmd = 0;
+					/* FALLTHROUGH */
                                  case 6: // delete
-										for(i=4;i<=7;i++) check_argc(argc,i+shift,NULL,&config_vlan_port[0]);
-										if(strcmp(argv[5+shift],config_vlan_port[0])) print_unknown(argv[5+shift],&config_vlan_port[0]);
-										if (str_portlist_to_array(argv[6+shift],&port_list[0],switchtypes[switchtype].num_ports)!=0){
-											printf("Incorrect list of ports: \"%s\"\n",argv[6+shift]);
-											exit(1);
-										}
-										if(strcmp(argv[7+shift],config_vlan_port[1])) print_unknown(argv[7+shift],&config_vlan_port[0]);
-										
-										if(!sscanf(argv[8+shift], "%d", &subcmd)){
-											printf("Incorrect VLAN index: \"%s\"\n",argv[8+shift]);
-											exit(1);
-										} else if(subcmd < 0 || subcmd > 31) {
-											printf("Incorrect VLAN index: \"%s\"\n",argv[8+shift]);
-											printf("This hardware can store only 32 indexes (0-31).\n");
-											exit(1);
-										}
-										do_vlan_table_config(&port_list[0],subcmd,1);
-										exit(0);
-                                 case 7: // index
-                                        for(i=4;i<=6;i++) check_argc(argc,i+shift,NULL,&config_vlan_idx[0]);
-										
-										if(!sscanf(argv[5+shift], "%d", &vid)){
-											printf("Incorrect VLAN index: \"%s\"\n",argv[5+shift]);
-											exit(1);
-										} else if(vid < 0 || vid > 31) {
-											printf("Incorrect VLAN index: \"%s\"\n",argv[5+shift]);
-											printf("This hardware can store only 32 indexes (0-31).\n");
-											exit(1);
-										}
-										
-										if(strcmp(argv[6+shift],config_vlan_idx[0])) print_unknown(argv[6+shift],&config_vlan_idx[0]);
-										
-										if(!sscanf(argv[7+shift], "%d", &subcmd)){
-											printf("Incorrect VID: \"%s\"\n",argv[7+shift]);
-											exit(1);
-										} else if(subcmd == 0 || subcmd == 1 || subcmd == 4095) {
-											printf("WARNING: VID %d is not recommended.\n", subcmd);
-										} else if(subcmd < 0 || subcmd > 4095) {
-											printf("Incorrect VID: \"%s\"\n",argv[7+shift]);
-											printf("VID can be only between 0-4095. Values 0, 1 and 4095 are not recommended.\n");
-											exit(1);
-										}
-										
-										do_vlan_index_config(vid,subcmd);
-										
-                                        exit(0);
-                                 default: 
+					for(i=4;i<=7;i++)
+					   check_argc(argc,i+shift,NULL,&config_vlan_port[0]);
+					if(strcmp(argv[5+shift],config_vlan_port[0]))
+					   print_unknown(argv[5+shift],&config_vlan_port[0]);
+
+					if (str_portlist_to_array(argv[6+shift], &port_list[0], switchtypes[switchtype].num_ports)!=0){
+					   printf("Incorrect list of ports: \"%s\"\n",argv[6+shift]);
+					   exit(1);
+					}
+					if(strcmp(argv[7+shift],config_vlan_port[1])) print_unknown(argv[7+shift],&config_vlan_port[0]);
+					if (do_vlan_table_config(&port_list[0],argv[8+shift], vlan_delete_cmd) != 0) {
+					   fputs(ErrMsg, stdout);
+					   exit(1);
+					}
+					exit(0);
+				 case 7: // index
+					for(i=4;i<=6;i++) check_argc(argc,i+shift,NULL,&config_vlan_idx[0]);
+
+					if (do_vlan_index_config(argv[5+shift], argv[7+shift]) != 0) {
+					   fputs(ErrMsg, stdout);
+					   exit(1);
+					}
+					exit(0);
+                                 default:
                                          print_unknown(argv[4+shift],&config_vlan[0]);
-                          }
+                          } /* switch */
+		     } /* case 2 */
                    case 3: // mac-address
                           check_argc(argc,3+shift,"MAC address needed\n",NULL);
    	                  if ((sscanf(argv[4+shift], "%02x:%02x:%02x:%02x:%02x:%02x",x,x+1,x+2,x+3,x+4,x+5)!=6)&&

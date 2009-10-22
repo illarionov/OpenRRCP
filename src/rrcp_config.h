@@ -191,6 +191,8 @@ void rrcp_config_bin2text(char *text_buffer, int buffer_length, int show_default
 
 char *rrcp_config_get_portname(char *buffer, int buffer_size, int port_number, int port_number_phys);
 
+int rrcp_config_get_port_log_num(const char *port);
+
 void do_show_config(int verbose);
 
 int find_vlan_index_by_vid(int vid);

@@ -139,6 +139,25 @@ char *rrcp_config_get_portname(char *buffer, int buffer_size, int port_number, i
     return buffer;
 }
 
+int rrcp_config_get_port_log_num(const char *port)
+{
+   int port_num;
+   char name[20];
+
+   if ((port == NULL)
+      || (port[0] == '\0'))
+      return -1;
+
+   if (sscanf(port, "%20[a-zA-Z0-9]/%d", name, &port_num) != 2)
+      return -1;
+
+   if ((strncasecmp("FastEthernet0", name, sizeof(name)) == 0)
+	 || (strncasecmp("GigabitEthernet0", name, sizeof(name))==0))
+      return port_num;
+
+   return -1;
+}
+
 void rrcp_config_bin2text(char *sc, int l, int show_defaults)
 {
     int port,port_phys,port2,port2_phys;

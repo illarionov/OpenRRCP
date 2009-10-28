@@ -206,31 +206,37 @@ int cmd_config_int_switchport_trunk_allowed_vlan(struct cli_def *cli, char *comm
 	    cli_print(cli, "  all     all VLANs");
 	    cli_print(cli, "  none    no VLANs");
 	}else{
-	    int port,port_phys;
+	    int vid,vi,port,port_phys,cnt;
+	    struct t_str_number_list vidlist;
+
 	    if (!swconfig.vlan.s.config.dot1q){
 		cli_print(cli, "%% Cannot set up switchport properties in current vlan mode.");
 		cli_print(cli, "%% Please, issue 'vlan dot1q' in global config mode first.");
 	    }
 	    port=atoi(strrchr(cli->modestring,'/')+1);
 	    port_phys=map_port_number_from_logical_to_physical(port);
-	    int vidlist[32];
-	    int i,vi;
 
-	    if (str_portlist_to_array_by_value(argv[0],vidlist,32)==0){
-		for (i=0;(i<32)&&(vidlist[i]>0)&&(vidlist[i]<4095);i++){
-		    vi=find_or_create_vlan_index_by_vid(vidlist[i]);
-//		    printf("%d - %d - %d\n",i,vidlist[i],vi);
-		    if (vi>=0){
-			swconfig.vlan_entry.bitmap[vi]|=(1<<port_phys);
-		    }else{
-			cli_print(cli, "%% Too many VLANs: This swith only supports 32.");
-			return CLI_ERROR;
-		    }
-		}
-		rrcp_config_commit_vlan_to_switch();
-	    }else{
-		cli_print(cli, "%% Invalid input detected: Cannot recognize port list.");
-		return CLI_ERROR;
+	    cnt = str_number_list_init(argv[0], &vidlist);
+	    if ((cnt <= 0) || cnt > 32) {
+	       cli_print(cli, "%% ERROR: Invalid vlan list: '%s'",argv[0]);
+	       return CLI_ERROR;
+	    }
+	    for (cnt=0; str_number_list_get_next(&vidlist, &vid) == 0; cnt++) {
+	       if (vid < 0 || vid > 4095) {
+		  cli_print(cli, "%% ERROR: Incorrect VLAN index: %i", vid);
+		  return CLI_ERROR;
+	       }
+	    }
+
+	    str_number_list_init(argv[0], &vidlist);
+	    while (str_number_list_get_next(&vidlist, &vid) == 0) {
+	       vi=find_or_create_vlan_index_by_vid(vid);
+	       if (vi>=0){
+		  swconfig.vlan_entry.bitmap[vi]|=(1<<port_phys);
+	       }else{
+		  cli_print(cli, "%% Too many VLANs: This swith only supports 32.");
+		  return CLI_ERROR;
+	       }
 	    }
 	}
 	return CLI_OK;

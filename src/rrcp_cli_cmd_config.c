@@ -147,31 +147,39 @@ int cmd_config_vlan(struct cli_def *cli, char *command, char *argv[], int argc)
 		cli_print(cli, "  <cr>");
 	        return CLI_ERROR;
 	    }else{
-		int vidlist[33];
-		int i,vi,port,port_phys;
+		int vid,vi,port,port_phys,cnt;
+		struct t_str_number_list vidlist;
 
-		if (str_portlist_to_array_by_value(argv[0],vidlist,32)==0){
-		    for (i=0;(i<32)&&(vidlist[i]>0)&&(vidlist[i]<4095);i++){
-			vi=find_vlan_index_by_vid(vidlist[i]);
-			if (vi>=0){
-			    swconfig.vlan_entry.bitmap[vi]=0;
-			    if (vidlist[i]>1){
-				swconfig.vlan_vid[vi]=0;
-			    }
-			}
-			for(port=1;port<=switchtypes[switchtype].num_ports;port++){
-			    port_phys=map_port_number_from_logical_to_physical(port);
-			    if (swconfig.vlan.s.port_vlan_index[port_phys]==vi){
-				swconfig.vlan.s.port_vlan_index[port_phys]=find_vlan_index_by_vid(1);
-				swconfig.vlan_entry.bitmap[find_vlan_index_by_vid(1)]|=1<<port_phys;
-			    }
-			}
-		    }
-		    rrcp_config_commit_vlan_to_switch();
-		}else{
-		    cli_print(cli, "%% ERROR: Invalid vlan list: '%s'",argv[0]);
-		    return CLI_ERROR;
+		cnt = str_number_list_init(argv[0], &vidlist);
+		if ((cnt <= 0) || cnt > 32) {
+		   cli_print(cli, "%% ERROR: Invalid vlan list: '%s'",argv[0]);
+		   return CLI_ERROR;
 		}
+		for (cnt=0; str_number_list_get_next(&vidlist, &vid) == 0; cnt++) {
+		   if (vid < 0 || vid > 4095) {
+		      cli_print(cli, "%% ERROR: Incorrect VLAN index: %i", vid);
+		      return CLI_ERROR;
+		   }
+		}
+
+		str_number_list_init(argv[0], &vidlist);
+		while (str_number_list_get_next(&vidlist, &vid) == 0) {
+		   vi=find_vlan_index_by_vid(vid);
+		   if (vi>=0){
+		      swconfig.vlan_entry.bitmap[vi]=0;
+		      if (vid>1){
+			 swconfig.vlan_vid[vi]=0;
+		      }
+		   }
+		   for(port=1;port<=switchtypes[switchtype].num_ports;port++){
+		      port_phys=map_port_number_from_logical_to_physical(port);
+		      if (swconfig.vlan.s.port_vlan_index[port_phys]==vi){
+			 swconfig.vlan.s.port_vlan_index[port_phys]=find_vlan_index_by_vid(1);
+			 swconfig.vlan_entry.bitmap[find_vlan_index_by_vid(1)]|=1<<port_phys;
+		      }
+		   }
+		}
+		rrcp_config_commit_vlan_to_switch();
 		return CLI_OK;
 	    }
 	}

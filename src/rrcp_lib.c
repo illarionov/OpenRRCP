@@ -71,56 +71,6 @@ int str_portlist_to_array(char *list,unsigned short int *arr,unsigned int arrlen
     return(0);
 }
 
-int str_portlist_to_array_by_value(char *list,int *arr,unsigned int arrlen){
-    short int i,k;
-    char *s,*c,*n;
-    char *d[16];
-    unsigned int st,sp;
-    int arrptr=0;
-
-    s=list;
-    for (i=0;i<strlen(s);i++){  //check allowed symbols
-	if ( ((s[i] >= '0') && (s[i] <= '9')) || (s[i] == ',') || (s[i] == '-') ) continue;
-	arr[arrptr]=-1;
-	return(1);
-    }
-    while(*s){
-	bzero(d,sizeof(d));
-	// parsing
-	if ( (c=strchr(s,',')) != NULL ) { k=c-s; n=c+1; }
-	else { k=strlen(s); n=s+k; }
-	if (k >= sizeof(d)) {
-	    arr[arrptr]=-1;
-	    return(1);
-	}
-	memcpy(d,s,k);s=n;
-	// range of ports or one port?
-	if (strchr((char *)d,'-')!=NULL){
-	    // range
-	    if (sscanf((char *)d,"%u-%u",&st,&sp) != 2) {
-		arr[arrptr]=-1;
-		return(2);
-	    }
-	    if ( !st || !sp || (st > sp) ) {
-		arr[arrptr]=-1;
-		return(3);
-	    }
-	    for (i=st;i<=sp;i++) { arr[arrptr++]=i; }
-	}else{
-	    // one port
-	    st=(unsigned int)strtoul((char *)d, (char **)NULL, 10);
-	    if ( !st ) {
-		arr[arrptr]=-1;
-		return(3);
-	    }
-	    arr[arrptr++]=st;
-	}
-    }
-    arr[arrptr]=-1;
-    return(0);
-}
-
-
 int parse_switch_id(const char *str) {
    unsigned i, key;
    unsigned char x[6];

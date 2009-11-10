@@ -76,6 +76,10 @@ struct bpf_program filter;
 #endif
 char ErrIOMsg[512];
 
+struct timeval add_ms_to_timeval(const struct timeval *tm, int ms);
+long get_timediff_us(const struct timeval *endtime,
+      const struct timeval *starttime);
+
 // takes logical port number as printed on switch' case (1,2,3...)
 // returns physical port number (0,1,2...) or -1 if this device has no such logical port
 int map_port_number_from_logical_to_physical(int port){
@@ -686,26 +690,46 @@ int rrcp_io_probe_switch_for_facing_switch_port(uint8_t *switch_mac_address, uin
  */
 int rtl83xx_readreg32_(uint16_t regno,uint32_t *regval){
     int len = 0;
-    int i;
+    unsigned reply_recived;
+    struct timeval starttime, curtime, maxtime;
     struct rrcp_packet_t pkt,pktr;
 
+    if (gettimeofday(&starttime, NULL) < 0)
+       return 4;
+
+    maxtime = add_ms_to_timeval(&starttime, DEFAULT_PING_TIME);
+
     init_rrcp_get_packet(&pkt, my_mac, dest_mac, &authkey, regno);
-    for(i=0;i<30;i++){
-        if (sock_send_(&pkt, sizeof(pkt)) < 0) return(1);
-	memset(&pktr,0,sizeof(pktr));
-	len=sock_rec(&pktr, sizeof(pktr),0);
-	if (is_rtl_packet(&pktr, len) && 
-	    (memcmp(pktr.ether_dhost,my_mac,6)==0)&&
-	    pktr.rrcp_proto==RTL_RRCP_PROTO &&
-	    pktr.rrcp_opcode==RRCP_OPCODE_GET &&
-	    pktr.rrcp_isreply==1 &&
-	    pktr.rrcp_authkey==htons(authkey)&&
-	    pktr.rrcp_reg_addr==regno){
-                *regval=pktr.rrcp_reg_data;
-                return(0);
-	}
+    if (sock_send_(&pkt, sizeof(pkt)) < 0)
+       return(1);
+
+    for (reply_recived=0; reply_recived == 0;) {
+       if (gettimeofday(&curtime, NULL) < 0)
+	  break;
+
+       if (timercmp(&curtime, &maxtime, >=)) /* Timeout */
+	  break;
+
+       memset(&pktr,0,sizeof(pktr));
+       len=sock_rec(&pktr, sizeof(pktr), get_timediff_us(&maxtime, &curtime));
+       if (len < 0) /* EINTR */
+	  break;
+
+       if (is_rtl_packet(&pktr, len) &&
+	     (memcmp(pktr.ether_dhost,my_mac,6)==0)&&
+	     pktr.rrcp_proto==RTL_RRCP_PROTO &&
+	     pktr.rrcp_opcode==RRCP_OPCODE_GET &&
+	     pktr.rrcp_isreply==1 &&
+	     pktr.rrcp_authkey==htons(authkey)&&
+	     pktr.rrcp_reg_addr==regno &&
+	     pktr.cookie1 == pkt.cookie1 &&
+	     pktr.cookie2 == pkt.cookie2 ){
+	  reply_recived=1;
+	  *regval=pktr.rrcp_reg_data;
+       }
     }
-    return(2);
+
+    return reply_recived ? 0 : 2;
 }
 
 /*

@@ -234,7 +234,7 @@ int main(int argc, char *argv[]){
  VlanGetFault=CheckVlan=Check1qVlan=0;
  LoopGetFault=CheckLoop=LoopEnFault=EnLoopDet=0;
  CheckPortsUp=PortsGetFault=PortsDownDet=0;
- while ((c = getopt_long(argc, argv, "dPvVcwH:I:t:T:u:pqlh?",longopts,&option)) != -1) {
+ while ((c = getopt_long(argc, argv, "a:dPvVcwH:I:t:T:u:pqlh?",longopts,&option)) != -1) {
   switch (c) {
    case 'd':
              debug++;

@@ -176,13 +176,12 @@ void print_quit(int state,char *msg){
 
 int main(int argc, char *argv[]){
  int i,c;
- int unsigned base,CheckVlan,Check1qVlan,CheckLoop,mac,ak,EnLoopDet,LoopEnFault,CheckPortsUp,PortsGetFault,PortsDownDet,LoopGetFault,VlanGetFault;
+ int unsigned base,CheckVlan,Check1qVlan,CheckLoop,mac,EnLoopDet,LoopEnFault,CheckPortsUp,PortsGetFault,PortsDownDet,LoopGetFault,VlanGetFault;
  long unsigned t_out;
  uint32_t port_loop_status=0;
  uint32_t RegValue;
  uint32_t vlan_status;
  unsigned int LoopDet=0;
- unsigned int x[6];
  ldiv_t difft;
  int exit_state=STATE_OK;
  int option = 0;
@@ -236,27 +235,16 @@ int main(int argc, char *argv[]){
              exit(STATE_UNKNOWN);
              break;
    case 'H':
-             if (sscanf(optarg, "%x-%x:%x:%x:%x:%x:%x@%s",&ak,x,x+1,x+2,x+3,x+4,x+5,ifname)==8){
-                if (ak > 0xffff) {
-                  printf("invalid authkey 0x%x\n",ak);
-                  exit(STATE_UNKNOWN);
-                }
-                authkey=(uint16_t)ak;
-                for (i=0;i<6;i++){
-                  dest_mac[i]=(unsigned char)x[i];
-                }
+	     if (parse_switch_id(optarg) >= 0) {
                 mac++;
-             }else if (sscanf(optarg, "%x:%x:%x:%x:%x:%x@%s",x,x+1,x+2,x+3,x+4,x+5,ifname)==7){
-                for (i=0;i<6;i++){
-                  dest_mac[i]=(unsigned char)x[i];
-                }
+             }else if (sscanf(optarg, "%2hhx:%2hhx:%2hhx:%2hhx:%2hhx:%2hhx",
+		      &dest_mac[0], &dest_mac[1], &dest_mac[2],
+		      &dest_mac[3], &dest_mac[4], &dest_mac[5])==6){
                 mac++;
-             }else if (sscanf(optarg, "%x:%x:%x:%x:%x:%x",x,x+1,x+2,x+3,x+4,x+5)==6){
-                for (i=0;i<6;i++){
-                   dest_mac[i]=(unsigned char)x[i];
-                }
-                mac++;
-             }
+             }else {
+		printf("Invalid switch MAC address: %s\n", optarg);
+		exit(STATE_UNKNOWN);
+	     }
              break;
    case 'I':
              strncpy(ifname,optarg,sizeof(ifname)-1);
@@ -380,9 +368,10 @@ int main(int argc, char *argv[]){
  // Calculation of a delay of the answer of the switch
  difft=ldiv(((recv_time.tv_sec-send_time.tv_sec)*1000000+recv_time.tv_usec)-send_time.tv_usec,1000);
  // Print final result...
- memset(Temp,0,sizeof(Temp));
- snprintf(Temp,sizeof(Temp),"Reply from %02X:%02X:%02X:%02X:%02X:%02X, time %li.%03li ms",
-         x[0],x[1],x[2],x[3],x[4],x[5],difft.quot,difft.rem);
+ snprintf(Temp,sizeof(Temp),"Reply from %02hhX:%02hhX:%02hhX:%02hhX:%02hhX:%02hhX, time %li.%03li ms",
+         dest_mac[0],dest_mac[1],dest_mac[2],
+	 dest_mac[3],dest_mac[4],dest_mac[5],
+	 difft.quot,difft.rem);
  // processing loop detect status
  if (CheckLoop){
   if (LoopEnFault){

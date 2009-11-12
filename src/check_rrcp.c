@@ -22,6 +22,7 @@
     This would be appreciated, however not required.
 */
 
+#include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
@@ -172,6 +173,21 @@ void print_quit(int state,char *msg){
 // if (s_send != -1) shutdown(s_send,SHUT_RDWR);
 #endif
  exit(state);
+}
+
+void tempstr_append(const char *fmt, ...)
+{
+   size_t len;
+   va_list ap;
+
+   len = strlen(Temp);
+   if (len + 1 >= sizeof(Temp))
+      return;
+   va_start(ap, fmt);
+   vsnprintf(Temp+len, sizeof(Temp)-len, fmt, ap);
+   va_end(ap);
+
+   return;
 }
 
 int main(int argc, char *argv[]){
@@ -368,7 +384,8 @@ int main(int argc, char *argv[]){
  // Calculation of a delay of the answer of the switch
  difft=ldiv(((recv_time.tv_sec-send_time.tv_sec)*1000000+recv_time.tv_usec)-send_time.tv_usec,1000);
  // Print final result...
- snprintf(Temp,sizeof(Temp),"Reply from %02hhX:%02hhX:%02hhX:%02hhX:%02hhX:%02hhX, time %li.%03li ms",
+ Temp[0]='\0';
+ tempstr_append("Reply from %02hhX:%02hhX:%02hhX:%02hhX:%02hhX:%02hhX, time %li.%03li ms",
          dest_mac[0],dest_mac[1],dest_mac[2],
 	 dest_mac[3],dest_mac[4],dest_mac[5],
 	 difft.quot,difft.rem);
@@ -376,48 +393,49 @@ int main(int argc, char *argv[]){
  if (CheckLoop){
   if (LoopEnFault){
    if (exit_state < STATE_WARNING) exit_state=STATE_WARNING;
-   snprintf(Temp+strlen(Temp),sizeof(Temp),", can not get loop enable/disable value");
+   tempstr_append(", can not get loop enable/disable value");
   }else{
    if (EnLoopDet){
     if (LoopDet) { // ...loop detected
      exit_state=STATE_WARNING;
      if (LoopGetFault){
-      snprintf(Temp+strlen(Temp),sizeof(Temp),", can not get loop status");
+	tempstr_append(", can not get loop status");
      }else{
-      snprintf(Temp+strlen(Temp),sizeof(Temp),", loop on port(s): ");
+      unsigned is_first_port = 1;
       for(i=1;i<=switchtypes[switchtype].num_ports;i++){
-        if ( (port_loop_status>>(map_port_number_from_logical_to_physical(i)))&0x1 ) 
-           snprintf(Temp+strlen(Temp),sizeof(Temp),"%u,",i);
+       if ( (port_loop_status>>(map_port_number_from_logical_to_physical(i)))&0x1 ) {
+	tempstr_append(is_first_port ? ", loop on port(s): %u" : ",%u",i);
+	is_first_port = 0;
+       }
       }
-      Temp[strlen(Temp)-1]='\0';
      }
     }
    }else{
      if (exit_state < STATE_WARNING) exit_state=STATE_WARNING;
-     snprintf(Temp+strlen(Temp),sizeof(Temp),", loop detect disable");
+     tempstr_append(", loop detect disable");
    }
   }
  }
 /*
  if (RegValue&0x2){ // ...trunk fault
    if (exit_state < STATE_WARNING) exit_state=STATE_WARNING;
-   snprintf(Temp+strlen(Temp),sizeof(Temp),", fault trunk group detected");
+   tempstr_append(", fault trunk group detected");
  }
 */
  // processing vlan status
  if (CheckVlan||Check1qVlan){
-  if (VlanGetFault){ 
+  if (VlanGetFault){
     if (exit_state < STATE_WARNING) exit_state=STATE_WARNING;
-    snprintf(Temp+strlen(Temp),sizeof(Temp),", can not get VLAN status");
-  }else{ 
+    tempstr_append(", can not get VLAN status");
+  }else{
     if (!(vlan_status&0x1)){ // ...VLAN disable
       if (exit_state < STATE_WARNING) exit_state=STATE_WARNING;
-      snprintf(Temp+strlen(Temp),sizeof(Temp),", VLAN disable");
+      tempstr_append(", VLAN disable");
     }else{
       if (Check1qVlan){ // ... dot1qVLAN disable
        if (!(vlan_status&0x10)){
         if (exit_state < STATE_WARNING) exit_state=STATE_WARNING;
-        snprintf(Temp+strlen(Temp),sizeof(Temp),", .1q_VLAN disable");
+        tempstr_append(", .1q_VLAN disable");
        }
       }
     }
@@ -427,7 +445,7 @@ int main(int argc, char *argv[]){
  if (CheckPortsUp){
   if (PortsGetFault){
     if (exit_state < STATE_WARNING) exit_state=STATE_WARNING;
-    snprintf(Temp+strlen(Temp),sizeof(Temp),", can not get ports status");
+    tempstr_append(", can not get ports status");
   }else{
    for(i=1;i<=switchtypes[switchtype].num_ports;i++){
     if (port_list[i-1]){
@@ -440,11 +458,13 @@ int main(int argc, char *argv[]){
    }
    if (PortsDownDet){
     if (exit_state < STATE_WARNING) exit_state=STATE_WARNING;
-    snprintf(Temp+strlen(Temp),sizeof(Temp),", port(s) down: ");
+    unsigned is_first_port = 1;
     for(i=1;i<=switchtypes[switchtype].num_ports;i++){
-     if (port_list[i-1]) snprintf(Temp+strlen(Temp),sizeof(Temp),"%u,",i);
+     if (port_list[i-1]) {
+      tempstr_append(is_first_port ? ", port(s) down: %u" : ",%u",i);
+      is_first_port = 0;
+     }
     }
-    Temp[strlen(Temp)-1]='\0';
    }
   }
  }

@@ -270,7 +270,11 @@ int main(int argc, char *argv[]){
              t_out = strtoul(optarg,(char **)NULL, base);
              break;
    case 'T':
-             switchtype = strtoul(optarg,(char **)NULL, 10);
+	     switchtype = rrcp_get_switch_id_by_short_name(optarg);
+	     if (switchtype < 0) {
+		printf("invalid switch type %s\n",optarg);
+		exit(STATE_UNKNOWN);
+	     }
              break;
    case 'p':
              CheckVlan++;

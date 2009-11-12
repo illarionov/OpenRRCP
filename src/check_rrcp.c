@@ -138,6 +138,8 @@ void print_help(void){
    timeout for waiting answer, ms, default: 5000ms\n\
 -a, --authkey=AUTHKEY\n\
    custom authkey, default: 0x2379\n\
+-A --update-authk\n\
+   Update authkey when it changes to default value\n\
 -l, --check_loop\n\
    check loop detect enable & loop detected\n\
 -p, --check_vlan\n\
@@ -192,7 +194,7 @@ void tempstr_append(const char *fmt, ...)
 
 int main(int argc, char *argv[]){
  int i,c;
- int unsigned base,CheckVlan,Check1qVlan,CheckLoop,mac,EnLoopDet,LoopEnFault,CheckPortsUp,PortsGetFault,PortsDownDet,LoopGetFault,VlanGetFault;
+ int unsigned base,CheckVlan,Check1qVlan,CheckLoop,mac,EnLoopDet,LoopEnFault,CheckPortsUp,PortsGetFault,PortsDownDet,LoopGetFault,VlanGetFault,UpdateAuthk,AuthkChanged;
  long unsigned t_out;
  uint32_t port_loop_status=0;
  uint32_t RegValue;
@@ -221,6 +223,7 @@ int main(int argc, char *argv[]){
     {"check_1q",no_argument, 0, 'q'},
     {"check_loop",no_argument, 0, 'l'},
     {"check_up", required_argument, 0, 'u'},
+    {"update_authk", no_argument, 0, 'A'},
     {0, 0, 0, 0}
  };
 
@@ -234,7 +237,8 @@ int main(int argc, char *argv[]){
  VlanGetFault=CheckVlan=Check1qVlan=0;
  LoopGetFault=CheckLoop=LoopEnFault=EnLoopDet=0;
  CheckPortsUp=PortsGetFault=PortsDownDet=0;
- while ((c = getopt_long(argc, argv, "a:dPvVcwH:I:t:T:u:pqlh?",longopts,&option)) != -1) {
+ UpdateAuthk=AuthkChanged=0;
+ while ((c = getopt_long(argc, argv, "Aa:dPvVcwH:I:t:T:u:pqlh?",longopts,&option)) != -1) {
   switch (c) {
    case 'd':
              debug++;
@@ -268,6 +272,9 @@ int main(int argc, char *argv[]){
    case 'a':
              authkey = (int unsigned)strtoul(optarg,(char **)NULL, 16);
              break;
+   case 'A':
+	     UpdateAuthk=1;
+	     break;
    case 't':
              base=10;
              if (strstr(optarg,"0x")==optarg) base=16;
@@ -322,7 +329,25 @@ int main(int argc, char *argv[]){
    if (debug) fprintf(stderr,"Get register 0x102...");
    if (rtl83xx_readreg32_(0x0102,&RegValue)){
      if (debug) fprintf(stderr,"device not responding\n");
-     print_quit(STATE_CRITICAL,"Device not responding");
+     /* Update authkey */
+     if (UpdateAuthk && authkey != 0x2379) {
+	uint16_t new_authk;
+	new_authk = authkey;
+	authkey = 0x2379;
+	if (rtl83xx_readreg32_(0x0102,&RegValue)){
+	   if (debug) fprintf(stderr,"device not responding to request with default authkey\n");
+	   print_quit(STATE_CRITICAL,"Device not responding");
+	}
+	rtl83xx_setreg16(0x209,new_authk);
+	authkey = new_authk;
+	gettimeofday(&send_time,NULL);
+	if (rtl83xx_readreg32_(0x0102,&RegValue)){
+	   if (debug) fprintf(stderr,"device not responding to request with new authkey\n");
+	   print_quit(STATE_CRITICAL,"Device not responding");
+	}
+	AuthkChanged = 1;
+     }else
+	print_quit(STATE_CRITICAL,"Device not responding");
    }
    if (debug) fprintf(stderr,"done, value=%04x\n",RegValue);
    // Storing of time of receiving of a packet
@@ -389,6 +414,10 @@ int main(int argc, char *argv[]){
          dest_mac[0],dest_mac[1],dest_mac[2],
 	 dest_mac[3],dest_mac[4],dest_mac[5],
 	 difft.quot,difft.rem);
+ if (AuthkChanged) {
+   if (exit_state < STATE_WARNING) exit_state=STATE_WARNING;
+   tempstr_append(", authkey changed");
+ }
  // processing loop detect status
  if (CheckLoop){
   if (LoopEnFault){

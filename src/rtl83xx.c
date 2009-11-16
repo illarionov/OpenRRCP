@@ -46,15 +46,24 @@
 
 #define OPENRRCP_VERSION  "0.2.2"
 
+#define DEFAULT_CAPTURE_MAC_TIME_SEC 30
+
 int myPid = 0;
 extern char ErrIOMsg[];
 char ErrMsg[512];
+
+static int break_capture_mac;
 
 void sigHandler(int sig)
 {
     printf("Timeout! (no switch with rtl83xx chip found?)\n");
     kill( myPid, SIGKILL );
     exit( 0 );
+}
+
+void sigMacCaptHandler(int sig)
+{
+   break_capture_mac = 1;
 }
 
 void engage_timeout(int seconds)
@@ -1134,6 +1143,180 @@ void do_igmp_snooping(int is_enabled){
     rtl83xx_setreg16(0x0308,swconfig.alt_igmp_snooping.raw);
 }
 
+int do_capture_mac_address(const char *iface_list)
+{
+   uint8_t fport;
+   uint16_t alt_conf_300, learn_ctrl_301, learn_ctrl_302;
+   uint16_t new_alt_conf_300, new_learn_ctrl_301, new_learn_ctrl_302;
+   uint32_t old_mac[3];
+   uint32_t tmp;
+   uint32_t reg302_mask;
+   unsigned cnt;
+   int ifacenum;
+   struct timeval starttime, curtime, maxtime;
+   struct t_str_number_list list;
+
+   cnt = str_number_list_init(iface_list, &list);
+   if (cnt <= 0 || cnt > 30) {
+      snprintf(ErrMsg, sizeof(ErrMsg),
+	    "Incorrect Interface list: %s\n", iface_list);
+      return -2;
+   }
+
+   for (; str_number_list_get_next(&list, &ifacenum) == 0;) {
+      if (ifacenum < 1 || ifacenum > switchtypes[switchtype].num_ports) {
+	 snprintf(ErrMsg, sizeof(ErrMsg),
+	       "Mailformed interface number: %i in interface list: %s\n",
+	       ifacenum, iface_list);
+	 return -1;
+      }
+   }
+
+   if (rrcp_io_probe_switch_for_facing_switch_port(dest_mac, (uint8_t *)&fport) < 0) {
+      snprintf(ErrMsg, sizeof(ErrMsg), "Switch not responded\n");
+      return -1;
+   }
+
+   fputs("Reading address lookup table configuration registers\n", stdout);
+   reg302_mask = switchtypes[switchtype].num_ports > 16;
+   if ( rtl83xx_readreg32_(0x0300, &tmp)) {
+      snprintf(ErrMsg, sizeof(ErrMsg),
+	    "Cannot read address learning control register %x\n", 0x0300);
+      return -1;
+   }
+   alt_conf_300  = (uint16_t)tmp;
+
+   if ( rtl83xx_readreg32_(0x0301, &tmp)) {
+      snprintf(ErrMsg, sizeof(ErrMsg),
+	    "Cannot read address learning control register %x\n", 0x0301);
+      return -1;
+   }
+   learn_ctrl_301 = (uint16_t)tmp;
+
+   if (reg302_mask) {
+      if (rtl83xx_readreg32_(0x0302, &tmp)) {
+	 snprintf(ErrMsg, sizeof(ErrMsg),
+	       "Cannot read address learning control register %x\n", 0x0302);
+	 return -1;
+      }
+      learn_ctrl_302 = (uint16_t)tmp;
+   }else
+      learn_ctrl_302 = 0;
+
+   /* Signals */
+   break_capture_mac=0;
+   signal(SIGHUP, sigMacCaptHandler);
+   signal(SIGINT, sigMacCaptHandler);
+   signal(SIGTERM, sigMacCaptHandler);
+
+   printf("Turning off mac-learning on interfaces: %s. "
+	 "Turning on 12 seconds MAC aging\n", iface_list);
+
+   tmp = 0;
+   str_number_list_init(iface_list, &list);
+   for (; str_number_list_get_next(&list, &ifacenum) == 0;) {
+      int f;
+      f = map_port_number_from_logical_to_physical(ifacenum);
+      if (f == fport)
+	 printf("Skipping facing port %i\n", ifacenum);
+      else
+	 tmp |= (uint32_t)1 << f;
+   }
+
+   new_learn_ctrl_301 = tmp & 0xffff;
+   new_learn_ctrl_302 = (tmp >> 16) & 0xffff;
+   new_alt_conf_300 = (alt_conf_300 & 0xfffe) | 0x02;
+
+   rtl83xx_setreg16(0x0300,new_alt_conf_300);
+   rtl83xx_setreg16(0x0301,new_learn_ctrl_301);
+   if (reg302_mask && !break_capture_mac)
+      rtl83xx_setreg16(0x0302,new_learn_ctrl_302);
+
+   /* Reset status */
+   rtl83xx_readreg32_(0x0306, &tmp);
+   if (break_capture_mac) goto restore_capture_status;
+   rtl83xx_readreg32_(0x0305, &tmp);
+   if (break_capture_mac) goto restore_capture_status;
+   rtl83xx_readreg32_(0x0304, &tmp);
+   if (break_capture_mac) goto restore_capture_status;
+   rtl83xx_readreg32_(0x0303, &tmp);
+   if (break_capture_mac) goto restore_capture_status;
+
+   printf("Capturing mac addresses for %u seconds\n", DEFAULT_CAPTURE_MAC_TIME_SEC);
+   if (gettimeofday(&starttime, NULL) < 0)
+       goto restore_capture_status;
+
+   maxtime = starttime;
+   maxtime.tv_sec += DEFAULT_CAPTURE_MAC_TIME_SEC;
+
+   engage_timeout(DEFAULT_CAPTURE_MAC_TIME_SEC+5);
+
+   old_mac[0] = old_mac[1] = old_mac[2] = 0xffffffff;
+   for (; break_capture_mac==0; usleep(300000)) {
+      unsigned if2;
+      uint32_t unk_sa_status;
+      uint32_t new_mac[3];
+
+      if (gettimeofday(&curtime, NULL) < 0)
+	  break;
+      if (timercmp(&curtime, &maxtime, >=)) /* Timeout */
+	 break;
+
+      if (rtl83xx_readreg32_(0x0306, &unk_sa_status)){
+	 printf(
+	       "Cannot read Unknown SA capture status register\n");
+	 continue;
+      }
+
+      /*
+       * Bit 5: 0 - Idle (old status),
+       * 1 - New unknown SA detected (autocleared)
+       *
+       */
+      if ((unk_sa_status & 0x20) == 0)
+	 continue;
+
+      /* Read sequence: 0x0305->0x0304->0x0303 */
+      if (rtl83xx_readreg32_(0x0305, &new_mac[2])
+	    || rtl83xx_readreg32_(0x0304, &new_mac[1])
+	    || rtl83xx_readreg32_(0x0303, &new_mac[0])) {
+	 printf("Cannot read Unknown SA capture registers\n");
+	 continue;
+      }
+
+      if (!((old_mac[0] == new_mac[0])
+	    && (old_mac[1] == new_mac[1])
+	    && (old_mac[2] == new_mac[2])))
+      {
+	 if2 = map_port_number_from_physical_to_logical(unk_sa_status & 0x1f);
+	 printf("MAC: %02x:%02x:%02x:%02x:%02x:%02x Port: %u\n",
+	       new_mac[0] & 0xff,
+	       new_mac[0] >> 8 & 0xff,
+	       new_mac[1] & 0xff,
+	       new_mac[1] >> 8 & 0xff,
+	       new_mac[2] & 0xff,
+	       new_mac[2] >> 8 & 0xff,
+	       if2
+	       );
+	 old_mac[0] = new_mac[0];
+	 old_mac[1] = new_mac[1];
+	 old_mac[2] = new_mac[2];
+      }
+   } /* for */
+
+restore_capture_status:
+   signal(SIGHUP, SIG_DFL);
+   signal(SIGINT, SIG_DFL);
+   signal(SIGTERM, SIG_DFL);
+   fputs("Restoring mac-learning configuration\n", stdout);
+   rtl83xx_setreg16(0x0300,alt_conf_300);
+   rtl83xx_setreg16(0x0301,learn_ctrl_301);
+   if (reg302_mask)
+      rtl83xx_setreg16(0x0302,learn_ctrl_302);
+
+   return 0;
+}
+
 void print_allow_command(char **command_list){
  int i=0;
 
@@ -1221,6 +1404,7 @@ void print_usage(void){
 	 " show interface [<list ports>] summary - print port rx/tx counters\n"
 	 " show interface [<list ports>] cable-diagnostics - cabe diagnostics\n"
 	 " show interface [<list ports>] phy-status        - PHY status\n"
+	 " capture interface <list ports> mac-address - capure mac-addresses\n"
 	 " show vlan [vid <id>]                  - show low-level vlan confg\n"
 	 " show version                          - system hardware and software status\n"
 	 " scan [verbose] [retries <number>]     - scan network for rrcp-enabled switches\n"
@@ -1301,7 +1485,7 @@ int main(int argc, char **argv){
     unsigned short int *p_port_list=NULL;
     unsigned short int port_list[26];
     char *ena_disa[]={"disable","enable",""};
-    char *cmd_level_1[]={"show","config","scan","reload","reboot","write","ping","detect",""}; 
+    char *cmd_level_1[]={"show","config","scan","reload","reboot","write","ping","detect","capture",""}; 
     char *show_sub_cmd[]={"running-config","startup-config","interface","vlan","version",""};
     char *scan_sub_cmd[]={"verbose","retries",""};
     char *show_sub_cmd_l2[]={"full","verbose",""};
@@ -1949,6 +2133,21 @@ int main(int argc, char **argv){
 			 switchtypes[switch_t].shortname,
 			 chipnames[switchtypes[switch_t].chip_id],
 			 eeprom_type_text[eeprom]);
+		   exit(0);
+		}
+	 case 8: /* capture */
+		{
+		   char *interface_cmd[] = {"interface", ""};
+		   char *macaddr_cmd[] = {"mac-address", ""};
+
+		   check_argc(argc, 3+shift, NULL, &interface_cmd[0]);
+		   check_argc(argc, 4+shift, "Interface number nedded\n", NULL);
+		   get_cmd_num(argv[5+shift], -1, NULL, &macaddr_cmd[0]);
+
+		   if (do_capture_mac_address(argv[4+shift]) != 0) {
+		      fputs(ErrMsg, stdout);
+		      exit(1);
+		   }
 		   exit(0);
 		}
          default:

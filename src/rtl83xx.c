@@ -990,7 +990,7 @@ int main(int argc, char **argv){
 	switchtype=17;
     }else if (strstr(p,"rtl83xx_zyxel_es116p")==argv[0]+strlen(argv[0])-20){ 
         switchtype=18; 
-    }else if (strstr(p,"rtl83xx_cleverswitch_cs8p")==argv[0]+strlen(argv[0])-25){
+    }else if (strstr(p,"rtl83xx_neomontana_cs8p")==argv[0]+strlen(argv[0])-23){
 	switchtype=19;
     }else if (strcmp(argv[2],"scan")==0){ //allow scan command to be runt without specifying chip/switch
 	switchtype=0;

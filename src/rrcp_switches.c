@@ -1228,9 +1228,9 @@ struct switchtype_t switchtypes[] = {
         &defregval_rtl8316b_generic[0]
     },
     {
+	"Neomontana",
 	"CleverSwitch",
-	"CS8P",
-	"unknown",
+	"DW-208R1",
 	{0,0,0},
 	0,
 	"rtl8316bp",

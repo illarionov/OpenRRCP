@@ -12,10 +12,10 @@ clean:
 	rm -f ../bin/*
 
 rrcpcli: rrcp_cli.c rrcp_cli_cmd_show.c rrcp_cli_cmd_config.c rrcp_cli_cmd_config_int.c rrcp_cli_cmd_other.c rrcp_config.c rrcp_io.c rrcp_lib.c rrcp_switches.c
-	gcc $(CFLAGS) rrcp_cli.c rrcp_cli_cmd_show.c rrcp_cli_cmd_config.c rrcp_cli_cmd_config_int.c rrcp_cli_cmd_other.c rrcp_config.c rrcp_io.c rrcp_lib.c rrcp_switches.c ../lib/libcli.c -lcrypt -o ../bin/rrcpcli
+	gcc $(CFLAGS) rrcp_cli.c rrcp_cli_cmd_show.c rrcp_cli_cmd_config.c rrcp_cli_cmd_config_int.c rrcp_cli_cmd_other.c rrcp_config.c rrcp_io.c rrcp_lib.c rrcp_switches.c ../lib/libcli.c -o ../bin/rrcpcli
 
 rrcpcli-debug: rrcp_cli.c rrcp_cli_cmd_show.c rrcp_cli_cmd_config.c rrcp_cli_cmd_config_int.c rrcp_cli_cmd_other.c rrcp_config.c rrcp_io.c rrcp_lib.c rrcp_switches.c
-	gcc -Wall -ggdb rrcp_cli.c rrcp_cli_cmd_show.c rrcp_cli_cmd_config.c rrcp_cli_cmd_config_int.c rrcp_cli_cmd_other.c rrcp_config.c rrcp_io.c rrcp_lib.c rrcp_switches.c ../lib/libcli.c -lcrypt -o ../bin/rrcpcli-debug
+	gcc -Wall -ggdb rrcp_cli.c rrcp_cli_cmd_show.c rrcp_cli_cmd_config.c rrcp_cli_cmd_config_int.c rrcp_cli_cmd_other.c rrcp_config.c rrcp_io.c rrcp_lib.c rrcp_switches.c ../lib/libcli.c -o ../bin/rrcpcli-debug
 
 rtl83xx: rtl83xx.c
 	gcc $(CFLAGS) rtl83xx.c rrcp_io.c rrcp_switches.c rrcp_config.c -o ../bin/rtl83xx

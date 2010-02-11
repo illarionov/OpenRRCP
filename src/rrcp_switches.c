@@ -977,7 +977,7 @@ int defregval_rtl8324_generic[]={   // generic rtl8324 & rtl8324p
      -1,0,0
 };
 
-const uint32_t switchtype_n = 19;
+const uint32_t switchtype_n = 20;
 
 struct switchtype_t switchtypes[] = {
     {
@@ -1225,6 +1225,19 @@ struct switchtype_t switchtypes[] = {
 	16,
 	{2,4,6,8,10,12,14,16,1,3,5,7,9,11,13,15,0,0,0,0,0,0,0,0,0,0,0},
         &reg2eeprom_rtl8316b_generic[0],
+        &defregval_rtl8316b_generic[0]
+    },
+    {
+	"CleverSwitch",
+	"CS8P",
+	"unknown",
+	{0,0,0},
+	0,
+	"rtl8316bp",
+	rtl8316bp,
+	8,
+	{1,2,3,4,5,6,7,8,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
+        &reg2eeprom_rtl8316bp_generic[0],
         &defregval_rtl8316b_generic[0]
     },
 };

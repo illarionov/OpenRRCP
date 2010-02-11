@@ -956,7 +956,7 @@ int main(int argc, char **argv){
 	switchtype=0;
     }else if (strstr(p,"rtl8316b")==argv[0]+strlen(argv[0])-8){
 	switchtype=1;
-    }else if (strstr(p,"rtl8316bp")==argv[0]+strlen(argv[0])-8){
+    }else if (strstr(p,"rtl8316bp")==argv[0]+strlen(argv[0])-9){
 	switchtype=2;
     }else if (strstr(p,"rtl8318")==argv[0]+strlen(argv[0])-8){
 	switchtype=3;
@@ -990,6 +990,8 @@ int main(int argc, char **argv){
 	switchtype=17;
     }else if (strstr(p,"rtl83xx_zyxel_es116p")==argv[0]+strlen(argv[0])-20){ 
         switchtype=18; 
+    }else if (strstr(p,"rtl83xx_cleverswitch_cs8p")==argv[0]+strlen(argv[0])-25){
+	switchtype=19;
     }else if (strcmp(argv[2],"scan")==0){ //allow scan command to be runt without specifying chip/switch
 	switchtype=0;
     }else {

@@ -116,12 +116,12 @@ void rrcp_config_commit_vlan_to_switch(void)
 }
 
 void sncprintf(char *str, size_t size, const char *format, ...) {
-    char line[1024];
+    char line[4096];
     va_list ap;
 
     line[0]=0;
     va_start(ap, format);
-    vsnprintf (line, size-1, format, ap);
+    vsnprintf (line, sizeof(line), format, ap);
     va_end(ap);
     if (size>(strlen(str)+strlen(line)+1)){
 	strncat(str,line,sizeof(line)-1);

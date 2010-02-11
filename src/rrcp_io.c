@@ -642,6 +642,7 @@ int rtl83xx_readreg32_(uint16_t regno,uint32_t *regval){
     int len = 0;
     int i;
     struct rrcp_packet_t pkt,pktr;
+	int cnt=0;
 
     memcpy(pkt.ether_dhost,dest_mac,6);
     memcpy(pkt.ether_shost,my_mac,6);
@@ -658,10 +659,13 @@ int rtl83xx_readreg32_(uint16_t regno,uint32_t *regval){
     for(i=0;i<30;i++){
         if (sock_send_(&pkt, sizeof(pkt)) < 0) return(1);
 	usleep(100+5000*i);
+next_packet:
+	cnt++;
 	memset(&pktr,0,sizeof(pktr));
 	len=sock_rec(&pktr, sizeof(pktr),100);
 	if (len >14 &&
 	    (memcmp(pktr.ether_dhost,my_mac,6)==0)&&
+	    (memcmp(pktr.ether_shost,dest_mac,6)==0)&&
 	    pktr.ether_type==htons(0x8899) &&
 	    pktr.rrcp_proto==0x01 &&
 	    pktr.rrcp_opcode==0x01 &&
@@ -671,6 +675,8 @@ int rtl83xx_readreg32_(uint16_t regno,uint32_t *regval){
                 *regval=pktr.rrcp_reg_data;
                 return(0);
 	}
+	if (cnt<=10) // ignore some packets from other sessions
+		goto next_packet;
     }
     return(2);
 }

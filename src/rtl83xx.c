@@ -962,7 +962,7 @@ int main(int argc, char **argv){
 	switchtype=3;
     }else if (strstr(p,"rtl8324")==argv[0]+strlen(argv[0])-7){
 	switchtype=4;
-    }else if (strstr(p,"rtl8324p")==argv[0]+strlen(argv[0])-7){
+    }else if (strstr(p,"rtl8324p")==argv[0]+strlen(argv[0])-8){
 	switchtype=5;
     }else if (strstr(p,"rtl83xx_asus_gigax_1024p")==argv[0]+strlen(argv[0])-24){
 	switchtype=6;

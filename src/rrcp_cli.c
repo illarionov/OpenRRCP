@@ -266,8 +266,7 @@ int main(int argc, char *argv[])
 	n = tcsetattr( x , TCSANOW , &ttyarg ) ; /* set changed tty arguments */
 	cli_set_privilege(cli, PRIVILEGE_PRIVILEGED);
 	cli_loop(cli, x);
-	cli_done(cli);
-//	system("reset"); //reset terminal on exit. FIXME: need to find more straight-forward solution to do this.
+	system("reset"); //reset terminal on exit. FIXME: need to find more straight-forward solution to do this.
     }else{
 	if (fork()==0){
 	    if ((s = socket(AF_INET, SOCK_STREAM, 0)) < 0){

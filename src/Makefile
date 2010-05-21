@@ -12,13 +12,13 @@ clean:
 	rm -f ../bin/*
 
 rrcpcli: rrcp_cli.c rrcp_cli_cmd_show.c rrcp_cli_cmd_config.c rrcp_cli_cmd_config_int.c rrcp_cli_cmd_other.c rrcp_config.c rrcp_io.c rrcp_lib.c rrcp_switches.c
-	gcc $(CFLAGS) rrcp_cli.c rrcp_cli_cmd_show.c rrcp_cli_cmd_config.c rrcp_cli_cmd_config_int.c rrcp_cli_cmd_other.c rrcp_config.c rrcp_io.c rrcp_lib.c rrcp_switches.c ../lib/libcli.c -o ../bin/rrcpcli
+	$(CC) $(CFLAGS) rrcp_cli.c rrcp_cli_cmd_show.c rrcp_cli_cmd_config.c rrcp_cli_cmd_config_int.c rrcp_cli_cmd_other.c rrcp_config.c rrcp_io.c rrcp_lib.c rrcp_switches.c ../lib/libcli.c -o ../bin/rrcpcli
 
 rrcpcli-debug: rrcp_cli.c rrcp_cli_cmd_show.c rrcp_cli_cmd_config.c rrcp_cli_cmd_config_int.c rrcp_cli_cmd_other.c rrcp_config.c rrcp_io.c rrcp_lib.c rrcp_switches.c
-	gcc -Wall -ggdb rrcp_cli.c rrcp_cli_cmd_show.c rrcp_cli_cmd_config.c rrcp_cli_cmd_config_int.c rrcp_cli_cmd_other.c rrcp_config.c rrcp_io.c rrcp_lib.c rrcp_switches.c ../lib/libcli.c -o ../bin/rrcpcli-debug
+	$(CC) -Wall -ggdb rrcp_cli.c rrcp_cli_cmd_show.c rrcp_cli_cmd_config.c rrcp_cli_cmd_config_int.c rrcp_cli_cmd_other.c rrcp_config.c rrcp_io.c rrcp_lib.c rrcp_switches.c ../lib/libcli.c -o ../bin/rrcpcli-debug
 
 rtl83xx: rtl83xx.c
-	gcc $(CFLAGS) rtl83xx.c rrcp_io.c rrcp_switches.c rrcp_config.c -o ../bin/rtl83xx
+	$(CC) $(CFLAGS) rtl83xx.c rrcp_io.c rrcp_switches.c rrcp_config.c -o ../bin/rtl83xx
 
 rtl8316b: rtl83xx
 	ln -sf rtl83xx ../bin/rtl8316b
@@ -81,10 +81,10 @@ rtl83xx_neomontana_cs8p: rtl83xx
 	ln -sf rtl83xx ../bin/rtl83xx_neomontana_cs8p
 
 rrcp_decode:
-	gcc $(CFLAGS) -o ../bin/rrcp_decode rrcp_switches.c rrcp_config.c rrcp_io.c rrcp_decode.c -lpcap
+	$(CC) $(CFLAGS) -o ../bin/rrcp_decode rrcp_switches.c rrcp_config.c rrcp_io.c rrcp_decode.c -lpcap
 
 check_rrcp:
-	gcc $(CFLAGS) check_rrcp.c rrcp_io.c rrcp_switches.c rrcp_config.c rrcp_lib.c -o ../bin/check_rrcp
+	$(CC) $(CFLAGS) check_rrcp.c rrcp_io.c rrcp_switches.c rrcp_config.c rrcp_lib.c -o ../bin/check_rrcp
 
 install:
 	mkdir -p $(DESTDIR)$(PREFIX)/bin 2>/dev/null

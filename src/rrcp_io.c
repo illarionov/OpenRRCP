@@ -26,6 +26,7 @@
 #include <sys/socket.h>
 #include <sys/ioctl.h>
 #include <sys/time.h>
+#include <endian.h>
 
 #ifdef __linux__
 #include <linux/if.h>
@@ -118,7 +119,7 @@ int rtl83xx_prepare(){
        return(1);
     }
 
-    sockaddr_send.sll_family   = PF_PACKET;	
+    sockaddr_send.sll_family   = PF_PACKET;
     sockaddr_send.sll_protocol = htons(0x8899);
     sockaddr_send.sll_ifindex  = if_nametoindex(ifname);
     sockaddr_send.sll_hatype   = ARPHRD_ETHER;
@@ -389,7 +390,7 @@ void rtl83xx_scan(int verbose, int retries){
 		f_cnt++; //for foreigh traffic age slowly
 	    }
 	}
-	if (f_cnt>50){
+	if (f_cnt>200){
 	    break;
 	}
     }
@@ -651,7 +652,7 @@ int rtl83xx_readreg32_(uint16_t regno,uint32_t *regval){
     pkt.rrcp_opcode=0x01;//0=hello; 1=get; 2=set
     pkt.rrcp_isreply=0;
     pkt.rrcp_authkey=htons(authkey);
-    pkt.rrcp_reg_addr=regno;
+    pkt.rrcp_reg_addr=htole16(regno);
     pkt.rrcp_reg_data=0;
     pkt.cookie1=rand();
     pkt.cookie2=rand();
@@ -671,8 +672,8 @@ next_packet:
 	    pktr.rrcp_opcode==0x01 &&
 	    pktr.rrcp_isreply==1 &&
 	    pktr.rrcp_authkey==htons(authkey)&&
-	    pktr.rrcp_reg_addr==regno){
-                *regval=pktr.rrcp_reg_data;
+	    pktr.rrcp_reg_addr==htole16(regno)){
+                *regval=htole32(pktr.rrcp_reg_data);
                 return(0);
 	}
 	if (cnt<=10) // ignore some packets from other sessions
@@ -736,8 +737,8 @@ void rtl83xx_setreg32(uint16_t regno, uint32_t regval){
     pkt.rrcp_opcode=0x02;//0=hello; 1=get; 2=set
     pkt.rrcp_isreply=0;
     pkt.rrcp_authkey=htons(authkey);
-    pkt.rrcp_reg_addr=regno;
-    pkt.rrcp_reg_data=regval;
+    pkt.rrcp_reg_addr=htole16(regno);
+    pkt.rrcp_reg_data=htole32(regval);
     pkt.cookie1=rand();
     pkt.cookie2=rand();
 /*

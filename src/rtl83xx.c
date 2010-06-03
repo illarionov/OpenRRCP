@@ -958,7 +958,7 @@ int main(int argc, char **argv){
 	switchtype=1;
     }else if (strstr(p,"rtl8316bp")==argv[0]+strlen(argv[0])-9){
 	switchtype=2;
-    }else if (strstr(p,"rtl8318")==argv[0]+strlen(argv[0])-8){
+    }else if (strstr(p,"rtl8318")==argv[0]+strlen(argv[0])-7){
 	switchtype=3;
     }else if (strstr(p,"rtl8324")==argv[0]+strlen(argv[0])-7){
 	switchtype=4;

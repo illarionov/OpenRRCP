@@ -17,9 +17,7 @@
 
     ---
 
-    You can send your updates, patches and suggestions on this software
-    to it's original author, Andrew Chernyak (nording@yandex.ru)
-    This would be appreciated, however not required.
+    Some support can be found at: http://openrrcp.org.ru/
 */
 
 #include <sys/types.h>
@@ -863,6 +861,7 @@ uint32_t rtl83xx_ping(void){
     int i,len = 0;
     struct rrcp_packet_t pkt,pktr;
 
+    memset(&pkt,0,sizeof(pkt));
     memcpy(pkt.ether_dhost,dest_mac,6);
     memcpy(pkt.ether_shost,my_mac,6);
     pkt.ether_type=htons(0x8899);

@@ -1463,7 +1463,8 @@ uint16_t rrcp_autodetect_switch_chip_eeprom(uint8_t *switch_type, uint8_t *chip_
 	  break;
        case 0x11f67001: /* compex-ps2216 1D  */
        case 0x11f67004: /* compex-ps2216-6d */
-	  if (detected_eeprom == EEPROM_2404) {
+	  if (detected_eeprom == EEPROM_2404
+		|| (detected_eeprom == EEPROM_2408)) {
 	     detected_chiptype=rtl8316b;
 	     detected_switchtype=(vender==0x11f67001?8:9);
 	  }

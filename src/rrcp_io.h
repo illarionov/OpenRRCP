@@ -28,12 +28,14 @@
 #define GetWriteMask 0
 #define GetReadMask  1
 
+#ifndef htole16
 #if __BYTE_ORDER == __BIG_ENDIAN
 #define htole16(x) ((x & 0xff)<<8 | (x & 0xff00)>>8)
 #define htole32(x) ((x & 0xff)<<24 | (x & 0xff00)<<8 | (x & 0xff0000)>>8 | (x & 0xff000000)>>24)
 #else
 #define htole16(x) (x)
 #define htole32(x) (x)
+#endif
 #endif
 
 extern char ifname[128];

@@ -24,7 +24,14 @@
 #include <sys/socket.h>
 #include <sys/ioctl.h>
 #include <sys/time.h>
+#ifdef __linux__
 #include <endian.h>
+#else
+#include <sys/endian.h>
+#define __BYTE_ORDER _BYTE_ORDER
+#define __LITTLE_ENDIAN _LITTLE_ENDIAN
+#define __BIG_ENDIAN _BIG_ENDIAN
+#endif
 
 #ifdef __linux__
 #include <linux/if.h>

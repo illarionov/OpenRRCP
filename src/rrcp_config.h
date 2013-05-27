@@ -39,6 +39,7 @@
 	uint8_t switch_type;
 	uint8_t chip_type;
 	t_eeprom_type eeprom_type;
+        uint8_t authkey;
 	uint8_t	port_count;
 	uint8_t facing_switch_port_phys;
 	union {//0x0200
@@ -192,6 +193,9 @@ void rrcp_config_bin2text(char *text_buffer, int buffer_length, int show_default
 char *rrcp_config_get_portname(char *buffer, int buffer_size, int port_number, int port_number_phys);
 
 int rrcp_config_get_port_log_num(const char *port);
+
+int rrcp_config_eeprom_init(uint8_t *eeprom, size_t size, unsigned switchtype);
+
 
 void do_show_config(int verbose);
 

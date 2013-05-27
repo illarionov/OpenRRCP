@@ -440,3 +440,73 @@ void rrcp_config_write_to_eeprom(void)
     }
 */
 }
+
+int reg_def_val(int sw_reg, unsigned switchtype)
+{
+   const struct switchtype_t *sw;
+   const int *p;
+   int res;
+
+   if (switchtype > switchtype_n)
+      return -1;
+
+   sw = &switchtypes[switchtype];
+   res=0;
+
+   for (p=sw->regdefval; *p != -1; p+= 3) {
+      int reg, def_val, cnt;
+      reg = p[0];
+      def_val = p[1];
+      cnt = p[2];
+
+      if (reg > sw_reg)
+	 break;
+      if (sw_reg<reg+cnt) {
+	 res = def_val;
+	 break;
+      }
+   }
+
+   return res;
+}
+
+int rrcp_config_eeprom_init(uint8_t *eeprom, size_t size, unsigned switchtype)
+{
+   const struct switchtype_t *sw;
+   const int *reg2eeprom_p;
+   int i;
+
+   if (size < 128)
+      return -1;
+   if (switchtype > switchtype_n)
+      return -1;
+
+   sw = &switchtypes[switchtype];
+   memset(eeprom, 0, size);
+
+   /* internal use eeprom defaults */
+   eeprom[0]=0x80; /* RX IO PAD Delay Configuration on rtl8326 */
+   eeprom[1]=0x0a;
+   eeprom[2]=0x55; /* TX IO Pad Delay configuration on rtl8326 */
+   eeprom[3]=0x01;
+   eeprom[4]=0x88; /* LED Display Configuraton */
+   eeprom[5]=0x0e;
+
+   for(reg2eeprom_p = sw->reg2eeprom; *reg2eeprom_p != -1; reg2eeprom_p += 3) {
+      int reg, eeprom_addr, cnt, defval;
+      reg = reg2eeprom_p[0];
+      eeprom_addr= reg2eeprom_p[1];
+      cnt = reg2eeprom_p[2];
+
+      if (eeprom_addr+2*cnt-1 >= size)
+	 continue;
+      for (i=0; i<cnt; i++) {
+	 defval=reg_def_val(reg+i, switchtype);
+	 eeprom[eeprom_addr+2*i]=defval&0xff;
+	 eeprom[eeprom_addr+2*i+1]=defval>>8;
+      }
+   }
+
+   return 0;
+}
+

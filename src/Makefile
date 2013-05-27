@@ -84,6 +84,8 @@ check_rrcp:
 
 rtlping:
 	gcc $(CFLAGS) rtlping.c rrcp_packet.c rrcp_io.c rrcp_lib.c rrcp_switches.c rrcp_config.c -o ../bin/rtlping
+c:
+	gcc $(CFLAGS) rrcp_packet.c rrcp_io.c rrcp_switches.c rrcp_config.c rrcp_lib.c command.c conf2eeprom.c -o conf2eeprom
 
 install:
 	mkdir -p $(DESTDIR)$(PREFIX)/bin 2>/dev/null

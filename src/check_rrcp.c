@@ -446,11 +446,7 @@ int main(int argc, char *argv[]){
 /*
  if (RegValue&0x2){ // ...trunk fault
    if (exit_state < STATE_WARNING) exit_state=STATE_WARNING;
-<<<<<<< HEAD
    tempstr_append(", fault trunk group detected");
-=======
-   snprintf(Temp+strlen(Temp),sizeof(Temp),", fault trunk group detected");
->>>>>>> b31900184fc1e9ec3f18668c62b4e9100086a76a
  }
 */
  // processing vlan status

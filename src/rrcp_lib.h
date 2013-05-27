@@ -17,9 +17,7 @@
 
     ---
 
-    You can send your updates, patches and suggestions on this software
-    to it's original author, Andrew Chernyak (nording@yandex.ru)
-    This would be appreciated, however not required.
+    Some support can be found at: http://openrrcp.org.ru/
 */
 
 struct t_str_number_list {
@@ -35,3 +33,4 @@ int str_number_list_init(const char *str, struct t_str_number_list *list);
 int str_number_list_get_next(struct t_str_number_list *list, int *val);
 
 int parse_switch_id(const char *str);
+

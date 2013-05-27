@@ -17,9 +17,7 @@
 
     ---
 
-    You can send your updates, patches and suggestions on this software
-    to it's original author, Andrew Chernyak (nording@yandex.ru)
-    This would be appreciated, however not required.
+    Some support can be found at: http://openrrcp.org.ru/
 */
 
 #define _GNU_SOURCE
@@ -141,7 +139,7 @@ int main(int argc, char *argv[])
 	char c;
 	c = getopt_long (argc, argv, "k:t:fp:",
                         NULL, NULL);
-	if (c == -1)
+        if (c < 'a' || c > 'z')
     	    break;
 
         switch (c) {
@@ -266,7 +264,8 @@ int main(int argc, char *argv[])
 	n = tcsetattr( x , TCSANOW , &ttyarg ) ; /* set changed tty arguments */
 	cli_set_privilege(cli, PRIVILEGE_PRIVILEGED);
 	cli_loop(cli, x);
-	system("reset"); //reset terminal on exit. FIXME: need to find more straight-forward solution to do this.
+        cli_done(cli);
+	//  system("reset"); //reset terminal on exit. FIXME: need to find more straight-forward solution to do this.
     }else{
 	if (fork()==0){
 	    if ((s = socket(AF_INET, SOCK_STREAM, 0)) < 0){

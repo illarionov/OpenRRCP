@@ -860,8 +860,10 @@ static int pass_matches(char *pass, char *try)
 	if ((des = !strncasecmp(pass, DES_PREFIX, sizeof(DES_PREFIX)-1)))
 		pass += sizeof(DES_PREFIX)-1;
 
+/*
 	if (des || !strncmp(pass, MD5_PREFIX, sizeof(MD5_PREFIX)-1))
 		try = crypt(try, pass);
+*/
 
 	return !strcmp(pass, try);
 }

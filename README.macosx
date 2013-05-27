@@ -1,0 +1,8 @@
+1. Install XCODE:
+http://developer.apple.com/tools/xcode/
+
+2. Install MacPort:
+http://www.macports.org/
+
+3. Compile as usual:
+make && make install

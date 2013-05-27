@@ -17,14 +17,21 @@
 
     ---
 
-    You can send your updates, patches and suggestions on this software
-    to it's original author, Andrew Chernyak (nording@yandex.ru)
-    This would be appreciated, however not required.
+    Some support can be found at: http://openrrcp.org.ru/
 */
 
 #include <stdint.h>
 
-#ifndef ETH_ALEN 
+#ifdef __linux__
+#include <endian.h>
+#else
+#include <sys/endian.h>
+#define __BYTE_ORDER _BYTE_ORDER
+#define __LITTLE_ENDIAN _LITTLE_ENDIAN
+#define __BIG_ENDIAN _BIG_ENDIAN
+#endif
+
+#ifndef ETH_ALEN
 #define ETH_ALEN 6
 #endif
 
@@ -45,8 +52,13 @@ struct rrcp_packet_t
   uint8_t  ether_shost[ETH_ALEN];      /* source ether addr    */
   uint16_t ether_type;                 /* must be 0x8899 */
   uint8_t  rrcp_proto;			/* must be 0x01         */
+#if __BYTE_ORDER == __BIG_ENDIAN
+  uint8_t  rrcp_isreply:1;             /* 0 = request to switch, 1 = reply from switch */
+  uint8_t  rrcp_opcode:7;              /* 0x00 = hello, 0x01 = get, 0x02 = set */
+#else
   uint8_t  rrcp_opcode:7;              /* 0x00 = hello, 0x01 = get, 0x02 = set */
   uint8_t  rrcp_isreply:1;             /* 0 = request to switch, 1 = reply from switch */
+#endif
   uint16_t rrcp_authkey;		/* 0x2379 by default */
   uint16_t rrcp_reg_addr;		/* register address */
   uint32_t rrcp_reg_data;		/* register data */
@@ -60,8 +72,13 @@ struct rrcp_helloreply_packet_t
   uint8_t  ether_shost[ETH_ALEN];      /* source ether addr    */
   uint16_t ether_type;                 /* must be 0x8899 */
   uint8_t  rrcp_proto;			/* must be 0x01         */
+#if __BYTE_ORDER == __BIG_ENDIAN
+  uint8_t  rrcp_isreply:1;             /* 0 = request to switch, 1 = reply from switch */
+  uint8_t  rrcp_opcode:7;              /* 0x00 = hello, 0x01 = get, 0x02 = set */
+#else
   uint8_t  rrcp_opcode:7;              /* 0x00 = hello, 0x01 = get, 0x02 = set */
   uint8_t  rrcp_isreply:1;             /* 0 = request to switch, 1 = reply from switch */
+#endif
   uint16_t rrcp_authkey;		/* 0x2379 by default */
   uint8_t  rrcp_downlink_port;		/*  */
   uint8_t  rrcp_uplink_port;		/*  */

@@ -17,9 +17,7 @@
 
     ---
 
-    You can send your updates, patches and suggestions on this software
-    to it's original author, Andrew Chernyak (nording@yandex.ru)
-    This would be appreciated, however not required.
+    Some support can be found at: http://openrrcp.org.ru/
 */
 
 #include <sys/types.h>
@@ -27,6 +25,14 @@
 #include <sys/ioctl.h>
 #include <sys/select.h>
 #include <sys/time.h>
+#ifdef __linux__
+#include <endian.h>
+#else
+#include <sys/endian.h>
+#define __BYTE_ORDER _BYTE_ORDER
+#define __LITTLE_ENDIAN _LITTLE_ENDIAN
+#define __BIG_ENDIAN _BIG_ENDIAN
+#endif
 
 #ifdef __linux__
 #include <linux/if.h>
@@ -149,7 +155,7 @@ int rtl83xx_prepare(){
        return(1);
     }
 
-    sockaddr_send.sll_family   = PF_PACKET;	
+    sockaddr_send.sll_family   = PF_PACKET;
     sockaddr_send.sll_protocol = RTL_ETHER_TYPE;
     sockaddr_send.sll_ifindex  = if_nametoindex(ifname);
     sockaddr_send.sll_hatype   = ARPHRD_ETHER;
@@ -450,7 +456,7 @@ void rtl83xx_scan(int verbose, int retries){
 		f_cnt++; //for foreigh traffic age slowly
 	    }
 	}
-	if (f_cnt>50){
+	if (f_cnt>200){
 	    break;
 	}
     }
@@ -721,11 +727,11 @@ int rtl83xx_readreg32_(uint16_t regno,uint32_t *regval){
 	     pktr.rrcp_opcode==RRCP_OPCODE_GET &&
 	     pktr.rrcp_isreply==1 &&
 	     pktr.rrcp_authkey==htons(authkey)&&
-	     pktr.rrcp_reg_addr==regno &&
+	     pktr.rrcp_reg_addr==htole16(regno) &&
 	     pktr.cookie1 == pkt.cookie1 &&
 	     pktr.cookie2 == pkt.cookie2 ){
 	  reply_recived=1;
-	  *regval=pktr.rrcp_reg_data;
+	  *regval=htole32(pktr.rrcp_reg_data);
        }
     }
 
@@ -1085,7 +1091,6 @@ int map_reg_to_eeprom(int switch_reg_no){
     return -1;
 }
 
-
 const char *cablestatus2str(int cable_status) {
    switch (cable_status) {
       case CABLE_STATUS_TIMEOUT:
@@ -1158,5 +1163,4 @@ int cable_diagnostic(int port_phys, struct cable_diagnostic_result *res) {
 
    return 0;
 }
-
 

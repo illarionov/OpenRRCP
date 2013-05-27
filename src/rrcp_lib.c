@@ -17,9 +17,7 @@
 
     ---
 
-    You can send your updates, patches and suggestions on this software
-    to it's original author, Andrew Chernyak (nording@yandex.ru)
-    This would be appreciated, however not required.
+    Some support can be found at: http://openrrcp.org.ru/
 */
 
 #include <stdint.h>
@@ -177,5 +175,4 @@ int str_number_list_get_next(struct t_str_number_list *list, int *val)
 
    return 0;
 }
-
 

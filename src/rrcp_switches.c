@@ -17,9 +17,7 @@
 
     ---
 
-    You can send your updates, patches and suggestions on this software
-    to it's original author, Andrew Chernyak (nording@yandex.ru)
-    This would be appreciated, however not required.
+    Some support can be found at: http://openrrcp.org.ru/
 */
 #include <limits.h>
 #include <stdio.h>
@@ -979,7 +977,7 @@ int defregval_rtl8324_generic[]={   // generic rtl8324 & rtl8324p
      -1,0,0
 };
 
-const uint32_t switchtype_n = 19;
+const uint32_t switchtype_n = 20;
 
 const unsigned normal_port_order[] = {1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,0};
 const unsigned reverse_vertical_port_order[] = {2,1,4,3,6,5,8,7,10,9,12,11,14,13,16,15,18,17,20,19,22,21,24,23,25,26,0};
@@ -1274,6 +1272,21 @@ struct switchtype_t switchtypes[] = {
         &defregval_rtl8316b_generic[0],
 	"zyxel-es116p",
 	"Zyxel ES-116P"
+    },
+    {
+	"Neomontana",
+	"CleverSwitch",
+	"DW-208R1",
+	{0,0,0},
+	0,
+	"rtl8316bp",
+	rtl8316bp,
+	8,
+	normal_port_order,
+        &reg2eeprom_rtl8316bp_generic[0],
+        &defregval_rtl8316b_generic[0],
+	"CleverSwitch",
+	"DW-208R1"
     }
 };
 
@@ -1428,7 +1441,7 @@ uint16_t rrcp_autodetect_switch_chip_eeprom(uint8_t *switch_type, uint8_t *chip_
     for(i=0;i<4;i++){
 	rtl83xx_setreg16(0x0218,test3[i]);
 	if ((rtl83xx_readreg16(0x0218) & 0xff) != test3[i]) {
-	    errcnt++;
+	    errcnt++; 
 	    break;
 	}
     }
@@ -1506,5 +1519,4 @@ int rrcp_get_switch_id_by_short_name(const char *str) {
 
    return -1;
 }
-
 

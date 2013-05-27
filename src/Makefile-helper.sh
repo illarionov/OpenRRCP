@@ -22,6 +22,11 @@ if test "$sys" = "OpenBSD"; then
     exit;
 fi;
 
+if test "$sys" = "Darwin"; then
+    echo -n "-s -Wall -O2 -ldnet -lpcap -I/opt/local/include -L/opt/local/lib -L/usr/lib"
+    exit;
+fi;
+
 #default
 echo -n "-s -Wall -O2"
 exit;

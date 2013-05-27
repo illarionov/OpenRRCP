@@ -17,9 +17,7 @@
 
     ---
 
-    You can send your updates, patches and suggestions on this software
-    to it's original author, Andrew Chernyak (nording@yandex.ru)
-    This would be appreciated, however not required.
+    Some support can be found at: http://openrrcp.org.ru/
 */
 
 #include <stdarg.h>
@@ -448,7 +446,11 @@ int main(int argc, char *argv[]){
 /*
  if (RegValue&0x2){ // ...trunk fault
    if (exit_state < STATE_WARNING) exit_state=STATE_WARNING;
+<<<<<<< HEAD
    tempstr_append(", fault trunk group detected");
+=======
+   snprintf(Temp+strlen(Temp),sizeof(Temp),", fault trunk group detected");
+>>>>>>> b31900184fc1e9ec3f18668c62b4e9100086a76a
  }
 */
  // processing vlan status

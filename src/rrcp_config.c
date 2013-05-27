@@ -17,9 +17,7 @@
 
     ---
 
-    You can send your updates, patches and suggestions on this software
-    to it's original author, Andrew Chernyak (nording@yandex.ru)
-    This would be appreciated, however not required.
+    Some support can be found at: http://openrrcp.org.ru/
 */
 
 #include <stdio.h>
@@ -116,7 +114,7 @@ void rrcp_config_commit_vlan_to_switch(void)
 }
 
 void sncprintf(char *str, size_t size, const char *format, ...) {
-    char line[1024];
+    char line[4096];
     va_list ap;
 
     line[0]=0;

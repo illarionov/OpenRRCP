@@ -1565,6 +1565,7 @@ int main(int argc, char **argv){
 	     {16, "rtl83xx_repotec_g3224x"    },
 	     {17, "rtl83xx_signamax_065-7531a"},
 	     {18, "rtl83xx_zyxel_es116p"      },
+	     {19, "rtl83xx_ovislink_fsh2402gt" },
 	     {-1,NULL}
 	  };
 	  unsigned i;

@@ -203,6 +203,82 @@ void print_link_status(unsigned short int *arr){
     }
 }
 
+void print_port_link_status_xml(int port_no, int enabled, unsigned char encoded_status, int loopdetect){
+    struct t_rtl83xx_port_link_status stat;
+
+    memcpy(&stat,&encoded_status,1);
+    printf("    <ifEntry ifIndex=\"%d\" ",port_no);
+    printf("ifAdminStatus=\"%s\" ",enabled ? "1" : "2");
+    if (stat.link){
+        switch (stat.speed){
+        case 0:
+            printf("ifSpeed=\"10000000\" ");
+            break;
+        case 1:
+            printf("ifSpeed=\"100000000\" ");
+            break;
+        case 2:
+            printf("ifSpeed=\"1000000000\" ");
+            break;
+        case 3:
+            printf("ifSpeed=\"0\" ");
+            break;
+        }
+    } else {
+        printf("ifSpeed=\"0\" ");
+    }
+    printf("ifOperStatus=\"%s\" ",stat.link ? "1" : "2");
+
+    switch(loopdetect){
+        case 2:
+            printf("ifLoopbackStatus=\"2\" ");
+            break;
+        case 1:
+            printf("ifLoopbackStatus=\"1\" ");
+            break;
+        default:
+            break;
+    }
+    printf("/>\n");
+}
+
+void print_link_status_xml(unsigned short int *arr){
+    int i;
+    union {
+    uint16_t sh[13];
+    uint8_t  ch[26];
+    } r;
+    union {
+        struct {
+            uint16_t low;
+            uint16_t high;
+    } doubleshort;
+        uint32_t signlelong;
+    } u;
+    uint32_t port_loop_status=0;
+    unsigned int EnLoopDet=0;
+
+    u.doubleshort.low=rtl83xx_readreg16(0x0608);
+    u.doubleshort.high=rtl83xx_readreg16(0x0609);
+    for(i=0;i<switchtypes[switchtype].num_ports/2;i++){
+    r.sh[i]=rtl83xx_readreg16(0x0619+i);
+    }
+    EnLoopDet=rtl83xx_readreg16(0x0200)&0x4;
+    if (EnLoopDet) port_loop_status=rtl83xx_readreg32(0x0101);
+
+    printf("<?xml version=\"1.0\" encoding=\"UTF-8\" ?>\n");
+    printf("<ifTable>\n");
+    for(i=1;i<=switchtypes[switchtype].num_ports;i++){
+        if (arr) { if (!*(arr+i-1)){ continue;} }
+    print_port_link_status_xml(
+        i,
+        !((u.signlelong>>(map_port_number_from_logical_to_physical(i)))&1),
+        r.ch[map_port_number_from_logical_to_physical(i)],
+                (EnLoopDet)?((port_loop_status>>(map_port_number_from_logical_to_physical(i)))&0x1)+1:0);
+    }
+    printf("</ifTable>\n");
+}
+
 void do_reboot(void){
     rtl83xx_setreg16(0x0000,0x0002);
 }
@@ -225,6 +301,41 @@ void print_counters(unsigned short int *arr){
 		(unsigned long)rtl83xx_readreg32(0x070d+port_tr),
 		(unsigned long)rtl83xx_readreg32(0x0727+port_tr),
 		(unsigned long)rtl83xx_readreg32(0x0741+port_tr));
+    }
+    return;
+}
+
+void print_counters_crc(unsigned short int *arr){
+    int i,port_tr;
+    for (i=0;i<switchtypes[switchtype].num_ports/2;i++){
+    rtl83xx_setreg16(0x0700+i,0x0820);//read rx byte, tx byte, CRC error packet
+    }
+    printf("port              RX          TX        CRC\n");
+    for (i=1;i<=switchtypes[switchtype].num_ports;i++){
+        if (arr) { if (!*(arr+i-1)){ continue;} }
+    port_tr=map_port_number_from_logical_to_physical(i);
+    printf("%s/%-2d: %11lu %11lu %11lu\n",
+        ifname,i,
+        (unsigned long)rtl83xx_readreg32(0x070d+port_tr),
+        (unsigned long)rtl83xx_readreg32(0x0727+port_tr),
+        (unsigned long)rtl83xx_readreg32(0x0741+port_tr));
+    }
+    return;
+}
+
+void print_router_port(unsigned short int *arr){
+    int i,port_tr;
+    unsigned long reg_val;
+    reg_val = (unsigned long)rtl83xx_readreg32(0x0309);
+    printf("port          Status\n");
+    for (i=1;i<=switchtypes[switchtype].num_ports;i++){
+        if (arr) { if (!*(arr+i-1)){ continue;} }
+        port_tr=map_port_number_from_logical_to_physical(i);
+        if ((reg_val >> port_tr) & 0x0001) {
+            printf("%s/%-2d: Router port\n", ifname,i);
+        } else {
+            printf("%s/%-2d: Normal port\n", ifname,i);
+        }
     }
     return;
 }
@@ -275,6 +386,49 @@ void print_cable_diagnostics(unsigned short int *arr) {
 	    putchar('\n');
 	 }
     }
+    return;
+}
+
+void print_cable_diagnostics_xml(unsigned short int *arr) {
+   uint8_t fport;
+   unsigned i, port_tr;
+   struct cable_diagnostic_result res;
+
+   if (rrcp_io_probe_switch_for_facing_switch_port(dest_mac, (uint8_t *)&fport) < 0) {
+      printf("Switch not responded\n");
+      return;
+   }
+
+   printf("<?xml version=\"1.0\" encoding=\"UTF-8\" ?>\n");
+   printf("<cableDiagTable>\n");
+    for (i=1;i<=switchtypes[switchtype].num_ports;i++){
+        if ((arr != NULL)
+       && (arr[i-1] == 0))
+    continue;
+
+    port_tr=map_port_number_from_logical_to_physical(i);
+    printf("    <cableDiagEntry PortIndex=\"%d\" PortType=\"fastEthernet\" ", i);
+    if (port_tr == fport)
+       printf("Pair2Status=\"facing\" Pair2Length=\"0\" Pair3Status=\"facing\" Pair3Length=\"0\" />\n");
+    else if (cable_diagnostic(port_tr, &res) < 0)
+       printf("Pair2Status=\"other\" Pair2Length=\"0\" Pair3Status=\"other\" Pair3Length=\"0\" />\n");
+     else {
+        printf("Pair2Status=\"%s\" ", cablestatus2str(res.pair1to2_status));
+        if (res.pair1to2_status <= 0)
+            printf("Pair2Length=\"0\" ");
+        else {
+            printf("Pair2Length=\"%d.%d\" ", res.pair1to2_distance_025m / 4, (res.pair1to2_distance_025m % 4) * 25);
+        }
+        printf("Pair3Status=\"%s\" ", cablestatus2str(res.pair3to6_status));
+        if (res.pair3to6_status <= 0)
+           printf("Pair3Length=\"0\" ");
+        else {
+           printf("Pair3Length=\"%d.%d\" ", res.pair3to6_distance_025m / 4, (res.pair3to6_distance_025m % 4) * 25);
+        }
+        printf("/>\n");
+     }
+    }
+    printf("</cableDiagTable>\n");
     return;
 }
 
@@ -1467,7 +1621,7 @@ void print_supported_switches() {
 int main(int argc, char **argv){
     unsigned int x[6];
     unsigned int ak;
-    int i;
+    int i, r;
     int media_speed=0;
     int direction=0;
     int bandw=0;
@@ -1484,12 +1638,13 @@ int main(int argc, char **argv){
     int dest_port=0;
     unsigned short int *p_port_list=NULL;
     unsigned short int port_list[26];
+    int out_xml = 0;
     char *ena_disa[]={"disable","enable",""};
     char *cmd_level_1[]={"show","config","scan","reload","reboot","write","ping","detect","capture",""}; 
     char *show_sub_cmd[]={"running-config","startup-config","interface","vlan","version",""};
     char *scan_sub_cmd[]={"verbose","retries",""};
     char *show_sub_cmd_l2[]={"full","verbose",""};
-    char *show_sub_cmd_l3[]={"summary","cable-diagnostics","phy-status",""};
+    char *show_sub_cmd_l3[]={"summary","cable-diagnostics","phy-status","xml","xml-cable-diagnostics","crc-summary","router-port",""};
     char *show_sub_cmd_l4[]={"id",""};
     char *reset_sub_cmd[]={"soft","hard",""};
     char *write_sub_cmd[]={"memory","eeprom","defaults",""};
@@ -1605,12 +1760,16 @@ int main(int argc, char **argv){
 	exit(0);
     }
 
-    if (argc<2 || strcmp(argv[2],"scan")!=0){
-	printf("! rtl83xx: trying to reach %d-port \"%s %s\" switch at %s\n",
-	    switchtypes[switchtype].num_ports,
-	    switchtypes[switchtype].vendor,
-	    switchtypes[switchtype].model,
-	    argv[1]);
+    if ((argc > 4 && strncmp(argv[4],"xml",3)==0) || (argc > 5 && strncmp(argv[5],"xml",3)==0)) {
+        out_xml = 1;
+    } else {
+        if (argc<2 || strcmp(argv[2],"scan")!=0){
+            printf("! rtl83xx: trying to reach %d-port \"%s %s\" switch at %s\n",
+                switchtypes[switchtype].num_ports,
+                switchtypes[switchtype].vendor,
+                switchtypes[switchtype].model,
+                argv[1]);
+        }
     }
 
     engage_timeout(30);
@@ -1655,6 +1814,18 @@ int main(int argc, char **argv){
 			     case 2: /* phy-status */
 				print_port_phy_status(p_port_list);
 				break;
+                             case 3: /* xml */
+                                print_link_status_xml(p_port_list);
+                                break;
+                             case 4: /* xml-cable-diagnostics */
+                                print_cable_diagnostics_xml(p_port_list);
+                                break;
+                             case 5: /* crc-summary */
+                                print_counters_crc(p_port_list);
+                                break;
+                             case 6: /* router-port */
+                                print_router_port(p_port_list);
+                                break;
 			     default:
 				print_unknown(argv[4+shift],&show_sub_cmd_l3[0]);
 				break;
@@ -1893,10 +2064,14 @@ int main(int argc, char **argv){
                               exit(1);
                           }
 		          for (i=0;i<6;i++){
-		            if (do_write_eeprom_byte(0x12+i,(unsigned char)x[i])){
-		             printf ("error writing eeprom!\n");
-		             exit(1);
-		            }
+                              for (r = 0; r < 10 && do_write_eeprom_byte(0x12+i,(unsigned char)x[i]); r++) {
+                                  printf("Can't write 0x%02x to EEPROM 0x%03x\n",(unsigned char)x[i],0x12+i);
+                                  usleep(100000);
+                              }
+                              if (r > 9) {
+                                  printf ("error writing eeprom!\n");
+                                  exit(1);
+                              }
 	                  }
 		          do_reboot();
                           exit(0);

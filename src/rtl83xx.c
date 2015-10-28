@@ -1297,7 +1297,7 @@ void do_igmp_snooping(int is_enabled){
     rtl83xx_setreg16(0x0308,swconfig.alt_igmp_snooping.raw);
 }
 
-int do_capture_mac_address(const char *iface_list)
+int do_capture_mac_address(const char *iface_list, int time_sec)
 {
    uint8_t fport;
    uint16_t alt_conf_300, learn_ctrl_301, learn_ctrl_302;
@@ -1396,14 +1396,14 @@ int do_capture_mac_address(const char *iface_list)
    rtl83xx_readreg32_(0x0303, &tmp);
    if (break_capture_mac) goto restore_capture_status;
 
-   printf("Capturing mac addresses for %u seconds\n", DEFAULT_CAPTURE_MAC_TIME_SEC);
+   printf("Capturing mac addresses for %u seconds\n", time_sec);
    if (gettimeofday(&starttime, NULL) < 0)
        goto restore_capture_status;
 
    maxtime = starttime;
-   maxtime.tv_sec += DEFAULT_CAPTURE_MAC_TIME_SEC;
+   maxtime.tv_sec += time_sec;
 
-   engage_timeout(DEFAULT_CAPTURE_MAC_TIME_SEC+5);
+   engage_timeout(time_sec+5);
 
    old_mac[0] = old_mac[1] = old_mac[2] = 0xffffffff;
    for (; break_capture_mac==0; usleep(300000)) {
@@ -1558,7 +1558,7 @@ void print_usage(void){
 	 " show interface [<list ports>] summary - print port rx/tx counters\n"
 	 " show interface [<list ports>] cable-diagnostics - cabe diagnostics\n"
 	 " show interface [<list ports>] phy-status        - PHY status\n"
-	 " capture interface <list ports> mac-address - capure mac-addresses\n"
+	 " capture interface <list ports> mac-address [<time-sec>] - capure mac-addresses\n"
 	 " show vlan [vid <id>]                  - show low-level vlan confg\n"
 	 " show version                          - system hardware and software status\n"
 	 " scan [verbose] [retries <number>]     - scan network for rrcp-enabled switches\n"
@@ -2315,12 +2315,19 @@ int main(int argc, char **argv){
 		{
 		   char *interface_cmd[] = {"interface", ""};
 		   char *macaddr_cmd[] = {"mac-address", ""};
+                   int capture_mac_time_sec = DEFAULT_CAPTURE_MAC_TIME_SEC;
 
 		   check_argc(argc, 3+shift, NULL, &interface_cmd[0]);
 		   check_argc(argc, 4+shift, "Interface number nedded\n", NULL);
 		   get_cmd_num(argv[5+shift], -1, NULL, &macaddr_cmd[0]);
+                   if (argc > 6+shift) {
+                       if (sscanf(argv[6+shift], "%i",&capture_mac_time_sec) != 1) {
+                           printf("Incorrect time sec: \"%s\"\n",argv[6+shift]);
+                           exit(0);
+                       }
+                   }
 
-		   if (do_capture_mac_address(argv[4+shift]) != 0) {
+		   if (do_capture_mac_address(argv[4+shift], capture_mac_time_sec) != 0) {
 		      fputs(ErrMsg, stdout);
 		      exit(1);
 		   }

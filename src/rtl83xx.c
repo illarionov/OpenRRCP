@@ -51,6 +51,7 @@
 int myPid = 0;
 extern char ErrIOMsg[];
 char ErrMsg[512];
+extern int out_xml;
 
 static int break_capture_mac;
 
@@ -1638,7 +1639,6 @@ int main(int argc, char **argv){
     int dest_port=0;
     unsigned short int *p_port_list=NULL;
     unsigned short int port_list[26];
-    int out_xml = 0;
     char *ena_disa[]={"disable","enable",""};
     char *cmd_level_1[]={"show","config","scan","reload","reboot","write","ping","detect","capture",""}; 
     char *show_sub_cmd[]={"running-config","startup-config","interface","vlan","version",""};

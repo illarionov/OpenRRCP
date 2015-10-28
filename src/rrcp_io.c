@@ -72,6 +72,7 @@ unsigned char dest_mac[6] = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
 
 extern int switchtype;
 int s,s_rec,s_send;
+int out_xml = 0;
 
 #ifdef __linux__
 struct sockaddr_ll sockaddr_rec,sockaddr_send;
@@ -745,7 +746,9 @@ uint32_t rtl83xx_readreg32(uint16_t regno){
 uint32_t regvalue;
 int res, r;
   for (r = 0; r < 10 && ( res=rtl83xx_readreg32_(regno,&regvalue) == 2  ); r++) {
-    printf("can't read register 0x%04x! Retry\n",regno);
+    if (!out_xml) {
+        printf("can't read register 0x%04x! Retry\n",regno);
+    }
     usleep(100000);
   }
   switch (res){

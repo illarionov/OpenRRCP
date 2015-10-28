@@ -743,8 +743,11 @@ int rtl83xx_readreg32_(uint16_t regno,uint32_t *regval){
  */
 uint32_t rtl83xx_readreg32(uint16_t regno){
 uint32_t regvalue;
-int res;
-  res=rtl83xx_readreg32_(regno,&regvalue);
+int res, r;
+  for (r = 0; r < 10 && ( res=rtl83xx_readreg32_(regno,&regvalue) == 2  ); r++) {
+    printf("can't read register 0x%04x! Retry\n",regno);
+    usleep(100000);
+  }
   switch (res){
         case 1:
               printf("Can't send\n");

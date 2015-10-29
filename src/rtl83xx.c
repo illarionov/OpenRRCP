@@ -710,6 +710,35 @@ void do_vlan_tmpl(int mode){
  }
 }
 
+void do_vlan_leaky(int mode,int state)
+{
+    swconfig.vlan.raw[0]=rtl83xx_readreg16(0x030b);
+    switch (mode){
+        case 1: // arp
+            swconfig.vlan.s.config.arp_leaky = state;
+            break;
+        case 2: // multicast
+            swconfig.vlan.s.config.multicast_leaky = state;
+            break;
+        case 3: // unicast
+            swconfig.vlan.s.config.unicast_leaky = state;
+            break;
+    }
+    rtl83xx_setreg16(0x030b,swconfig.vlan.raw[0]);
+}
+
+void do_vlan_drop(int mode,int state)
+{
+    swconfig.vlan.raw[0]=rtl83xx_readreg16(0x030b);
+    switch (mode){
+        case 1: // untagged_frames
+            swconfig.vlan.s.config.drop_untagged_frames = state;
+        case 2: // invalid_vid
+            swconfig.vlan.s.config.ingress_filtering = state;
+    }
+    rtl83xx_setreg16(0x030b,swconfig.vlan.raw[0]);
+}
+
 int compare_command(char *argv, char **command_list){
 /*
    found word from argv in command_list and return his number,
@@ -1594,6 +1623,8 @@ void print_usage(void){
 	 " config vlan add port <port-list> index <idx-list> - add port(s) in VLAN table on index\n"
 	 " config vlan delete port <port-list> index <idx-list> - delete port(s) from VLAN table on index\n"
 	 " config vlan index <idx-list> vid <vid> - set VLAN ID for index in VLAN table\n"
+         " config [no] vlan leaky arp|multicast|unicast - Allow certain type of packets to be switched beetween VLANs\n"
+         " config [no] vlan drop untagged_frames|invalid_vid - Allow dropping certain types of non-conforming packets\n"
 	 " config mac-address <mac>              - set a new <mac> address to switch and reboot\n"
 	 " config mac-address-table aging-time|drop-unknown <arg>  - address lookup table control\n"
 	 " config flowcontrol dot3x enable|disable - globally disable full duplex flow control (802.3x pause)\n"
@@ -1666,11 +1697,13 @@ int main(int argc, char **argv){
     char *config_alt[]={"aging-time","unknown-destination",""};
     char *config_alt_time[]={"0","12","300",""};
     char *config_alt_dest[]={"drop","pass",""};
-    char *config_vlan[]={"disable","transparent","clear","mode","template-load","add","delete","index",""};
+    char *config_vlan[]={"disable","transparent","clear","mode","template-load","add","delete","index","leaky","drop",""};
     char *config_vlan_mode[]={"portbased","dot1q",""};
     char *config_vlan_tmpl[]={"portbased","dot1qtree",""};
     char *config_vlan_port[]={"port","index",""};
     char *config_vlan_idx[]={"vid",""};
+    char *config_vlan_leaky[]={"arp","multicast","unicast",""};
+    char *config_vlan_drop[]={"untagged_frames","invalid_vid",""};
     char *config_flowc[]={"dot3x","backpressure","ondemand-disable",""};
     char *config_storm[]={"broadcast","multicast",""};
     char *config_storm_br[]={"relaxed","strict",""};
@@ -2059,6 +2092,16 @@ int main(int argc, char **argv){
 					   exit(1);
 					}
 					exit(0);
+                                 case 8: // leaky
+                                        check_argc(argc,4+shift,NULL,&config_vlan_leaky[0]);
+                                        subcmd=get_cmd_num(argv[5+shift],-1,NULL,&config_vlan_leaky[0]);
+                                        do_vlan_leaky(subcmd+1,!negate);
+                                        exit(0);
+                                 case 9: // drop
+                                        check_argc(argc,4+shift,NULL,&config_vlan_drop[0]);
+                                        subcmd=get_cmd_num(argv[5+shift],-1,NULL,&config_vlan_drop[0]);
+                                        do_vlan_drop(subcmd+1,!negate);
+                                        exit(0);
                                  default:
                                          print_unknown(argv[4+shift],&config_vlan[0]);
                           } /* switch */

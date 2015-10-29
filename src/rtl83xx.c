@@ -1303,7 +1303,8 @@ int do_capture_mac_address(const char *iface_list, int time_sec)
    uint8_t fport;
    uint16_t alt_conf_300, learn_ctrl_301, learn_ctrl_302;
    uint16_t new_alt_conf_300, new_learn_ctrl_301, new_learn_ctrl_302;
-   uint32_t old_mac[3];
+   uint32_t old_macs[1024][3];
+   int old_macs_count, i;
    uint32_t tmp;
    uint32_t reg302_mask;
    unsigned cnt;
@@ -1406,8 +1407,8 @@ int do_capture_mac_address(const char *iface_list, int time_sec)
 
    engage_timeout(time_sec+5);
 
-   old_mac[0] = old_mac[1] = old_mac[2] = 0xffffffff;
-   for (; break_capture_mac==0; usleep(300000)) {
+   memset(old_macs, 0xff, sizeof(old_macs));
+   for (old_macs_count = 0; (break_capture_mac==0) && (old_macs_count < 1024); usleep(300000)) {
       unsigned if2;
       uint32_t unk_sa_status;
       uint32_t new_mac[3];
@@ -1439,12 +1440,18 @@ int do_capture_mac_address(const char *iface_list, int time_sec)
 	 continue;
       }
 
-      if (!((old_mac[0] == new_mac[0])
-	    && (old_mac[1] == new_mac[1])
-	    && (old_mac[2] == new_mac[2])))
-      {
-	 if2 = map_port_number_from_physical_to_logical(unk_sa_status & 0x1f);
-	 printf("MAC: %02x:%02x:%02x:%02x:%02x:%02x Port: %u\n",
+      for (i = 0; i < old_macs_count; i++) {
+          if ((old_macs[i][0] == new_mac[0])
+                && (old_macs[i][1] == new_mac[1])
+                && (old_macs[i][2] == new_mac[2]))
+          {
+              break;
+          }
+      }
+      if (i != old_macs_count) continue;
+
+      if2 = map_port_number_from_physical_to_logical(unk_sa_status & 0x1f);
+      printf("MAC: %02x:%02x:%02x:%02x:%02x:%02x Port: %u\n",
 	       new_mac[0] & 0xff,
 	       new_mac[0] >> 8 & 0xff,
 	       new_mac[1] & 0xff,
@@ -1453,10 +1460,10 @@ int do_capture_mac_address(const char *iface_list, int time_sec)
 	       new_mac[2] >> 8 & 0xff,
 	       if2
 	       );
-	 old_mac[0] = new_mac[0];
-	 old_mac[1] = new_mac[1];
-	 old_mac[2] = new_mac[2];
-      }
+      old_macs[old_macs_count][0] = new_mac[0];
+      old_macs[old_macs_count][1] = new_mac[1];
+      old_macs[old_macs_count][2] = new_mac[2];
+      old_macs_count++;
    } /* for */
 
 restore_capture_status:

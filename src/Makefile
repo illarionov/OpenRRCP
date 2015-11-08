@@ -91,6 +91,6 @@ rtlping:
 
 install:
 	mkdir -p $(DESTDIR)$(PREFIX)/bin 2>/dev/null
-	cp -p ../bin/* $(DESTDIR)$(PREFIX)/bin
+	cp -dp ../bin/* $(DESTDIR)$(PREFIX)/bin
 #	chmod 4555 $(DESTDIR)$(PREFIX)/rtl83xx
 #	chown root $(DESTDIR)$(PREFIX)/rtl83xx

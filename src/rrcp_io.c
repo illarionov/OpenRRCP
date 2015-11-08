@@ -72,6 +72,7 @@ unsigned char dest_mac[6] = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
 
 extern int switchtype;
 int s,s_rec,s_send;
+int out_xml = 0;
 
 #ifdef __linux__
 struct sockaddr_ll sockaddr_rec,sockaddr_send;
@@ -743,8 +744,13 @@ int rtl83xx_readreg32_(uint16_t regno,uint32_t *regval){
  */
 uint32_t rtl83xx_readreg32(uint16_t regno){
 uint32_t regvalue;
-int res;
-  res=rtl83xx_readreg32_(regno,&regvalue);
+int res, r;
+  for (r = 0; r < 10 && ( res=rtl83xx_readreg32_(regno,&regvalue) == 2  ); r++) {
+    if (!out_xml) {
+        printf("can't read register 0x%04x! Retry\n",regno);
+    }
+    usleep(100000);
+  }
   switch (res){
         case 1:
               printf("Can't send\n");
@@ -1043,6 +1049,7 @@ void do_write_eeprom_defaults(){
 void do_write_eeprom_all(int mode){
  int i=0;
  int k=0;
+ int r=0;
  int regnum,l;
  uint16_t addr,data;
 
@@ -1062,16 +1069,14 @@ void do_write_eeprom_all(int mode){
      }
      addr=(uint16_t)switchtypes[switchtype].reg2eeprom[i+1]+k*2;
 //    printf("0x%04x -> 0x%04x\n",switchtypes[switchtype].reg2eeprom[i]+k,addr);
-     if ( eeprom_write(addr,(uint8_t)(data&0x00ff)) ||
-          eeprom_write(addr+1,(uint8_t)(data>>8))  ) {
-      usleep(100000);
-      if ( eeprom_write(addr,(uint8_t)(data&0x00ff)) ||
-       eeprom_write(addr+1,(uint8_t)(data>>8))  ) {
+     for (r = 0; r < 10 && ( eeprom_write(addr,(uint8_t)(data&0x00ff)) || eeprom_write(addr+1,(uint8_t)(data>>8))  ); r++) {
        printf("Can't write register 0x%04x to EEPROM 0x%03x\n",switchtypes[switchtype].reg2eeprom[i]+k,addr);
-       exit(1);
-      }
+       usleep(100000);
      }
-     // else printf("Success write register N0x%04x to EEPROM 0x%03x-0x%03x value 0x%04x\n",switchtypes[switchtype].reg2eeprom[i]+k,addr-1,addr,data);
+     if (r > 9) {
+       printf("Write register 0x%04x to EEPROM 0x%03x failed with 10 retries\n",switchtypes[switchtype].reg2eeprom[i]+k,addr);
+       exit(1);
+     } else printf("Success write register N0x%04x to EEPROM 0x%03x-0x%03x value 0x%04x\n",switchtypes[switchtype].reg2eeprom[i]+k,addr-1,addr,data);
    }
    i+=3;
  }

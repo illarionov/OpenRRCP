@@ -51,6 +51,7 @@
 int myPid = 0;
 extern char ErrIOMsg[];
 char ErrMsg[512];
+extern int out_xml;
 
 static int break_capture_mac;
 
@@ -203,6 +204,82 @@ void print_link_status(unsigned short int *arr){
     }
 }
 
+void print_port_link_status_xml(int port_no, int enabled, unsigned char encoded_status, int loopdetect){
+    struct t_rtl83xx_port_link_status stat;
+
+    memcpy(&stat,&encoded_status,1);
+    printf("    <ifEntry ifIndex=\"%d\" ",port_no);
+    printf("ifAdminStatus=\"%s\" ",enabled ? "1" : "2");
+    if (stat.link){
+        switch (stat.speed){
+        case 0:
+            printf("ifSpeed=\"10000000\" ");
+            break;
+        case 1:
+            printf("ifSpeed=\"100000000\" ");
+            break;
+        case 2:
+            printf("ifSpeed=\"1000000000\" ");
+            break;
+        case 3:
+            printf("ifSpeed=\"0\" ");
+            break;
+        }
+    } else {
+        printf("ifSpeed=\"0\" ");
+    }
+    printf("ifOperStatus=\"%s\" ",stat.link ? "1" : "2");
+
+    switch(loopdetect){
+        case 2:
+            printf("ifLoopbackStatus=\"2\" ");
+            break;
+        case 1:
+            printf("ifLoopbackStatus=\"1\" ");
+            break;
+        default:
+            break;
+    }
+    printf("/>\n");
+}
+
+void print_link_status_xml(unsigned short int *arr){
+    int i;
+    union {
+    uint16_t sh[13];
+    uint8_t  ch[26];
+    } r;
+    union {
+        struct {
+            uint16_t low;
+            uint16_t high;
+    } doubleshort;
+        uint32_t signlelong;
+    } u;
+    uint32_t port_loop_status=0;
+    unsigned int EnLoopDet=0;
+
+    u.doubleshort.low=rtl83xx_readreg16(0x0608);
+    u.doubleshort.high=rtl83xx_readreg16(0x0609);
+    for(i=0;i<switchtypes[switchtype].num_ports/2;i++){
+    r.sh[i]=rtl83xx_readreg16(0x0619+i);
+    }
+    EnLoopDet=rtl83xx_readreg16(0x0200)&0x4;
+    if (EnLoopDet) port_loop_status=rtl83xx_readreg32(0x0101);
+
+    printf("<?xml version=\"1.0\" encoding=\"UTF-8\" ?>\n");
+    printf("<ifTable>\n");
+    for(i=1;i<=switchtypes[switchtype].num_ports;i++){
+        if (arr) { if (!*(arr+i-1)){ continue;} }
+    print_port_link_status_xml(
+        i,
+        !((u.signlelong>>(map_port_number_from_logical_to_physical(i)))&1),
+        r.ch[map_port_number_from_logical_to_physical(i)],
+                (EnLoopDet)?((port_loop_status>>(map_port_number_from_logical_to_physical(i)))&0x1)+1:0);
+    }
+    printf("</ifTable>\n");
+}
+
 void do_reboot(void){
     rtl83xx_setreg16(0x0000,0x0002);
 }
@@ -225,6 +302,41 @@ void print_counters(unsigned short int *arr){
 		(unsigned long)rtl83xx_readreg32(0x070d+port_tr),
 		(unsigned long)rtl83xx_readreg32(0x0727+port_tr),
 		(unsigned long)rtl83xx_readreg32(0x0741+port_tr));
+    }
+    return;
+}
+
+void print_counters_crc(unsigned short int *arr){
+    int i,port_tr;
+    for (i=0;i<switchtypes[switchtype].num_ports/2;i++){
+    rtl83xx_setreg16(0x0700+i,0x0820);//read rx byte, tx byte, CRC error packet
+    }
+    printf("port              RX          TX        CRC\n");
+    for (i=1;i<=switchtypes[switchtype].num_ports;i++){
+        if (arr) { if (!*(arr+i-1)){ continue;} }
+    port_tr=map_port_number_from_logical_to_physical(i);
+    printf("%s/%-2d: %11lu %11lu %11lu\n",
+        ifname,i,
+        (unsigned long)rtl83xx_readreg32(0x070d+port_tr),
+        (unsigned long)rtl83xx_readreg32(0x0727+port_tr),
+        (unsigned long)rtl83xx_readreg32(0x0741+port_tr));
+    }
+    return;
+}
+
+void print_router_port(unsigned short int *arr){
+    int i,port_tr;
+    unsigned long reg_val;
+    reg_val = (unsigned long)rtl83xx_readreg32(0x0309);
+    printf("port          Status\n");
+    for (i=1;i<=switchtypes[switchtype].num_ports;i++){
+        if (arr) { if (!*(arr+i-1)){ continue;} }
+        port_tr=map_port_number_from_logical_to_physical(i);
+        if ((reg_val >> port_tr) & 0x0001) {
+            printf("%s/%-2d: Router port\n", ifname,i);
+        } else {
+            printf("%s/%-2d: Normal port\n", ifname,i);
+        }
     }
     return;
 }
@@ -275,6 +387,49 @@ void print_cable_diagnostics(unsigned short int *arr) {
 	    putchar('\n');
 	 }
     }
+    return;
+}
+
+void print_cable_diagnostics_xml(unsigned short int *arr) {
+   uint8_t fport;
+   unsigned i, port_tr;
+   struct cable_diagnostic_result res;
+
+   if (rrcp_io_probe_switch_for_facing_switch_port(dest_mac, (uint8_t *)&fport) < 0) {
+      printf("Switch not responded\n");
+      return;
+   }
+
+   printf("<?xml version=\"1.0\" encoding=\"UTF-8\" ?>\n");
+   printf("<cableDiagTable>\n");
+    for (i=1;i<=switchtypes[switchtype].num_ports;i++){
+        if ((arr != NULL)
+       && (arr[i-1] == 0))
+    continue;
+
+    port_tr=map_port_number_from_logical_to_physical(i);
+    printf("    <cableDiagEntry PortIndex=\"%d\" PortType=\"fastEthernet\" ", i);
+    if (port_tr == fport)
+       printf("Pair2Status=\"facing\" Pair2Length=\"0\" Pair3Status=\"facing\" Pair3Length=\"0\" />\n");
+    else if (cable_diagnostic(port_tr, &res) < 0)
+       printf("Pair2Status=\"other\" Pair2Length=\"0\" Pair3Status=\"other\" Pair3Length=\"0\" />\n");
+     else {
+        printf("Pair2Status=\"%s\" ", cablestatus2str(res.pair1to2_status));
+        if (res.pair1to2_status <= 0)
+            printf("Pair2Length=\"0\" ");
+        else {
+            printf("Pair2Length=\"%d.%d\" ", res.pair1to2_distance_025m / 4, (res.pair1to2_distance_025m % 4) * 25);
+        }
+        printf("Pair3Status=\"%s\" ", cablestatus2str(res.pair3to6_status));
+        if (res.pair3to6_status <= 0)
+           printf("Pair3Length=\"0\" ");
+        else {
+           printf("Pair3Length=\"%d.%d\" ", res.pair3to6_distance_025m / 4, (res.pair3to6_distance_025m % 4) * 25);
+        }
+        printf("/>\n");
+     }
+    }
+    printf("</cableDiagTable>\n");
     return;
 }
 
@@ -553,6 +708,35 @@ void do_vlan_tmpl(int mode){
    if (!swconfig.vlan.s.config.enable) { printf("WARNING: vlan mode not enabled\n"); } 
    do_vlan_enable_vlan(swconfig.vlan.s.config.dot1q,1);
  }
+}
+
+void do_vlan_leaky(int mode,int state)
+{
+    swconfig.vlan.raw[0]=rtl83xx_readreg16(0x030b);
+    switch (mode){
+        case 1: // arp
+            swconfig.vlan.s.config.arp_leaky = state;
+            break;
+        case 2: // multicast
+            swconfig.vlan.s.config.multicast_leaky = state;
+            break;
+        case 3: // unicast
+            swconfig.vlan.s.config.unicast_leaky = state;
+            break;
+    }
+    rtl83xx_setreg16(0x030b,swconfig.vlan.raw[0]);
+}
+
+void do_vlan_drop(int mode,int state)
+{
+    swconfig.vlan.raw[0]=rtl83xx_readreg16(0x030b);
+    switch (mode){
+        case 1: // untagged_frames
+            swconfig.vlan.s.config.drop_untagged_frames = state;
+        case 2: // invalid_vid
+            swconfig.vlan.s.config.ingress_filtering = state;
+    }
+    rtl83xx_setreg16(0x030b,swconfig.vlan.raw[0]);
 }
 
 int compare_command(char *argv, char **command_list){
@@ -1143,12 +1327,13 @@ void do_igmp_snooping(int is_enabled){
     rtl83xx_setreg16(0x0308,swconfig.alt_igmp_snooping.raw);
 }
 
-int do_capture_mac_address(const char *iface_list)
+int do_capture_mac_address(const char *iface_list, int time_sec)
 {
    uint8_t fport;
    uint16_t alt_conf_300, learn_ctrl_301, learn_ctrl_302;
    uint16_t new_alt_conf_300, new_learn_ctrl_301, new_learn_ctrl_302;
-   uint32_t old_mac[3];
+   uint32_t old_macs[1024][3];
+   int old_macs_count, i;
    uint32_t tmp;
    uint32_t reg302_mask;
    unsigned cnt;
@@ -1242,17 +1427,17 @@ int do_capture_mac_address(const char *iface_list)
    rtl83xx_readreg32_(0x0303, &tmp);
    if (break_capture_mac) goto restore_capture_status;
 
-   printf("Capturing mac addresses for %u seconds\n", DEFAULT_CAPTURE_MAC_TIME_SEC);
+   printf("Capturing mac addresses for %u seconds\n", time_sec);
    if (gettimeofday(&starttime, NULL) < 0)
        goto restore_capture_status;
 
    maxtime = starttime;
-   maxtime.tv_sec += DEFAULT_CAPTURE_MAC_TIME_SEC;
+   maxtime.tv_sec += time_sec;
 
-   engage_timeout(DEFAULT_CAPTURE_MAC_TIME_SEC+5);
+   engage_timeout(time_sec+5);
 
-   old_mac[0] = old_mac[1] = old_mac[2] = 0xffffffff;
-   for (; break_capture_mac==0; usleep(300000)) {
+   memset(old_macs, 0xff, sizeof(old_macs));
+   for (old_macs_count = 0; (break_capture_mac==0) && (old_macs_count < 1024); usleep(300000)) {
       unsigned if2;
       uint32_t unk_sa_status;
       uint32_t new_mac[3];
@@ -1284,12 +1469,18 @@ int do_capture_mac_address(const char *iface_list)
 	 continue;
       }
 
-      if (!((old_mac[0] == new_mac[0])
-	    && (old_mac[1] == new_mac[1])
-	    && (old_mac[2] == new_mac[2])))
-      {
-	 if2 = map_port_number_from_physical_to_logical(unk_sa_status & 0x1f);
-	 printf("MAC: %02x:%02x:%02x:%02x:%02x:%02x Port: %u\n",
+      for (i = 0; i < old_macs_count; i++) {
+          if ((old_macs[i][0] == new_mac[0])
+                && (old_macs[i][1] == new_mac[1])
+                && (old_macs[i][2] == new_mac[2]))
+          {
+              break;
+          }
+      }
+      if (i != old_macs_count) continue;
+
+      if2 = map_port_number_from_physical_to_logical(unk_sa_status & 0x1f);
+      printf("MAC: %02x:%02x:%02x:%02x:%02x:%02x Port: %u\n",
 	       new_mac[0] & 0xff,
 	       new_mac[0] >> 8 & 0xff,
 	       new_mac[1] & 0xff,
@@ -1298,10 +1489,10 @@ int do_capture_mac_address(const char *iface_list)
 	       new_mac[2] >> 8 & 0xff,
 	       if2
 	       );
-	 old_mac[0] = new_mac[0];
-	 old_mac[1] = new_mac[1];
-	 old_mac[2] = new_mac[2];
-      }
+      old_macs[old_macs_count][0] = new_mac[0];
+      old_macs[old_macs_count][1] = new_mac[1];
+      old_macs[old_macs_count][2] = new_mac[2];
+      old_macs_count++;
    } /* for */
 
 restore_capture_status:
@@ -1404,7 +1595,7 @@ void print_usage(void){
 	 " show interface [<list ports>] summary - print port rx/tx counters\n"
 	 " show interface [<list ports>] cable-diagnostics - cabe diagnostics\n"
 	 " show interface [<list ports>] phy-status        - PHY status\n"
-	 " capture interface <list ports> mac-address - capure mac-addresses\n"
+	 " capture interface <list ports> mac-address [<time-sec>] - capure mac-addresses\n"
 	 " show vlan [vid <id>]                  - show low-level vlan confg\n"
 	 " show version                          - system hardware and software status\n"
 	 " scan [verbose] [retries <number>]     - scan network for rrcp-enabled switches\n"
@@ -1432,6 +1623,8 @@ void print_usage(void){
 	 " config vlan add port <port-list> index <idx-list> - add port(s) in VLAN table on index\n"
 	 " config vlan delete port <port-list> index <idx-list> - delete port(s) from VLAN table on index\n"
 	 " config vlan index <idx-list> vid <vid> - set VLAN ID for index in VLAN table\n"
+         " config [no] vlan leaky arp|multicast|unicast - Allow certain type of packets to be switched beetween VLANs\n"
+         " config [no] vlan drop untagged_frames|invalid_vid - Allow dropping certain types of non-conforming packets\n"
 	 " config mac-address <mac>              - set a new <mac> address to switch and reboot\n"
 	 " config mac-address-table aging-time|drop-unknown <arg>  - address lookup table control\n"
 	 " config flowcontrol dot3x enable|disable - globally disable full duplex flow control (802.3x pause)\n"
@@ -1467,7 +1660,7 @@ void print_supported_switches() {
 int main(int argc, char **argv){
     unsigned int x[6];
     unsigned int ak;
-    int i;
+    int i, r;
     int media_speed=0;
     int direction=0;
     int bandw=0;
@@ -1489,7 +1682,7 @@ int main(int argc, char **argv){
     char *show_sub_cmd[]={"running-config","startup-config","interface","vlan","version",""};
     char *scan_sub_cmd[]={"verbose","retries",""};
     char *show_sub_cmd_l2[]={"full","verbose",""};
-    char *show_sub_cmd_l3[]={"summary","cable-diagnostics","phy-status",""};
+    char *show_sub_cmd_l3[]={"summary","cable-diagnostics","phy-status","xml","xml-cable-diagnostics","crc-summary","router-port",""};
     char *show_sub_cmd_l4[]={"id",""};
     char *reset_sub_cmd[]={"soft","hard",""};
     char *write_sub_cmd[]={"memory","eeprom","defaults",""};
@@ -1504,11 +1697,13 @@ int main(int argc, char **argv){
     char *config_alt[]={"aging-time","unknown-destination",""};
     char *config_alt_time[]={"0","12","300",""};
     char *config_alt_dest[]={"drop","pass",""};
-    char *config_vlan[]={"disable","transparent","clear","mode","template-load","add","delete","index",""};
+    char *config_vlan[]={"disable","transparent","clear","mode","template-load","add","delete","index","leaky","drop",""};
     char *config_vlan_mode[]={"portbased","dot1q",""};
     char *config_vlan_tmpl[]={"portbased","dot1qtree",""};
     char *config_vlan_port[]={"port","index",""};
     char *config_vlan_idx[]={"vid",""};
+    char *config_vlan_leaky[]={"arp","multicast","unicast",""};
+    char *config_vlan_drop[]={"untagged_frames","invalid_vid",""};
     char *config_flowc[]={"dot3x","backpressure","ondemand-disable",""};
     char *config_storm[]={"broadcast","multicast",""};
     char *config_storm_br[]={"relaxed","strict",""};
@@ -1605,12 +1800,16 @@ int main(int argc, char **argv){
 	exit(0);
     }
 
-    if (argc<2 || strcmp(argv[2],"scan")!=0){
-	printf("! rtl83xx: trying to reach %d-port \"%s %s\" switch at %s\n",
-	    switchtypes[switchtype].num_ports,
-	    switchtypes[switchtype].vendor,
-	    switchtypes[switchtype].model,
-	    argv[1]);
+    if ((argc > 4 && strncmp(argv[4],"xml",3)==0) || (argc > 5 && strncmp(argv[5],"xml",3)==0)) {
+        out_xml = 1;
+    } else {
+        if (argc<2 || strcmp(argv[2],"scan")!=0){
+            printf("! rtl83xx: trying to reach %d-port \"%s %s\" switch at %s\n",
+                switchtypes[switchtype].num_ports,
+                switchtypes[switchtype].vendor,
+                switchtypes[switchtype].model,
+                argv[1]);
+        }
     }
 
     engage_timeout(30);
@@ -1655,6 +1854,18 @@ int main(int argc, char **argv){
 			     case 2: /* phy-status */
 				print_port_phy_status(p_port_list);
 				break;
+                             case 3: /* xml */
+                                print_link_status_xml(p_port_list);
+                                break;
+                             case 4: /* xml-cable-diagnostics */
+                                print_cable_diagnostics_xml(p_port_list);
+                                break;
+                             case 5: /* crc-summary */
+                                print_counters_crc(p_port_list);
+                                break;
+                             case 6: /* router-port */
+                                print_router_port(p_port_list);
+                                break;
 			     default:
 				print_unknown(argv[4+shift],&show_sub_cmd_l3[0]);
 				break;
@@ -1881,6 +2092,16 @@ int main(int argc, char **argv){
 					   exit(1);
 					}
 					exit(0);
+                                 case 8: // leaky
+                                        check_argc(argc,4+shift,NULL,&config_vlan_leaky[0]);
+                                        subcmd=get_cmd_num(argv[5+shift],-1,NULL,&config_vlan_leaky[0]);
+                                        do_vlan_leaky(subcmd+1,!negate);
+                                        exit(0);
+                                 case 9: // drop
+                                        check_argc(argc,4+shift,NULL,&config_vlan_drop[0]);
+                                        subcmd=get_cmd_num(argv[5+shift],-1,NULL,&config_vlan_drop[0]);
+                                        do_vlan_drop(subcmd+1,!negate);
+                                        exit(0);
                                  default:
                                          print_unknown(argv[4+shift],&config_vlan[0]);
                           } /* switch */
@@ -1893,10 +2114,14 @@ int main(int argc, char **argv){
                               exit(1);
                           }
 		          for (i=0;i<6;i++){
-		            if (do_write_eeprom_byte(0x12+i,(unsigned char)x[i])){
-		             printf ("error writing eeprom!\n");
-		             exit(1);
-		            }
+                              for (r = 0; r < 10 && do_write_eeprom_byte(0x12+i,(unsigned char)x[i]); r++) {
+                                  printf("Can't write 0x%02x to EEPROM 0x%03x\n",(unsigned char)x[i],0x12+i);
+                                  usleep(100000);
+                              }
+                              if (r > 9) {
+                                  printf ("error writing eeprom!\n");
+                                  exit(1);
+                              }
 	                  }
 		          do_reboot();
                           exit(0);
@@ -2140,12 +2365,19 @@ int main(int argc, char **argv){
 		{
 		   char *interface_cmd[] = {"interface", ""};
 		   char *macaddr_cmd[] = {"mac-address", ""};
+                   int capture_mac_time_sec = DEFAULT_CAPTURE_MAC_TIME_SEC;
 
 		   check_argc(argc, 3+shift, NULL, &interface_cmd[0]);
 		   check_argc(argc, 4+shift, "Interface number nedded\n", NULL);
 		   get_cmd_num(argv[5+shift], -1, NULL, &macaddr_cmd[0]);
+                   if (argc > 6+shift) {
+                       if (sscanf(argv[6+shift], "%i",&capture_mac_time_sec) != 1) {
+                           printf("Incorrect time sec: \"%s\"\n",argv[6+shift]);
+                           exit(0);
+                       }
+                   }
 
-		   if (do_capture_mac_address(argv[4+shift]) != 0) {
+		   if (do_capture_mac_address(argv[4+shift], capture_mac_time_sec) != 0) {
 		      fputs(ErrMsg, stdout);
 		      exit(1);
 		   }

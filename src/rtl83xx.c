@@ -1428,6 +1428,7 @@ int do_capture_mac_address(const char *iface_list, int time_sec)
    if (break_capture_mac) goto restore_capture_status;
 
    printf("Capturing mac addresses for %u seconds\n", time_sec);
+   fflush(stdout);
    if (gettimeofday(&starttime, NULL) < 0)
        goto restore_capture_status;
 
@@ -1489,6 +1490,7 @@ int do_capture_mac_address(const char *iface_list, int time_sec)
 	       new_mac[2] >> 8 & 0xff,
 	       if2
 	       );
+      fflush(stdout);
       old_macs[old_macs_count][0] = new_mac[0];
       old_macs[old_macs_count][1] = new_mac[1];
       old_macs[old_macs_count][2] = new_mac[2];

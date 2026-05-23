@@ -43,7 +43,7 @@ extern uint16_t authkey;
 extern unsigned char my_mac[6];
 extern unsigned char dest_mac[6];
 #ifdef __linux__
-extern unsigned int if_nametoindex (__const char *__ifname) __THROW;
+#include <net/if.h>
 #endif
 
 struct rrcp_packet_t;

@@ -1141,7 +1141,7 @@ void do_port_config_mirror(int dir,unsigned short int *arr, int dest_port ){
   }
 }
 
-void do_alt_config(mode){
+void do_alt_config(int mode){
   swconfig.alt_config.raw=rtl83xx_readreg16(0x0300);
   switch (mode){
     case 1: 

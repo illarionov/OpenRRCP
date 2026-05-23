@@ -146,7 +146,7 @@ int rrcp_config_get_port_log_num(const char *port)
       || (port[0] == '\0'))
       return -1;
 
-   if (sscanf(port, "%20[a-zA-Z0-9]/%d", name, &port_num) != 2)
+   if (sscanf(port, "%19[a-zA-Z0-9]/%d", name, &port_num) != 2)
       return -1;
 
    if ((strncasecmp("FastEthernet0", name, sizeof(name)) == 0)

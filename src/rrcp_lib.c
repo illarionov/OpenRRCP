@@ -74,9 +74,9 @@ int parse_switch_id(const char *str) {
    unsigned char x[6];
    char ifn[128];
 
-   if (sscanf(str, "%4x-%2hhx:%2hhx:%2hhx:%2hhx:%2hhx:%2hhx@%128s",&key,x,x+1,x+2,x+3,x+4,x+5,ifn)==8){
+   if (sscanf(str, "%4x-%2hhx:%2hhx:%2hhx:%2hhx:%2hhx:%2hhx@%127s",&key,x,x+1,x+2,x+3,x+4,x+5,ifn)==8){
 	 authkey=(uint16_t)key;
-   }else if (sscanf(str, "%2hhx:%2hhx:%2hhx:%2hhx:%2hhx:%2hhx@%128s",x,x+1,x+2,x+3,x+4,x+5,ifn)==7){
+   }else if (sscanf(str, "%2hhx:%2hhx:%2hhx:%2hhx:%2hhx:%2hhx@%127s",x,x+1,x+2,x+3,x+4,x+5,ifn)==7){
    }else
       return -1;
 

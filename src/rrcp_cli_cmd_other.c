@@ -213,6 +213,7 @@ int cmd_copy(struct cli_def *cli, char *command, char *argv[], int argc)
 		    if ((f=fopen(s,"r"))!=NULL){
 		    	l=fread(buf,1,sizeof(buf),f);
 			if (l!=eeprom_type_size[swconfig.eeprom_type]){
+			    fclose(f);
 			    cli_print(cli, "%% ERROR: File size (%d bytes) does not match EEPROM size (%d bytes)",l,eeprom_type_size[swconfig.eeprom_type]);
 			    return CLI_ERROR;
 			}else{

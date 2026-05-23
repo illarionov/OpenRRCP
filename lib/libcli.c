@@ -3,6 +3,11 @@
 #include <errno.h>
 #include <stdarg.h>
 #include <stdlib.h>
+#include <stdint.h>
+#include <stddef.h>
+#include <sys/time.h>
+#include <sys/types.h>
+#include <sys/select.h>
 #include <memory.h>
 #ifdef __linux__
 #include <malloc.h>
@@ -472,7 +477,7 @@ int cli_add_history(struct cli_def *cli, char *cmd)
 	}
 	// No space found, drop one off the beginning of the list
 	free(cli->history[0]);
-	for (i = 0; i < MAX_HISTORY; i++)
+	for (i = 0; i < MAX_HISTORY - 1; i++)
 		cli->history[i] = cli->history[i+1];
 	cli->history[MAX_HISTORY - 1] = strdup(cmd);
 	return CLI_OK;
@@ -799,9 +804,9 @@ int cli_get_completions(struct cli_def *cli, char *command, char **completions, 
 	c=cli->commands;
 	sp=command;
 	while (1){
-		unsigned int l;
-		if ((l=(unsigned int)strchr(sp,' '))==0) break;
-		l-=(unsigned int)sp;
+		ptrdiff_t l;
+		if ((l=(uintptr_t)strchr(sp,' '))==0) break;
+		l-=(uintptr_t)sp;
     		for (; c; c = c->next)
 		{
 			if (strncasecmp(sp, c->command, l) == 0 && c->children && cli->privilege >= c->privilege && (c->mode == cli->mode || c->mode == MODE_ANY))
@@ -899,7 +904,7 @@ int cli_loop(struct cli_def *cli, int sockfd)
 
 	cli->state = STATE_LOGIN;
 
-	memset(cli->history, 0, MAX_HISTORY);
+	memset(cli->history, 0, sizeof(cli->history));
 	if (sockfd>0){
 		write(sockfd, negotiate, strlen(negotiate));
 	}
